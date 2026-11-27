@@ -21,6 +21,7 @@ use crate::{
     login, private,
     registration_form::Fields,
     settings::Settings,
+    staff_debater,
     staff_pairing::lock_round,
     staff_rankings, staff_roles, staff_room,
     staff_roster_data::{self as data, Edit, Error, Kind},
@@ -500,37 +501,10 @@ async fn save_edit(
     fields: &Fields,
     return_path: &str,
 ) -> Result<Response, Error> {
-    let Some(session) = legacy_session::cookie(headers, "sessionid") else {
-        return Ok(access::access_denied());
-    };
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
-    // Refresh authorization after waiting for the tournament write lock.
-    let current =
-        match legacy_session::actor_on(&mut db, session, app.django_secret.as_deref()).await {
-            Ok(
-                actor @ Actor::User {
-                    id, board: false, ..
-                },
-            ) if id == user => actor,
-            Err(SessionError::Database) => return Err(Error::Database),
-            _ => return Ok(access::access_denied()),
-        };
-    let checkins = match current {
-        Actor::User {
-            superuser: true, ..
-        } => true,
-        Actor::User { staff: true, .. } => {
-            let Some(preset) = staff_roles::preset_on(&mut *db, user)
-                .await?
-                .filter(|preset| preset.data_entry())
-            else {
-                return Ok(access::access_denied());
-            };
-            preset.checkins()
-        }
-        _ if access::legacy_entry_user(&mut *db, user).await? => false,
-        _ => return Ok(access::access_denied()),
+    let Some((current, checkins)) = roster_writer(app, &mut db, headers, user, true).await? else {
+        return Ok(access::access_denied());
     };
     let result = data::save_on(
         &mut db,
@@ -547,11 +521,19 @@ async fn save_edit(
     match result {
         Ok(saved) => {
             db.commit().await?;
-            if matches!(kind, Kind::School | Kind::Room) {
+            if matches!(kind, Kind::School | Kind::Room | Kind::Debater) {
                 let name = fields.get("name");
                 let (target, message) = if id.is_some() {
                     // The Django room edit also uses "School" in its success message.
-                    (return_path, format!("School {name} updated successfully"))
+                    let subject = if kind == Kind::Room {
+                        "School"
+                    } else {
+                        kind.singular()
+                    };
+                    (
+                        return_path,
+                        format!("{subject} {name} updated successfully"),
+                    )
                 } else {
                     (
                         "/",
@@ -580,6 +562,40 @@ async fn save_edit(
     }
 }
 
+async fn roster_writer(
+    app: &App,
+    db: &mut MySqlConnection,
+    headers: &HeaderMap,
+    user: i32,
+    allow_entry: bool,
+) -> Result<Option<(Actor, bool)>, Error> {
+    // The caller holds the tournament write lock. Check the session and role again.
+    let Some(session) = legacy_session::cookie(headers, "sessionid") else {
+        return Ok(None);
+    };
+    let actor = match legacy_session::actor_on(db, session, app.django_secret.as_deref()).await {
+        Ok(
+            actor @ Actor::User {
+                id, board: false, ..
+            },
+        ) if id == user => actor,
+        Err(SessionError::Database) => return Err(Error::Database),
+        _ => return Ok(None),
+    };
+    let checkins = match actor {
+        Actor::User {
+            superuser: true, ..
+        } => Some(true),
+        Actor::User { staff: true, .. } => staff_roles::preset_on(&mut *db, user)
+            .await?
+            .filter(|preset| preset.data_entry())
+            .map(|preset| preset.checkins()),
+        _ if allow_entry && access::legacy_entry_user(&mut *db, user).await? => Some(false),
+        _ => None,
+    };
+    Ok(checkins.map(|checkins| (actor, checkins)))
+}
+
 async fn show(
     app: &App,
     actor: Actor,
@@ -597,6 +613,9 @@ async fn show(
             Some(staff_school::show(app, actor, headers, id, return_path, posted).await)
         }
         Kind::Room => Some(staff_room::show(app, actor, headers, id, return_path, posted).await),
+        Kind::Debater => {
+            Some(staff_debater::show(app, actor, headers, id, return_path, posted).await)
+        }
         _ => None,
     };
     if let Some(legacy) = legacy {
@@ -738,27 +757,21 @@ async fn form_fields(
 ) -> Result<Vec<FormField>, sqlx::Error> {
     let field = |name, label, control| FormField::new(values, name, label, control);
     let mut output = vec![field("name", "Name", "text").input(true, kind.limit())];
-    if kind == Kind::Debater {
-        output.push(field("apda_id", "APDA ID", "number"));
-    }
     if kind == Kind::Judge {
         let mut rank = field("rank", "Rank", "number");
         rank.required = true;
         rank.step = Some("0.01");
         output.push(rank);
     }
-    if matches!(kind, Kind::Debater | Kind::Judge) {
+    if kind == Kind::Judge {
         output.push(field("email", "Email", "email").input(false, 254));
         for &(name, label) in BASE {
             output.push(field(name, label, "checkbox"));
         }
     }
-    if matches!(kind, Kind::Debater | Kind::Judge | Kind::Team) {
+    if matches!(kind, Kind::Judge | Kind::Team) {
         let choices = options(db, "SELECT id, name FROM tab_school ORDER BY name, id").await?;
         match kind {
-            Kind::Debater => {
-                output.push(field("school", "School", "select").choices(choices, false))
-            }
             Kind::Judge => output
                 .push(field("schools", "School affiliations", "multi").choices(choices, false)),
             Kind::Team => {
@@ -767,12 +780,8 @@ async fn form_fields(
                     field("hybrid_school", "Hybrid school", "select").choices(choices, false),
                 );
             }
-            Kind::School | Kind::Room => unreachable!(),
+            Kind::School | Kind::Room | Kind::Debater => unreachable!(),
         }
-    }
-    if kind == Kind::Debater {
-        output.push(field("novice_status", "Division", "select").choices(divisions(), true));
-        output.push(field("qualified", "Qualified", "checkbox"));
     }
     if matches!(kind, Kind::Judge | Kind::Team) {
         let registrations = options(db,
@@ -877,10 +886,7 @@ async fn current(
             .collect());
     };
     let fields = match kind {
-        Kind::School | Kind::Room => unreachable!(),
-        Kind::Debater => "'apda_id', apda_id, 'school', school_id, 'email', email, 'qualified', qualified,
-            'needs_crash_housing', needs_crash_housing, 'requests_wgm_housing', requests_wgm_housing,
-            'novice_status', novice_status",
+        Kind::School | Kind::Room | Kind::Debater => unreachable!(),
         Kind::Judge => "'rank', CAST(`rank` AS CHAR), 'email', email, 'registration', registration_id,
             'ballot_code', ballot_code, 'reported_experience', reported_experience, 'wing_only', wing_only,
             'is_dino', is_dino, 'request_wing', request_wing, 'no_wings', no_wings,
@@ -1015,13 +1021,47 @@ pub async fn delete(
     if !login::valid_csrf(&headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
-    match data::delete(&app.db, kind, id).await {
-        Ok(()) => access::found(format!("/view_{}s/", kind.model())),
+    let Actor::User { id: user, .. } = actor else {
+        return access::access_denied();
+    };
+    match delete_entry(&app, &headers, kind, id, user).await {
+        Ok(response) => response,
         Err(Error::Missing) => missing(),
-        Err(Error::Invalid(error)) => {
-            remove_page(&app, actor, &headers, kind, id, Some(error)).await
+        Err(_) => unavailable(),
+    }
+}
+
+async fn delete_entry(
+    app: &App,
+    headers: &HeaderMap,
+    kind: Kind,
+    id: i32,
+    user: i32,
+) -> Result<Response, Error> {
+    let mut db = app.db.begin().await?;
+    lock_round(&mut db).await?;
+    let Some((actor, _)) = roster_writer(app, &mut db, headers, user, false).await? else {
+        return Ok(access::access_denied());
+    };
+    match data::delete_on(&mut db, kind, id).await {
+        Ok(()) => {
+            db.commit().await?;
+            if kind == Kind::Debater {
+                Ok(staff_roster_notice::saved(
+                    app,
+                    headers,
+                    "/",
+                    "Debater deleted successfully",
+                ))
+            } else {
+                Ok(access::found(format!("/view_{}s/", kind.model())))
+            }
         }
-        Err(Error::Database) => unavailable(),
+        Err(Error::Invalid(error)) => {
+            db.rollback().await?;
+            Ok(remove_page(app, actor, headers, kind, id, Some(error)).await)
+        }
+        Err(error) => Err(error),
     }
 }
 

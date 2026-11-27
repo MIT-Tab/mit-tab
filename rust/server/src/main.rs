@@ -82,6 +82,7 @@ mod settings;
 mod settings_form;
 mod speakers;
 mod spreadsheets;
+mod staff_debater;
 mod staff_elimination;
 mod staff_elimination_assign;
 mod staff_elimination_page;

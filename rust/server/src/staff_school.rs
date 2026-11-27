@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, num::IntErrorKind};
+use std::collections::BTreeMap;
 
 use axum::{
     http::{HeaderMap, StatusCode},
@@ -12,9 +12,9 @@ use crate::{
     App, legacy_html,
     legacy_session::Actor,
     login::TemplateCsrf,
-    registration_form::{Fields, integer_input},
+    registration_form::Fields,
     staff_roster_data::{Error, Kind},
-    staff_roster_fields::{input, name_error},
+    staff_roster_fields::{apda_id_error, input, name_error},
     staff_roster_notice, unavailable,
 };
 
@@ -112,22 +112,7 @@ async fn school_fields(
         name = fields.all("name").last().cloned().unwrap_or_default();
         apda_id = fields.all("apda_id").last().cloned().unwrap_or_default();
         invalid_name = name_error(db, Kind::School, id, &name, message).await?;
-        if !apda_id.trim().is_empty()
-            && let Err(error) = integer_input(apda_id.trim())
-        {
-            id_error = Some(
-                match error.kind() {
-                    IntErrorKind::PosOverflow => {
-                        "Ensure this value is less than or equal to 2147483647."
-                    }
-                    IntErrorKind::NegOverflow => {
-                        "Ensure this value is greater than or equal to -2147483648."
-                    }
-                    _ => "Enter a whole number.",
-                }
-                .into(),
-            );
-        }
+        id_error = apda_id_error(&apda_id);
     }
     Ok([
         input(

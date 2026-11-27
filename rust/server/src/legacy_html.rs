@@ -358,6 +358,10 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/tab/room_detail.html"),
         ),
         (
+            "tab/debater_detail.html",
+            include_str!("../../../mittab/templates/tab/debater_detail.html"),
+        ),
+        (
             "ui/form.html",
             include_str!("../../../mittab/templates/ui/form.html"),
         ),
@@ -725,6 +729,14 @@ fn translate(name: &str, source: &str) -> String {
             .replace("round.judges.all", "round.judges")
             .replace("judge != round.chair", "judge.id != round.chair_id")
             .replace("judge != outround.chair", "judge.id != outround.chair_id"),
+        "tab/debater_detail.html" => translated
+            .replace("round.round.judges.all", "round.round.judges")
+            .replace("judge != round.round.chair", "judge.id != round.round.chair_id")
+            .replace("debater_obj.ranking_groups.count", "ranking_groups")
+            .replace("debater_obj.ranking_groups.all", "ranking_groups")
+            .replace("{{ team_school.team }}", "{{ team_school.team.name }}")
+            .replace("{{ team_school.school }}", "{{ team_school.school.name }}")
+            .replace("{{ team_school.hybrid_school }}", "{{ team_school.hybrid_school.name }}"),
         "tab/_email_preview.html" => translated.replace(
             "|default:email.to_address", "|django_default(email.to_address)",
         ).replace("{{ email.html_body }}", "{{ email.html_body|isolated_email_preview }}"),

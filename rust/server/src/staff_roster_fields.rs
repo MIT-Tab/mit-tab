@@ -1,7 +1,12 @@
+use std::{fmt::Write, num::IntErrorKind};
+
 use minijinja::{Value, context};
 use sqlx::{AssertSqlSafe, MySqlConnection};
 
-use crate::{legacy_html::escape, staff_roster_data::Kind};
+use crate::{
+    admin_model_data::valid_email, legacy_html::escape, registration_form::integer_input,
+    staff_roster_data::Kind,
+};
 
 pub async fn name_error(
     db: &mut MySqlConnection,
@@ -49,11 +54,11 @@ fn attributes(id: &str, style: &str, invalid: bool) -> String {
     }
 }
 
-fn widget(id: &str, label: &str, input: String, error: Option<String>, checkbox: bool) -> Value {
+fn widget(id: &str, label: &str, input: String, errors: Vec<String>, checkbox: bool) -> Value {
     let label = escape(label);
     let label_tag = Value::from_safe_string(format!(r#"<label for="{id}">{label}</label>"#));
-    let error_id = error.as_ref().map(|_| format!("{id}_error"));
-    context! { label_tag, input, errors => error.into_iter().collect::<Vec<_>>(), error_id, checkbox }
+    let error_id = (!errors.is_empty()).then(|| format!("{id}_error"));
+    context! { label_tag, input, errors, error_id, checkbox }
 }
 
 pub fn input(
@@ -63,7 +68,7 @@ pub fn input(
     value: &str,
     attributes_before_class: &str,
     required: bool,
-    error: Option<String>,
+    errors: impl IntoIterator<Item = String>,
 ) -> Value {
     let id = format!("id_{name}");
     let value = if value.is_empty() {
@@ -71,12 +76,13 @@ pub fn input(
     } else {
         format!(r#" value="{}""#, escape(value))
     };
-    let attrs = attributes(&id, "form-control", error.is_some());
+    let errors: Vec<_> = errors.into_iter().collect();
+    let attrs = attributes(&id, "form-control", !errors.is_empty());
     let required = if required { " required" } else { "" };
     let input = format!(
         r#"<input type="{kind}" name="{name}"{value}{attributes_before_class} {attrs}{required} id="{id}">"#,
     );
-    widget(&id, label, input, error, false)
+    widget(&id, label, input, errors, false)
 }
 
 pub fn multi_select(
@@ -86,26 +92,79 @@ pub fn multi_select(
     selected: &[String],
     error: Option<String>,
 ) -> Value {
-    use std::fmt::Write;
-
     let id = format!("id_{name}");
     let attrs = attributes(&id, "form-control", error.is_some());
     let mut input = format!(r#"<select name="{name}" {attrs} id="{id}" multiple>"#);
     for (value, label) in options {
-        let checked = if selected.contains(value) {
-            " selected"
-        } else {
-            ""
-        };
-        let value = escape(value);
-        let label = escape(label);
-        let _ = write!(
-            input,
-            "\n  <option value=\"{value}\"{checked}>{label}</option>\n"
-        );
+        option(&mut input, value, label, selected.contains(value));
     }
     input.push_str("\n</select>");
-    widget(&id, label, input, error, false)
+    widget(&id, label, input, error.into_iter().collect(), false)
+}
+
+pub fn select(
+    name: &str,
+    label: &str,
+    options: &[(String, String)],
+    selected: &str,
+    required: bool,
+    error: Option<String>,
+) -> Value {
+    let id = format!("id_{name}");
+    let attrs = attributes(&id, "form-control", error.is_some());
+    let required = if required { " required" } else { "" };
+    let mut input = format!(r#"<select name="{name}" {attrs}{required} id="{id}">"#);
+    option(&mut input, "", "---------", selected.is_empty());
+    for (value, label) in options {
+        option(&mut input, value, label, selected == value);
+    }
+    input.push_str("\n</select>");
+    widget(&id, label, input, error.into_iter().collect(), false)
+}
+
+fn option(input: &mut String, value: &str, label: &str, selected: bool) {
+    let selected = if selected { " selected" } else { "" };
+    let value = escape(value);
+    let label = escape(label);
+    let _ = write!(
+        input,
+        "\n  <option value=\"{value}\"{selected}>{label}</option>\n"
+    );
+}
+
+pub fn apda_id_error(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let error = integer_input(value).err()?;
+    Some(
+        match error.kind() {
+            IntErrorKind::PosOverflow => "Ensure this value is less than or equal to 2147483647.",
+            IntErrorKind::NegOverflow => {
+                "Ensure this value is greater than or equal to -2147483648."
+            }
+            _ => "Enter a whole number.",
+        }
+        .into(),
+    )
+}
+
+pub fn email_errors(value: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    if !value.is_empty() && !valid_email(value) {
+        errors.push("Enter a valid email address.".into());
+    }
+    let length = value.chars().count();
+    if length > 254 {
+        errors.push(format!(
+            "Ensure this value has at most 254 characters (it has {length})."
+        ));
+    }
+    if value.contains('\0') {
+        errors.push("Null characters are not allowed.".into());
+    }
+    errors
 }
 
 pub fn checkbox(name: &str, label: &str, value: bool) -> Value {
@@ -114,7 +173,7 @@ pub fn checkbox(name: &str, label: &str, value: bool) -> Value {
     let input = format!(
         r#"<input type="checkbox" name="{name}" class="form-check-input" id="{id}"{checked}>"#
     );
-    widget(&id, label, input, None, true)
+    widget(&id, label, input, Vec::new(), true)
 }
 
 pub fn rank_input(value: &str) -> Result<String, &'static str> {

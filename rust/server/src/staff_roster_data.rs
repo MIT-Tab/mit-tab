@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, ops::RangeInclusive};
 
 use serde_json::json;
-use sqlx::{AssertSqlSafe, MySqlConnection, MySqlPool, QueryBuilder};
+use sqlx::{AssertSqlSafe, MySqlConnection, QueryBuilder};
 
 use crate::{
     codes::{self, Credential},
@@ -9,8 +9,7 @@ use crate::{
     registration_form::{Fields, integer_input, length, valid_email},
     roster_log,
     settings::Settings,
-    staff_pairing::lock_round,
-    staff_roster_fields::rank_input,
+    staff_roster_fields::{email_errors, rank_input},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -315,12 +314,7 @@ pub async fn save_on(db: &mut MySqlConnection, kind: Kind, edit: Edit<'_>) -> Re
 }
 
 async fn save_school(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Result<i32, Error> {
-    let apda_id = edit.fields.get("apda_id");
-    let apda_id = if apda_id.is_empty() {
-        None
-    } else {
-        Some(integer_input(apda_id).map_err(|_| Error::Invalid("Enter a valid number."))?)
-    };
+    let apda_id = apda_id(edit.fields)?;
     if let Some(id) = edit.id {
         sqlx::query("UPDATE tab_school SET name = ?, apda_id = ? WHERE id = ?")
             .bind(name)
@@ -336,6 +330,17 @@ async fn save_school(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> R
         .execute(db)
         .await?;
     Ok(result.last_insert_id() as i32)
+}
+
+fn apda_id(fields: &Fields) -> Result<Option<i32>, Error> {
+    let value = fields.get("apda_id");
+    if value.is_empty() {
+        Ok(None)
+    } else {
+        integer_input(value)
+            .map(Some)
+            .map_err(|_| Error::Invalid("Enter a valid number."))
+    }
 }
 
 async fn save_room(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Result<i32, Error> {
@@ -383,21 +388,29 @@ async fn save_room(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Res
 async fn save_debater(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Result<i32, Error> {
     let fields = edit.fields;
     let school = foreign(db, fields, "school", "tab_school").await?;
-    let email = optional_email(fields)?;
-    let apda_id = integer(fields, "apda_id")?;
-    let status = enum_value(fields, "novice_status", 1, 0)?;
+    let email = fields.get("email");
+    if !email_errors(email).is_empty() {
+        return Err(Error::Invalid("Enter a valid email address."));
+    }
+    let email = (!email.is_empty()).then_some(email);
+    let apda_id = apda_id(fields)?;
+    let status = match fields.all("novice_status").last().map(String::as_str) {
+        Some("0") => 0,
+        Some("1") => 1,
+        _ => return Err(Error::Invalid("Choose a valid novice status.")),
+    };
     let qualified = fields.flag("qualified");
     let crash = fields.flag("needs_crash_housing");
     let wgm = fields.flag("requests_wgm_housing");
+    let coin = codes::coin(db, false).await?;
     if let Some(id) = edit.id {
         sqlx::query(
             "UPDATE tab_debater SET name = ?, school_id = ?, email = ?, apda_id = ?, novice_status = ?,
-             qualified = ?, needs_crash_housing = ?, requests_wgm_housing = ? WHERE id = ?",
+             qualified = ?, needs_crash_housing = ?, requests_wgm_housing = ?, tiebreaker = ? WHERE id = ?",
         ).bind(name).bind(school).bind(email).bind(apda_id).bind(status).bind(qualified)
-            .bind(crash).bind(wgm).bind(id).execute(db).await?;
+            .bind(crash).bind(wgm).bind(coin).bind(id).execute(db).await?;
         return Ok(id);
     }
-    let coin = codes::coin(db, false).await?;
     let result = sqlx::query(
         "INSERT INTO tab_debater (name, school_id, email, apda_id, novice_status, qualified,
          needs_crash_housing, requests_wgm_housing, tiebreaker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -690,16 +703,14 @@ async fn audit(
     Ok(())
 }
 
-pub async fn delete(pool: &MySqlPool, kind: Kind, id: i32) -> Result<(), Error> {
-    let mut tx = pool.begin().await?;
-    lock_round(&mut tx).await?;
-    let name = name(&mut tx, kind, id).await?.ok_or(Error::Missing)?;
+pub async fn delete_on(db: &mut MySqlConnection, kind: Kind, id: i32) -> Result<(), Error> {
+    let name = name(db, kind, id).await?.ok_or(Error::Missing)?;
     match kind {
-        Kind::Team => entity_store::delete_team(&mut tx, id).await?,
-        Kind::Judge => entity_store::delete_judge(&mut tx, id).await?,
+        Kind::Team => entity_store::delete_team(db, id).await?,
+        Kind::Judge => entity_store::delete_judge(db, id).await?,
         Kind::Debater => {
             if referenced(
-                &mut tx,
+                db,
                 "SELECT EXISTS(SELECT 1 FROM tab_team_debaters WHERE debater_id = ?)",
                 id,
             )
@@ -709,11 +720,11 @@ pub async fn delete(pool: &MySqlPool, kind: Kind, id: i32) -> Result<(), Error> 
                     "Remove this debater from their team before deleting the debater.",
                 ));
             }
-            entity_store::delete_debater(&mut tx, id).await?;
+            entity_store::delete_debater(db, id).await?;
         }
         Kind::Room => {
             if referenced(
-                &mut tx,
+                db,
                 "SELECT EXISTS(SELECT 1 FROM tab_round WHERE room_id = ?)",
                 id,
             )
@@ -726,11 +737,11 @@ pub async fn delete(pool: &MySqlPool, kind: Kind, id: i32) -> Result<(), Error> 
             let outrounds: Vec<i32> =
                 sqlx::query_scalar("SELECT id FROM tab_outround WHERE room_id = ?")
                     .bind(id)
-                    .fetch_all(&mut *tx)
+                    .fetch_all(&mut *db)
                     .await?;
-            entity_store::delete_outrounds(&mut tx, &outrounds).await?;
+            entity_store::delete_outrounds(db, &outrounds).await?;
             entity_store::delete_links(
-                &mut tx,
+                db,
                 &[id],
                 &[
                     ("tab_roomcheckin", "room_id"),
@@ -742,13 +753,13 @@ pub async fn delete(pool: &MySqlPool, kind: Kind, id: i32) -> Result<(), Error> 
         }
         Kind::School => {
             let teams = referenced(
-                &mut tx,
+                db,
                 "SELECT EXISTS(SELECT 1 FROM tab_team WHERE school_id = ?)",
                 id,
             )
             .await?;
             let judges = referenced(
-                &mut tx,
+                db,
                 "SELECT EXISTS(SELECT 1 FROM tab_judge_schools WHERE school_id = ?)",
                 id,
             )
@@ -759,7 +770,7 @@ pub async fn delete(pool: &MySqlPool, kind: Kind, id: i32) -> Result<(), Error> 
                 ));
             }
             let registrations = referenced(
-                &mut tx,
+                db,
                 "SELECT EXISTS(SELECT 1 FROM registration_registration WHERE school_id = ?)",
                 id,
             )
@@ -771,21 +782,21 @@ pub async fn delete(pool: &MySqlPool, kind: Kind, id: i32) -> Result<(), Error> 
             }
             sqlx::query("UPDATE tab_team SET hybrid_school_id = NULL WHERE hybrid_school_id = ?")
                 .bind(id)
-                .execute(&mut *tx)
+                .execute(&mut *db)
                 .await?;
             sqlx::query("UPDATE tab_debater SET school_id = NULL WHERE school_id = ?")
                 .bind(id)
-                .execute(&mut *tx)
+                .execute(&mut *db)
                 .await?;
             sqlx::query("DELETE FROM tab_school WHERE id = ?")
                 .bind(id)
-                .execute(&mut *tx)
+                .execute(&mut *db)
                 .await?;
         }
     }
-    if matches!(kind, Kind::Team | Kind::Judge) && roster_log::enabled(&mut tx).await? {
+    if matches!(kind, Kind::Team | Kind::Judge) && roster_log::enabled(db).await? {
         roster_log::record(
-            &mut tx,
+            db,
             if kind == Kind::Team {
                 "teams"
             } else {
@@ -796,7 +807,6 @@ pub async fn delete(pool: &MySqlPool, kind: Kind, id: i32) -> Result<(), Error> 
         )
         .await?;
     }
-    tx.commit().await?;
     Ok(())
 }
 

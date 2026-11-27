@@ -4279,9 +4279,196 @@ def test_room_roster_forms_and_history_match_django(html_assets, subtests):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_native_staff_roster_edits_and_data_entry_scope():
+def test_debater_roster_forms_and_history_match_django(html_assets, subtests):
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("tot_rounds", 2)
+    school = School.objects.create(name="Z & University")
+    partner_school = School.objects.create(name="A <College>")
+    debater = Debater.objects.create(name="Debater <One>", novice_status=1, email="fixture@example.org",
+                                    school=school, apda_id=151, needs_crash_housing=True,
+                                    requests_wgm_housing=True, qualified=True)
+    unattached = Debater.objects.create(name="Unaffiliated Debater", novice_status=0, apda_id=None)
+    team = Team.objects.create(name="Z & Regular Team", school=school, seed=0)
+    hybrid = Team.objects.create(name="A <Hybrid> Team", school=partner_school, seed=0, hybrid_school=school)
+    for member in (team, hybrid):
+        member.debaters.add(debater)
+    for name in ("Z Award <Fixture>", "A Award & Friends"):
+        RankingGroup.objects.create(name=name).debaters.add(debater)
+    room = Room.objects.create(name="Room <History>", rank=3)
+    chair = Judge.objects.create(name="B Chair & Coach", rank=5)
+    wing_a = Judge.objects.create(name="A Wing", rank=3)
+    wing_z = Judge.objects.create(name="Z Wing", rank=3)
+    second = Round.objects.create(round_number=2, gov_team=team, opp_team=hybrid,
+                                  room=room, chair=chair, victor=Round.GOV)
+    second.judges.add(chair, wing_z, wing_a)
+    first = Round.objects.create(round_number=1, gov_team=hybrid, opp_team=team, victor=Round.OPP)
+    first.judges.add(wing_a)
+    latest_score = RoundStats.objects.create(round=second, debater=debater, speaks="27.3750", ranks="2.0000")
+    RoundStats.objects.create(round=first, debater=debater, speaks="28.0000", ranks="1.7500")
+    RoundStats.objects.create(round=second, debater=debater, speaks="27.5000", ranks="3.0000")
+
+    users = get_user_model().objects
+    admin = users.create_superuser(username="debater-form-admin")
+    board = users.create_superuser(username="debater-form-board")
+    board.groups.add(Group.objects.create(name="APDA Board"))
+    entry = users.create_user(username="entry")
+
+    def staff(username, group):
+        user = users.create_user(username=username, is_staff=True)
+        user.groups.add(Group.objects.create(name=group))
+        return user
+
+    helper = staff("debater-form-helper", "MIT-TAB: Data entry helper")
+    assistant = staff("debater-form-assistant", "MIT-TAB: Tab assistant")
+    scratch = staff("debater-form-scratches", "MIT-TAB: Create and view scratches")
+
+    def client_for(user):
+        client = Client()
+        client.force_login(user)
+        client.cookies["csrftoken"] = "a" * 32
+        return client
+
+    create = "/enter_debater/"
+    detail = f"/debater/{debater.id}/"
+    clients = {user.username: client_for(user) for user in (admin, entry, helper, assistant, board, scratch)}
+    with rust_server(overrides=html_assets) as port:
+        for user in (admin, entry, helper, assistant):
+            for path in (create, detail, f"/debater/{unattached.id}/"):
+                with subtests.test(user=user.username, path=path):
+                    compare_admin_page(port, path, clients[user.username])
+
+        invalid = (
+            {"name": "", "email": "bad", "novice_status": "3", "apda_id": "bad", "school": "888888"},
+            {"name": debater.name, "novice_status": "1", "apda_id": "2147483648"},
+            {"name": "X" * 31, "novice_status": ""},
+            *({"name": "Invalid Email", "novice_status": "0", "email": address}
+              for address in ("person(name)@example.org", "person@example.x", "a" * 330, "bad\x00mail")),
+        )
+        for fields in invalid:
+            with subtests.test(invalid=fields):
+                compare_admin_page(port, create, clients[helper.username], {**fields, "return_to": create})
+
+        def request_as(user, path, fields=None, *, stable=False, notice=None):
+            session = clients[user.username].cookies["sessionid"].value
+            csrf = "a" * (43 if stable else 32)
+            headers = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+            if notice is not None:
+                headers["Cookie"] += f"; mittab_roster_notice={notice}"
+            form = {**fields, "csrfmiddlewaretoken": csrf} if fields is not None else None
+            return request(port, path, method="POST" if form is not None else "GET", extra_headers=headers, form=form)
+
+        for user in (board, scratch):
+            for path in (create, detail):
+                for fields in (None, {"name": "Forbidden Debater", "novice_status": "1"}):
+                    with subtests.test(user=user.username, path=path, posted=fields is not None):
+                        assert request_as(user, path, fields)[1]["Location"] == "/403/"
+        assert not Debater.objects.filter(name="Forbidden Debater").exists()
+
+        first_html = request_as(helper, detail, stable=True)[2]
+        assert b"Debater Rounds" not in first_html and b"B Chair" not in first_html
+        latest_score.speaks = "29.8750"
+        latest_score.save(update_fields=["speaks"])
+        second.judges.remove(wing_z)
+        assert request_as(helper, detail, stable=True)[2] == first_html
+        assert request_as(entry, detail + "delete/")[1]["Location"] == "/403/"
+
+        school_path = f"/school/{school.id}/"
+        debater_fields = {"name": "Updated & Debater", "email": "updated@example.org",
+                          "novice_status": "0", "apda_id": "152.0", "school": school.id,
+                          "needs_crash_housing": "on", "qualified": "on", "return_to": school_path}
+        invalid_update = request_as(helper, detail, {**debater_fields, "school": "888888"})
+        assert invalid_update[0] == 422 and b"Select a valid choice." in invalid_update[2]
+        original_coin = debater.tiebreaker
+        updated = request_as(assistant, detail, {**debater_fields, "speaks": "50", "ranking_groups": "99"})
+        assert updated[0] == 302 and updated[1]["Location"] == school_path
+        debater.refresh_from_db()
+        assert debater.apda_id == 152 and debater.novice_status == 0 and debater.school_id == school.id
+        assert debater.tiebreaker != original_coin and debater.qualified and not debater.requests_wgm_housing
+        assert debater.ranking_groups.count() == 2
+        latest_score.refresh_from_db()
+        assert latest_score.speaks == Decimal("29.8750")
+        session = clients[assistant.username].cookies["sessionid"].value
+        notice = load_cookies(updated[1])["mittab_roster_notice"].value
+        page = request(port, school_path, extra_headers={"Cookie": f"sessionid={session}; mittab_roster_notice={notice}"})[2]
+        assert b"Debater Updated &amp; Debater updated successfully" in page
+
+        other_admin = users.create_superuser(username="debater-form-other-admin")
+        clients[other_admin.username] = client_for(other_admin)
+        success = b"Debater Updated &amp; Debater updated successfully"
+        for rankings_path in ("/debater/ranking/", "/debater/rank/"):
+            with subtests.test(return_path=rankings_path):
+                assert request_as(admin, rankings_path)[0] == 200
+                updated = request_as(admin, detail, {**debater_fields, "return_to": rankings_path,
+                                                     "email": "person@[127.0.0.1]"})
+                assert updated[1]["Location"] == rankings_path
+                debater.refresh_from_db()
+                assert debater.email == "person@[127.0.0.1]"
+                notice = load_cookies(updated[1])["mittab_roster_notice"].value
+                assert success not in request_as(other_admin, rankings_path, notice=notice)[2]
+                other_path = "/debater/rank/" if rankings_path == "/debater/ranking/" else "/debater/ranking/"
+                assert success not in request_as(admin, other_path, notice=notice)[2]
+                status, headers, page = request_as(admin, rankings_path, notice=notice)
+                assert status == 200 and success in page
+                assert headers["Cache-Control"] == "private, no-store"
+                assert load_cookies(headers)["mittab_roster_notice"]["max-age"] == "0"
+                assert success not in request_as(other_admin, rankings_path)[2]
+                assert success not in request_as(admin, rankings_path)[2]
+
+        created = request_as(helper, create, {"name": "New & Debater", "novice_status": "1", "school": partner_school.id})
+        assert created[0] == 302 and created[1]["Location"] == "/"
+        added = Debater.objects.get(name="New & Debater")
+        assert added.email is None and added.apda_id is None and added.school_id == partner_school.id
+        delete_path = f"/debater/{added.id}/delete/"
+        assert request_as(helper, delete_path)[0] == 200
+        assert Debater.objects.filter(id=added.id).exists()
+        assert request_as(entry, delete_path, {})[1]["Location"] == "/403/"
+
+        score = RoundStats.objects.create(round=first, debater=added, speaks="27.0000", ranks="2.0000")
+        awards = RankingGroup.objects.create(name="New Award")
+        awards.debaters.add(added)
+        denied = roster_request_waiting_for_lock(
+            lambda: request_as(assistant, delete_path, {}),
+            lambda: assistant.groups.add(board.groups.get()),
+        )
+        assert denied[0] == 302 and denied[1]["Location"] == "/403/"
+        assert Debater.objects.filter(id=added.id).exists()
+        assert RoundStats.objects.filter(id=score.id).exists()
+        assert awards.debaters.filter(id=added.id).exists()
+        deleted = request_as(helper, delete_path, {})
+        assert deleted[0] == 302 and deleted[1]["Location"] == "/"
+        notice = load_cookies(deleted[1])["mittab_roster_notice"].value
+        assert b"Debater deleted successfully" in request_as(helper, "/", notice=notice)[2]
+        assert not Debater.objects.filter(id=added.id).exists()
+        assert not RoundStats.objects.filter(id=score.id).exists()
+        assert not awards.debaters.filter(id=added.id).exists()
+
+
+def roster_request_waiting_for_lock(submit, change_role):
     from time import monotonic, sleep
 
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with transaction.atomic():
+            TabSettings.objects.select_for_update().get(key="cur_round")
+            pending = executor.submit(submit)
+            deadline = monotonic() + 3
+            while monotonic() < deadline:
+                with connection.cursor() as cursor:
+                    cursor.execute("SHOW FULL PROCESSLIST")
+                    waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                  and "`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE" in row[7]
+                                  for row in cursor.fetchall())
+                if waiting:
+                    break
+                sleep(0.025)
+            else:
+                pytest.fail("The roster request did not reach the transaction lock")
+            change_role()
+        return pending.result(timeout=6)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_staff_roster_edits_and_data_entry_scope():
     tab = legacy_tab_session("native-roster-tab")
     board = legacy_tab_session("native-roster-board")
     get_user_model().objects.get(username="native-roster-board").groups.add(Group.objects.create(name="APDA Board"))
@@ -4312,23 +4499,7 @@ def test_native_staff_roster_edits_and_data_entry_scope():
                            form=[("csrfmiddlewaretoken", token), *values])
 
         def submit_during_role_change(path, values, session, change_role):
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                with transaction.atomic():
-                    TabSettings.objects.select_for_update().get(key="cur_round")
-                    pending = executor.submit(post, path, values, session)
-                    deadline = monotonic() + 3
-                    while monotonic() < deadline:
-                        with connection.cursor() as cursor:
-                            cursor.execute("SHOW FULL PROCESSLIST")
-                            waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
-                                          and "`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE" in row[7]
-                                          for row in cursor.fetchall())
-                        if waiting:
-                            break
-                        sleep(0.025)
-                    assert waiting, "The roster save did not reach the transaction lock"
-                    change_role()
-                return pending.result(timeout=6)
+            return roster_request_waiting_for_lock(lambda: post(path, values, session), change_role)
 
         fields = {"name": "Roster School", "apda_id": 445}
         assert post("/enter_school/", fields.items(), token="bad")[0] == 403

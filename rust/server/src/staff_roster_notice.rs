@@ -37,7 +37,7 @@ fn signed_data(session: &str, path: &str, body: &str) -> Vec<u8> {
     format!("mit-tab staff roster notice v1\0{session}\0{path}\0{body}").into_bytes()
 }
 
-fn message(app: &App, headers: &HeaderMap, path: &str) -> Option<String> {
+pub fn message(app: &App, headers: &HeaderMap, path: &str) -> Option<String> {
     let session = cookie(headers, "sessionid")?;
     let (body, signature) = cookie(headers, COOKIE)?.rsplit_once('.')?;
     let signature = URL_SAFE_NO_PAD.decode(signature).ok()?;
@@ -74,13 +74,17 @@ pub fn render(
         .unwrap_or_default();
     messages.push(context! { text, tags => "success", level => 25 });
     let mut response = legacy_html::render(template, shell, context! { messages, ..page }, status);
+    clear(&mut response, headers);
+    response
+}
+
+pub fn clear(response: &mut Response, headers: &HeaderMap) {
     login::set_cookie(
-        &mut response,
+        response,
         COOKIE,
         "",
         0,
         login::secure_request(headers),
         true,
     );
-    response
 }
