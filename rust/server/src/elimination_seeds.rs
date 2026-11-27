@@ -3,7 +3,11 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use mittab_tabulation::outrounds::{self, Seed, SeedBasis};
 use sqlx::{MySql, MySqlConnection, QueryBuilder};
 
-use crate::{board_snapshot::Snapshot, settings::Settings};
+use crate::{
+    board_snapshot::Snapshot,
+    settings::Settings,
+    staff_elimination_store::{generation_is_current, generation_key, stage_challenge_picks},
+};
 
 fn prefix(division: i32, size: i32, generation: i32) -> String {
     format!("rust_seed_{division}_{size}_{generation}_")
@@ -40,7 +44,7 @@ pub struct Replay {
     mode: i32,
     once_used: bool,
     once_happened: bool,
-    picks_generation: i32,
+    picks_current: bool,
     seed_basis: SeedBasis,
 }
 
@@ -50,7 +54,7 @@ impl Replay {
         division: i32,
         generation: i32,
     ) -> Result<Self, sqlx::Error> {
-        let picks = format!("challenge_pick_generation_{division}");
+        let picks = generation_key(division);
         let once = format!("challenge_once_applied_{division}_{generation}");
         let settings = Settings::load(
             db,
@@ -68,7 +72,7 @@ impl Replay {
             mode: settings.integer("outround_pairing_mode", 0),
             once_used: false,
             once_happened: settings.flag(&once, false),
-            picks_generation: settings.integer(&picks, 0),
+            picks_current: generation_is_current(&settings, &picks, generation),
             seed_basis: if settings.integer("challenge_seed_basis", 1) == 1 {
                 SeedBasis::Effective
             } else {
@@ -114,10 +118,8 @@ impl Replay {
         if self.mode != 1 && !(self.mode == 2 && self.once_happened && !self.once_used) {
             return Ok(());
         }
-        let picks = if self.picks_generation == self.generation {
-            sqlx::query_as::<_, (i32, i32)>(
-                "SELECT challenger_id, challenged_id FROM tab_outroundchallenge WHERE type_of_round = ? AND num_teams = ?",
-            ).bind(self.division).bind(size).fetch_all(&mut *db).await?.into_iter().collect()
+        let picks = if self.picks_current {
+            stage_challenge_picks(db, self.division, size, active).await?
         } else {
             BTreeMap::new()
         };

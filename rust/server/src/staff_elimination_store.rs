@@ -310,8 +310,127 @@ impl ChallengeState {
     }
 }
 
-fn generation_key(division: i32) -> String {
+pub fn generation_key(division: i32) -> String {
     format!("challenge_pick_generation_{division}")
+}
+
+pub fn generation_is_current(settings: &Settings, key: &str, generation: i32) -> bool {
+    settings.value(key).unwrap_or(SettingValue::Number(0)) == SettingValue::Number(generation)
+}
+
+#[derive(Serialize)]
+pub struct ChallengeAdminState {
+    pub generations: [i32; 2],
+    stored_generations: [serde_json::Value; 2],
+    stale_picks: Vec<(i32, i32, i32, i32, i32)>,
+}
+
+pub async fn challenge_admin_state(
+    db: &mut MySqlConnection,
+    lock: bool,
+) -> Result<ChallengeAdminState, sqlx::Error> {
+    let query = if lock {
+        "SELECT id, type_of_team FROM tab_breakingteam WHERE type_of_team IN (0, 1) ORDER BY id FOR UPDATE"
+    } else {
+        "SELECT id, type_of_team FROM tab_breakingteam WHERE type_of_team IN (0, 1) ORDER BY id"
+    };
+    let rows = sqlx::query_as::<_, (i32, i32)>(query)
+        .fetch_all(&mut *db)
+        .await?;
+    let mut generations = [0; 2];
+    for (id, division) in rows {
+        if generations[division as usize] == 0 {
+            generations[division as usize] = id;
+        }
+    }
+    let keys = [generation_key(0), generation_key(1)];
+    let refs = keys.each_ref().map(String::as_str);
+    let settings = if lock {
+        Settings::load_locked(db, &refs).await?
+    } else {
+        Settings::load(db, &refs).await?
+    };
+    let stored_generations = refs.map(|key| match settings.value(key) {
+        Some(SettingValue::Text(marker)) => json!(marker),
+        Some(SettingValue::Number(marker)) => json!(marker),
+        None => json!(0),
+    });
+    let mut stale_picks = Vec::new();
+    let query = if lock {
+        "SELECT id, type_of_round, num_teams, challenger_id, challenged_id FROM tab_outroundchallenge
+         WHERE type_of_round = ? ORDER BY id FOR UPDATE"
+    } else {
+        "SELECT id, type_of_round, num_teams, challenger_id, challenged_id FROM tab_outroundchallenge
+         WHERE type_of_round = ? ORDER BY id"
+    };
+    for (division, (key, generation)) in refs.into_iter().zip(generations).enumerate() {
+        if !generation_is_current(&settings, key, generation) {
+            let mut picks = sqlx::query_as(query)
+                .bind(division as i32)
+                .fetch_all(&mut *db)
+                .await?;
+            stale_picks.append(&mut picks);
+        }
+    }
+    Ok(ChallengeAdminState {
+        generations,
+        stored_generations,
+        stale_picks,
+    })
+}
+
+pub async fn prepare_challenge_edits(
+    db: &mut MySqlConnection,
+    division: i32,
+    generation: i32,
+    editing: Option<i32>,
+) -> Result<(), sqlx::Error> {
+    let key = generation_key(division);
+    let stored = Settings::load_locked(db, &[&key]).await?;
+    if !generation_is_current(&stored, &key, generation) {
+        // Django recreates the edited row at its original ID after clearing an old generation.
+        sqlx::query(
+            "DELETE FROM tab_outroundchallenge WHERE type_of_round = ? AND (? IS NULL OR id <> ?)",
+        )
+        .bind(division)
+        .bind(editing)
+        .bind(editing)
+        .execute(&mut *db)
+        .await?;
+        settings::put(db, &key, SettingValue::Number(generation)).await?;
+    }
+    Ok(())
+}
+
+pub async fn stage_challenge_picks(
+    db: &mut MySqlConnection,
+    division: i32,
+    size: i32,
+    active: &BTreeSet<i32>,
+) -> Result<BTreeMap<i32, i32>, sqlx::Error> {
+    let mut picks = challenge_picks(db, division, size, false).await?;
+    picks.retain(|challenger, _| active.contains(challenger));
+    Ok(picks)
+}
+
+async fn challenge_picks(
+    db: &mut MySqlConnection,
+    division: i32,
+    size: i32,
+    lock: bool,
+) -> Result<BTreeMap<i32, i32>, sqlx::Error> {
+    let query = if lock {
+        "SELECT challenger_id, challenged_id FROM tab_outroundchallenge WHERE type_of_round = ? AND num_teams = ? FOR UPDATE"
+    } else {
+        "SELECT challenger_id, challenged_id FROM tab_outroundchallenge WHERE type_of_round = ? AND num_teams = ?"
+    };
+    Ok(sqlx::query_as(query)
+        .bind(division)
+        .bind(size)
+        .fetch_all(db)
+        .await?
+        .into_iter()
+        .collect())
 }
 
 fn once_key(division: i32, generation: i32) -> String {
@@ -360,10 +479,9 @@ async fn challenge_state(
             )
         });
     }
-    let picks = if enabled && current.integer(&generation_key, 0) == generation {
-        sqlx::query_as::<_, (i32, i32)>(
-            "SELECT challenger_id, challenged_id FROM tab_outroundchallenge WHERE type_of_round = ? AND num_teams = ?",
-        ).bind(division).bind(size).fetch_all(db).await?.into_iter().collect()
+    let picks = if enabled && generation_is_current(&current, &generation_key, generation) {
+        let active = entries.iter().map(|entry| entry.team).collect();
+        stage_challenge_picks(db, division, size, &active).await?
     } else {
         BTreeMap::new()
     };
@@ -421,7 +539,7 @@ pub async fn set_pick(
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
-    let mut state = prepare(&mut db, &settings, prior).await?;
+    let state = prepare(&mut db, &settings, prior).await?;
     if !state.enabled {
         return Err(Error::Invalid(
             "Challenge entries are unavailable for this stage.",
@@ -430,24 +548,30 @@ pub async fn set_pick(
     if !state.entries.iter().any(|entry| entry.team == challenger) {
         return Err(Error::Invalid("Choose a team in this stage."));
     }
-    let key = generation_key(prior.division);
-    let stored = Settings::load(&mut db, &[&key]).await?;
-    if stored.integer(&key, 0) != state.generation {
-        sqlx::query("DELETE FROM tab_outroundchallenge WHERE type_of_round = ?")
-            .bind(prior.division)
-            .execute(&mut *db)
-            .await?;
-        settings::put(&mut db, &key, SettingValue::Number(state.generation)).await?;
-    }
+    prepare_challenge_edits(&mut db, prior.division, state.generation, None).await?;
     if let Some(opponent) = opponent {
-        state.picks.insert(challenger, opponent);
+        let size = state.stage.size;
+        let mut picks = challenge_picks(&mut db, prior.division, size, true).await?;
+        if picks.iter().any(|(&owner, &target)| {
+            owner != challenger && (owner == opponent || target == challenger || target == opponent)
+        }) {
+            return Err(Error::Invalid(
+                "One of these teams already has a challenge pick.",
+            ));
+        }
+        let updating = picks.contains_key(&challenger);
+        let active: BTreeSet<_> = state.entries.iter().map(|entry| entry.team).collect();
+        picks.retain(|owner, _| active.contains(owner));
+        picks.insert(challenger, opponent);
         let seeds = seeds(&state.entries);
-        outrounds::challenge(&seeds, state.basis, &state.picks).map_err(challenge_error)?;
-        sqlx::query(
-            "INSERT INTO tab_outroundchallenge (num_teams, type_of_round, challenger_id, challenged_id)
-             VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE challenged_id = ?",
-        ).bind(state.stage.size).bind(prior.division).bind(challenger).bind(opponent).bind(opponent)
-            .execute(&mut *db).await?;
+        outrounds::challenge(&seeds, state.basis, &picks).map_err(challenge_error)?;
+        if updating {
+            sqlx::query("UPDATE tab_outroundchallenge SET challenged_id = ? WHERE num_teams = ? AND type_of_round = ? AND challenger_id = ?")
+                .bind(opponent).bind(size).bind(prior.division).bind(challenger).execute(&mut *db).await?;
+        } else {
+            sqlx::query("INSERT INTO tab_outroundchallenge (num_teams, type_of_round, challenger_id, challenged_id) VALUES (?, ?, ?, ?)")
+                .bind(size).bind(prior.division).bind(challenger).bind(opponent).execute(&mut *db).await?;
+        }
     } else {
         sqlx::query("DELETE FROM tab_outroundchallenge WHERE type_of_round = ? AND num_teams = ? AND challenger_id = ?")
             .bind(prior.division).bind(state.stage.size).bind(challenger).execute(&mut *db).await?;

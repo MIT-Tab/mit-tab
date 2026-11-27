@@ -25,6 +25,7 @@ pub const MANAGED: &[&str] = &[
     "scratch",
     "round",
     "outround",
+    "outroundchallenge",
     "team",
     "judge",
     "tabsettings",
@@ -927,6 +928,33 @@ impl Resource {
                 },
                 &[],
             ),
+            "outroundchallenge" => (
+                const {
+                    &[
+                        Field::new("num_teams", "Num teams", Kind::Integer),
+                        Field::new(
+                            "type_of_round",
+                            "Type of round",
+                            Kind::Choice(&[(0, "Varsity"), (1, "Novice")]),
+                        )
+                        .initial("0"),
+                        Field::relation("challenger", "challenger_id", "Challenger", TEAM),
+                        Field::relation("challenged", "challenged_id", "Challenged", TEAM),
+                    ]
+                },
+                &[
+                    Unique {
+                        fields: &[0, 1, 2],
+                        error_field: None,
+                        message: "Outround challenge with this Num teams, Type of round and Challenger already exists.",
+                    },
+                    Unique {
+                        fields: &[0, 1, 3],
+                        error_field: None,
+                        message: "Outround challenge with this Num teams, Type of round and Challenged already exists.",
+                    },
+                ],
+            ),
             "scratch" => (
                 const {
                     &[
@@ -972,6 +1000,10 @@ impl Resource {
 
     pub fn motion(&self) -> bool {
         self.list.model.name == "motion"
+    }
+
+    pub fn challenge(&self) -> bool {
+        self.list.model.name == "outroundchallenge"
     }
 
     pub fn email_log(&self) -> bool {
@@ -1224,7 +1256,7 @@ pub struct Form {
     pub fields: Vec<BoundField>,
     pub readonly: Vec<minijinja::Value>,
     pub can_add: bool,
-    pub non_field_error: Option<&'static str>,
+    pub non_field_errors: Vec<&'static str>,
     pub pairing_revision: Option<String>,
     pub resource_revision: Option<(&'static str, String)>,
     pub inlines: Option<crate::admin_registration_inlines::Inlines>,
@@ -1301,7 +1333,7 @@ impl Form {
             fields,
             readonly: Vec::new(),
             can_add: true,
-            non_field_error: None,
+            non_field_errors: Vec::new(),
             pairing_revision: None,
             resource_revision: None,
             inlines: None,
@@ -1356,7 +1388,8 @@ impl Form {
                 .split(',')
                 .any(|judge| judge == chair)
         {
-            self.non_field_error = Some("Chair must be a judge in the round");
+            self.non_field_errors
+                .push("Chair must be a judge in the round");
         }
         if resource.motion() {
             let has_value = |index: usize| {
@@ -1364,7 +1397,7 @@ impl Form {
                     || (self.fields[index].error.is_some()
                         && initial.is_some_and(|initial| initial[index].is_some()))
             };
-            self.non_field_error = match (has_value(0), has_value(2), has_value(1)) {
+            self.non_field_errors.extend(match (has_value(0), has_value(2), has_value(1)) {
                 (true, true, _) => Some(
                     "A motion cannot have both a round number (inround) and outround fields set.",
                 ),
@@ -1375,10 +1408,19 @@ impl Form {
                     Some("Outround motions must specify the outround type (Varsity/Novice).")
                 }
                 _ => None,
-            };
+            });
         }
         self.check_duplicates(resource, db, id, &values).await?;
-        if self.non_field_error.is_some() || self.fields.iter().any(|field| field.error.is_some()) {
+        if resource.challenge()
+            && let Some(challenger) = resource.value("challenger", &values)
+            && resource.value("challenged", &values) == Some(challenger)
+        {
+            self.non_field_errors
+                .push("Constraint “challenge_distinct_teams” is violated.");
+        }
+        if !self.non_field_errors.is_empty()
+            || self.fields.iter().any(|field| field.error.is_some())
+        {
             return Ok(None);
         }
         Ok(Some(values))
@@ -1400,7 +1442,7 @@ impl Form {
                 if let Some(index) = unique.error_field {
                     self.fields[index].error = Some(unique.message.into());
                 } else {
-                    self.non_field_error = Some(unique.message);
+                    self.non_field_errors.push(unique.message);
                 }
             }
         }

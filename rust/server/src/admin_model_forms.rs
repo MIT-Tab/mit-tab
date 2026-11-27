@@ -25,12 +25,15 @@ use crate::{
     admin_repairs::{self, LATER_STAGE},
     admin_scores::score_audit,
     board_snapshot, entity_store,
-    legacy_html::{DjangoJson, escape},
+    legacy_html::{self, DjangoJson, escape},
     legacy_session::{Actor, cookie},
     login, private, publication,
     registration_form::Fields,
     roster_log, round_audit,
     settings::Settings,
+    staff_elimination_store::{
+        ChallengeAdminState, challenge_admin_state, prepare_challenge_edits,
+    },
     staff_pairing::lock_round_if_configured,
     unavailable,
 };
@@ -225,9 +228,23 @@ async fn change(
     if post.is_some() {
         lock_round_if_configured(&mut db).await?;
     }
+    if !admin_html::model_enabled(
+        &mut db,
+        resource.list.model.application(),
+        resource.list.model.name,
+    )
+    .await?
+    {
+        return legacy_html::forbidden(&mut db, page.actor, page.target).await;
+    }
+    let challenge = if resource.challenge() {
+        Some(challenge_admin_state(&mut db, post.is_some()).await?)
+    } else {
+        None
+    };
     let can_add = admin_model_list::can_add(&mut db, resource.list.model.name).await?;
     if id.is_none() && !can_add {
-        return Ok(crate::motions::forbidden(Extension(page.actor)).await);
+        return legacy_html::forbidden(&mut db, page.actor, page.target).await;
     }
     let (initial, original) = if let Some(id) = id {
         let Some(initial) = resource.load(&mut db, id, post.is_some()).await? else {
@@ -258,13 +275,17 @@ async fn change(
     } else {
         None
     };
-    let resource_revision =
+    let resource_revision = if let Some(challenge) = &challenge {
+        AdminFormProof::for_session(&page, "admin challenge edit", (challenge, &initial))
+            .map(|proof| ("mittab_challenge_revision", proof))
+    } else {
         initial
             .as_ref()
             .zip(revision)
             .and_then(|(initial, (name, purpose))| {
                 AdminFormProof::for_session(&page, purpose, initial).map(|proof| (name, proof))
-            });
+            })
+    };
     let stale_resource = post
         .zip(resource_revision.as_ref())
         .is_some_and(|(post, (name, proof))| !proof.verified(app, post.get(name)));
@@ -316,7 +337,7 @@ async fn change(
     }
     form.inlines = inlines;
     if stale || stale_registration {
-        form.non_field_error = Some(if stale_registration {
+        form.non_field_errors.push(if stale_registration {
             "This registration changed. Review the current values before saving."
         } else if stale_resource && resource.registration_config() {
             "This registration configuration changed. Review the current values before saving."
@@ -324,6 +345,8 @@ async fn change(
             "This motion changed. Review the current values before saving."
         } else if stale_resource && resource.email_log() {
             "This email log changed. Review the current values before saving."
+        } else if stale_resource && resource.challenge() {
+            "The challenge pick or the break changed. Review the current values before saving."
         } else if stale_resource {
             "This content changed. Review the current values before saving."
         } else {
@@ -365,6 +388,16 @@ async fn change(
             _ => SettingEffects::default(),
         };
         effects.refresh(&mut db).await?;
+        if let Some(challenge) = challenge {
+            let division = i32::from(resource.value("type_of_round", &values) == Some("1"));
+            prepare_challenge_edits(
+                &mut db,
+                division,
+                challenge.generations[division as usize],
+                id,
+            )
+            .await?;
+        }
         let pairing = admin_repairs::Edit::capture(&mut db, resource.list.model.name, id).await?;
         match resource
             .save(&mut db, id, &values, page.user, initial.as_deref())
@@ -375,7 +408,7 @@ async fn change(
                     && let Some(message) = pairing.record(&mut db, saved, page.user).await?
                 {
                     db.rollback().await?;
-                    form.non_field_error = Some(message);
+                    form.non_field_errors.push(message);
                     return Ok(form_conflict(render_form(
                         page,
                         id,
@@ -451,7 +484,8 @@ async fn change(
                     && resource.list.model.name == "registrationconfig" =>
             {
                 db.rollback().await?;
-                return Ok(crate::motions::forbidden(Extension(page.actor)).await);
+                let mut db = app.db.acquire().await?;
+                return legacy_html::forbidden(&mut db, page.actor, page.target).await;
             }
             Err(sqlx::Error::Database(error))
                 if error.is_unique_violation() && !resource.unique.is_empty() =>
@@ -724,7 +758,7 @@ fn render_form(
         .iter()
         .filter(|field| field.error.is_some())
         .count()
-        + usize::from(form.non_field_error.is_some())
+        + usize::from(!form.non_field_errors.is_empty())
         + form.inlines.as_ref().map_or(0, Inlines::error_count);
     let add = id.is_none();
     let action = if add { "Add" } else { "Change" };
@@ -752,7 +786,7 @@ fn render_form(
         show_save_and_add_another => !popup && form.can_add, show_save_and_continue => !popup,
         has_view_permission => true, can_change => true,
         errors => (0..errors).collect::<Vec<_>>(),
-        non_field_errors => form.non_field_error.map(|message| error_list(message, true)).unwrap_or_default(),
+        non_field_errors => error_items(form.non_field_errors.iter().copied(), true),
         media => if resource.registration() {
             admin_html::registration_admin_scripts()
         } else if resource.fields.iter().any(|field| field.filter_label.is_some()) {
@@ -819,12 +853,23 @@ fn change_log(add: bool, changed: &[&crate::admin_model_data::Field]) -> (u8, St
 }
 
 pub(super) fn error_list(message: &str, non_field: bool) -> String {
+    error_items([message], non_field)
+}
+
+fn error_items<'a>(messages: impl IntoIterator<Item = &'a str>, non_field: bool) -> String {
+    let messages = messages
+        .into_iter()
+        .map(|message| format!("<li>{}</li>", escape(message)))
+        .collect::<String>();
+    if messages.is_empty() {
+        return messages;
+    }
     let class = if non_field {
         "errorlist nonfield"
     } else {
         "errorlist"
     };
-    format!("<ul class=\"{class}\"><li>{}</li></ul>", escape(message))
+    format!("<ul class=\"{class}\">{messages}</ul>")
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -1132,6 +1177,7 @@ impl AdminFormProof {
             && !page.resource.registration_config()
             && !page.resource.motion()
             && !page.resource.email_log()
+            && !page.resource.challenge()
         {
             return None;
         }
@@ -1141,6 +1187,7 @@ impl AdminFormProof {
             (
                 &records.rows,
                 &records.revisions,
+                &records.challenge,
                 cascade.scope(),
                 pairings.scope(),
             ),
@@ -1324,6 +1371,7 @@ impl CascadePairings {
 struct Removed {
     rows: Vec<(i32, String)>,
     revisions: Vec<Option<String>>,
+    challenge: Option<ChallengeAdminState>,
 }
 
 impl Removed {
@@ -1335,11 +1383,18 @@ impl Removed {
         selected: Option<&BTreeSet<i32>>,
         lock: bool,
     ) -> Result<Self, sqlx::Error> {
+        let challenge = if resource.challenge() {
+            Some(challenge_admin_state(db, lock).await?)
+        } else {
+            None
+        };
         let list = &resource.list;
         let revision = if resource.registration_config() {
             "CAST(t.updated_at AS CHAR)"
         } else if resource.motion() {
             "CAST(JSON_ARRAY(t.updated_at, t.round_number, t.outround_type, t.num_teams, t.info_slide, t.motion_text, t.is_published) AS CHAR)"
+        } else if resource.challenge() {
+            "CAST(JSON_ARRAY(t.num_teams, t.type_of_round, t.challenger_id, t.challenged_id) AS CHAR)"
         } else {
             email_log_revision(list.model.name).unwrap_or("NULL")
         };
@@ -1374,7 +1429,11 @@ impl Removed {
             .into_iter()
             .map(|(id, label, update)| ((id, label), update))
             .unzip();
-        Ok(Self { rows, revisions })
+        Ok(Self {
+            rows,
+            revisions,
+            challenge,
+        })
     }
 
     async fn cascade(
@@ -1693,14 +1752,23 @@ async fn delete(
 ) -> Result<Response, sqlx::Error> {
     let mut db = app.db.begin().await?;
     let confirm = post.is_some_and(|form| form.get("post") == "yes");
+    if confirm {
+        lock_round_if_configured(&mut db).await?;
+    }
+    if !admin_html::model_enabled(
+        &mut db,
+        page.resource.list.model.application(),
+        page.resource.list.model.name,
+    )
+    .await?
+    {
+        return legacy_html::forbidden(&mut db, page.actor, page.target).await;
+    }
     if post.is_some() && !confirm {
         return Ok(private((
             StatusCode::BAD_REQUEST,
             "Confirm the deletion first.",
         )));
-    }
-    if confirm {
-        lock_round_if_configured(&mut db).await?;
     }
     let records = Removed::read(&mut db, &page.resource, &[id], None, None, confirm).await?;
     let Some((_, description)) = records.rows.first() else {
@@ -1780,6 +1848,20 @@ async fn delete(
 }
 
 async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx::Error> {
+    let confirm = post.get("post") == "yes";
+    let mut db = app.db.begin().await?;
+    if confirm {
+        lock_round_if_configured(&mut db).await?;
+    }
+    if !admin_html::model_enabled(
+        &mut db,
+        page.resource.list.model.application(),
+        page.resource.list.model.name,
+    )
+    .await?
+    {
+        return legacy_html::forbidden(&mut db, page.actor, page.target).await;
+    }
     let filter = match ListKind::find(page.resource.list.model.name) {
         Some(kind) => kind.ids(&page.query),
         None => page.query.record_ids(&[]),
@@ -1801,12 +1883,7 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
             "Invalid record selection.",
         )));
     };
-    let confirm = post.get("post") == "yes";
     let selected = (confirm || !post.flag("select_across")).then_some(&selected);
-    let mut db = app.db.begin().await?;
-    if confirm {
-        lock_round_if_configured(&mut db).await?;
-    }
     let records = Removed::read(
         &mut db,
         &page.resource,
@@ -1912,6 +1989,15 @@ fn deletion_title(name: &str, rejection: Option<&str>, permissions: Vec<&str>) -
 
 async fn history(app: &App, page: Page<'_>, id: i32) -> Result<Response, sqlx::Error> {
     let mut db = app.db.acquire().await?;
+    if !admin_html::model_enabled(
+        &mut db,
+        page.resource.list.model.application(),
+        page.resource.list.model.name,
+    )
+    .await?
+    {
+        return legacy_html::forbidden(&mut db, page.actor, page.target).await;
+    }
     let Some(description) = page.resource.describe(&mut db, id).await? else {
         return Ok(access::found("/admin/"));
     };

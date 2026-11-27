@@ -119,17 +119,6 @@ fn report(application: &str, model: &str) -> Option<Resource> {
             ],
             detail: &[],
         },
-        ("tab", "outroundchallenge") => Resource {
-            title: "Elimination Challenges",
-            table: "tab_outroundchallenge",
-            columns: &[
-                ("Division", "type_of_round"),
-                ("Stage Size", "num_teams"),
-                ("Challenger ID", "challenger_id"),
-                ("Challenged ID", "challenged_id"),
-            ],
-            detail: &[],
-        },
         ("tab", "usertournamentsetuppreference") => Resource {
             title: "Tournament Setup Preferences",
             table: "tab_usertournamentsetuppreference",

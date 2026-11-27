@@ -509,7 +509,7 @@ async fn default_page(
     let result = async {
         let mut db = app.db.begin().await?;
         if !admin_html::model_enabled(&mut db, "tab", model.name).await? {
-            return Ok(private((StatusCode::FORBIDDEN, "Access denied.")));
+            return legacy_html::forbidden(&mut db, actor, &path).await;
         }
         let Some(ids) = query.record_ids(&[]) else {
             return Ok(access::found(format!("{path}?e=1")));

@@ -180,8 +180,8 @@ pub async fn model_enabled(
     }
     let settings = Settings::load(db, &["outround_pairing_mode"]).await?;
     Ok(matches!(
-        settings.integer("outround_pairing_mode", 0),
-        1 | 2
+        settings.value("outround_pairing_mode"),
+        Some(crate::settings::SettingValue::Number(1 | 2))
     ))
 }
 

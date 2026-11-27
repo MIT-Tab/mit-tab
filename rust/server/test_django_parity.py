@@ -4350,6 +4350,12 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
         assert list(BreakingTeam.objects.order_by("pk").values_list("id", "team_id", "seed")) == before_rebreak
         assert OutroundChallenge.objects.filter(challenger_id=a, challenged_id=c).exists()
         assert not Outround.objects.exists()
+        outsider = Team.objects.create(name="Outside Challenge Field", school=school, seed=0)
+        OutroundChallenge.objects.create(type_of_round=0, num_teams=4, challenger=outsider, challenged_id=b)
+        conflict = post(path, {**action, "challenged_id": b})
+        assert conflict[0] == 422 and b"One of these teams already has a challenge pick." in conflict[2]
+        assert OutroundChallenge.objects.get(challenger_id=a).challenged_id == c
+        assert OutroundChallenge.objects.get(challenger=outsider).challenged_id == b
         result = post(path)
         assert result[0] == 302 and result[1]["Location"] == "/outround_pairing/0/4", result
         assert {frozenset((row.gov_team_id, row.opp_team_id)) for row in Outround.objects.all()} == {
@@ -4368,6 +4374,13 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
         assigned = {row.id: list(row.judges.values_list("id", flat=True)) for row in matching}
         challenged_match = next(row for row in matching if c in (row.gov_team_id, row.opp_team_id))
         ballot = f"/outround/{challenged_match.id}/result/"
+        if imported:
+            generation = min(seed.id for seed in seeds)
+            TabSettings.set("challenge_pick_generation_0", str(generation))
+            code = Outround.GOV if c == challenged_match.gov_team_id else Outround.OPP
+            assert post(ballot, {"winner": code, "round_instance": challenged_match.id})[0] == 302
+            assert BreakingTeam.objects.get(team_id=d).effective_seed == 4
+            TabSettings.set("challenge_pick_generation_0", generation)
         for winning_team in (c, a, c):
             code = Outround.GOV if winning_team == challenged_match.gov_team_id else Outround.OPP
             assert post(ballot, {"winner": code, "round_instance": challenged_match.id})[0] == 302
@@ -6055,7 +6068,7 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
                        registration_revision=False, configuration_revision=False, list_revision=False,
                        content_revision=False, motion_revision=False, staff_motion_revision=False,
-                       email_log_revision=False):
+                       email_log_revision=False, challenge_revision=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
@@ -6071,6 +6084,10 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
         status, _, previous = request(port, path, cookie=session)
         assert status == 200
         form["mittab_email_log_revision"] = email_log_edit_proof(previous)
+    if challenge_revision and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["mittab_challenge_revision"] = challenge_proof(previous)
     if list_revision and form is not None:
         status, _, previous = request(port, path, cookie=session)
         assert status == 200
@@ -6134,6 +6151,11 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
                 rb'<input type="hidden" name="mittab_email_log_revision" value="[a-f0-9]{64}">', b"", body,
             )
             assert metadata == 1
+        if challenge_revision:
+            body, metadata = re.subn(
+                rb'<input type="hidden" name="mittab_challenge_revision" value="[a-f0-9]{64}">', b"", body,
+            )
+            assert metadata == 1
         if content_revision:
             body, metadata = re.subn(
                 rb'<input type="hidden" name="mittab_content_revision" value="[a-f0-9]{64}">', b"", body,
@@ -6164,6 +6186,10 @@ def motion_edit_proof(body):
 
 def email_log_edit_proof(body):
     return re.search(rb'name="mittab_email_log_revision" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+def challenge_proof(body):
+    return re.search(rb'name="mittab_challenge_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
 
 def content_edit_proof(body):
@@ -7158,3 +7184,154 @@ def test_tab_email_log_admin_matches_django(html_assets, subtests):
             assert submit(port, root, {**bulk, "post": "yes", "mittab_delete_scope": bulk_scope})[0] == 302
             assert not model.objects.filter(pk__in=[added.id, existing.id]).exists()
             assert type(related).objects.filter(pk=related.pk).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_outround_challenge_admin_matches_django_and_tracks_break_generation(html_assets, subtests):
+    from mittab.apps.tab.models import OutroundChallenge
+
+    staff = legacy_tab_session("challenge-admin")
+    board = legacy_tab_session("challenge-admin-board")
+    get_user_model().objects.get(username="challenge-admin-board").groups.add(
+        Group.objects.create(name="APDA Board")
+    )
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("outround_pairing_mode", 1)
+    TabSettings.set("var_outrounds_public", 1)
+    school = School.objects.create(name="Challenge Admin School")
+    teams = [Team.objects.create(name=f"Example Team {i} & Partners", school=school, seed=0) for i in range(1, 9)]
+    gov, opp, third, fourth, fifth, sixth, seventh, eighth = teams
+    Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+    live = Outround.objects.create(num_teams=4, type_of_round=0, gov_team=gov, opp_team=fourth, victor=Outround.GOV)
+    original_pairings = list(Outround.objects.values())
+    for division in (0, 1):
+        for seed, team in enumerate(teams[division * 4:division * 4 + 4], 1):
+            BreakingTeam.objects.create(team=team, seed=seed, effective_seed=seed, type_of_team=division)
+    generation = BreakingTeam.objects.filter(type_of_team=0).order_by("id").first().id
+    novice_generation = BreakingTeam.objects.filter(type_of_team=1).order_by("id").first().id
+    TabSettings.set("challenge_pick_generation_0", generation)
+    TabSettings.set("challenge_pick_generation_1", novice_generation)
+
+    varsity = OutroundChallenge.objects.create(num_teams=4, type_of_round=0, challenger=gov, challenged=opp)
+    novice = OutroundChallenge.objects.create(num_teams=4, type_of_round=1, challenger=fifth, challenged=sixth)
+    other_novice = OutroundChallenge.objects.create(num_teams=8, type_of_round=1, challenger=seventh, challenged=eighth)
+    root = "/admin/tab/outroundchallenge/"
+    add = root + "add/"
+    edit = f"{root}{varsity.id}/change/"
+    delete = f"{root}{varsity.id}/delete/"
+    history = f"{root}{varsity.id}/history/"
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = csrf
+
+    def submit(port, path, fields, *, session=staff, token=csrf):
+        return request(port, path, method="POST", form={**fields, "csrfmiddlewaretoken": token},
+                       extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"})
+
+    def proof(port, path):
+        status, _, body = request(port, path, cookie=staff)
+        assert status == 200
+        return challenge_proof(body)
+
+    fields = {"num_teams": "4", "type_of_round": "0", "challenger": str(third.id), "challenged": str(fourth.id)}
+    bulk = {"action": "delete_selected", "index": 0, "select_across": 0,
+            "_selected_action": [str(varsity.id), str(novice.id)]}
+    with rust_server(overrides=html_assets) as port:
+        for path in (root, root + "?o=1", root + f"?id__exact={varsity.id}", "/admin/", "/admin/tab/", "/403/",
+                     add, add + f"?challenger={gov.id}&type_of_round=1", edit,
+                     edit + "?_popup=1&_to_field=id", delete, history):
+            with subtests.test(path=path):
+                compare_admin_page(port, path, client, challenge_revision=path.startswith((add, edit)),
+                                   deletion_scope=path == delete)
+        for invalid in ({}, {**fields, "num_teams": "not a size"}, {**fields, "type_of_round": 5},
+                        {**fields, "challenged": 2147483647}, {**fields, "challenged": third.id},
+                        {**fields, "challenger": gov.id, "challenged": opp.id},
+                        {**fields, "challenger": opp.id, "challenged": opp.id}):
+            with subtests.test(invalid=invalid):
+                compare_admin_page(port, add, client, post=invalid, challenge_revision=True)
+        compare_admin_page(port, root, client, post=bulk, deletion_scope=True)
+        for path in (root, add, edit, delete, history):
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+        for path, form in ((root, bulk), (add, fields), (edit, fields), (delete, {"post": "yes"})):
+            assert submit(port, path, form, session=board)[1]["Location"] == "/403/"
+            assert submit(port, path, form, token="b" * 32)[0] == 403
+
+        unchanged = OutroundChallenge.objects.count()
+        for disabled in (0, "1", 3):
+            TabSettings.set("outround_pairing_mode", disabled)
+            for path in (root, add, edit, delete, history):
+                with subtests.test(disabled=disabled, path=path):
+                    compare_admin_page(port, path, client)
+            for path, form in ((root, bulk), (add, fields), (edit, fields), (delete, {"post": "yes"})):
+                assert submit(port, path, form)[0] == 403
+            assert submit(port, delete, {})[0] == 403
+            assert OutroundChallenge.objects.count() == unchanged
+        TabSettings.set("outround_pairing_mode", 2)
+        compare_admin_page(port, add, client, challenge_revision=True)
+
+        stale_add = proof(port, add)
+        BreakingTeam.objects.filter(pk=generation).delete()
+        current = BreakingTeam.objects.filter(type_of_team=0).order_by("id").first().id
+        assert current != generation
+        stale = submit(port, add, {**fields, "mittab_challenge_revision": stale_add})
+        assert stale[0] == 409 and b"the break changed" in stale[2]
+        assert OutroundChallenge.objects.filter(pk=varsity.id).exists()
+        assert TabSettings.get("challenge_pick_generation_0", use_cache=False) == generation
+        marker_proof = proof(port, add)
+        TabSettings.set("challenge_pick_generation_0", current)
+        assert submit(port, add, {**fields, "mittab_challenge_revision": marker_proof})[0] == 409
+        TabSettings.set("challenge_pick_generation_0", str(current))
+        scope_proof = proof(port, add)
+        OutroundChallenge.objects.filter(pk=varsity.id).update(challenged=fifth)
+        assert submit(port, add, {**fields, "mittab_challenge_revision": scope_proof})[0] == 409
+        assert submit(port, add, {**fields, "mittab_challenge_revision": proof(port, add)})[0] == 302
+        created = OutroundChallenge.objects.get(type_of_round=0)
+        assert (created.challenger_id, created.challenged_id) == (third.id, fourth.id)
+        assert TabSettings.get("challenge_pick_generation_0", use_cache=False) == current
+        assert list(OutroundChallenge.objects.filter(type_of_round=1).values_list("id", flat=True)) == [novice.id, other_novice.id]
+        compare_admin_page(port, f"{root}{created.id}/history/", client)
+
+        novice_edit = f"{root}{novice.id}/change/"
+        novice_delete = f"{root}{novice.id}/delete/"
+        old_edit = proof(port, novice_edit)
+        old_delete = motion_delete_proof(request(port, novice_delete, cookie=staff)[2])
+        bulk = {**bulk, "_selected_action": [str(novice.id)]}
+        old_bulk = motion_delete_proof(submit(port, root, bulk)[2])
+        OutroundChallenge.objects.filter(pk=novice.id).update(challenged=seventh)
+        new_values = {"num_teams": 4, "type_of_round": 1, "challenger": fifth.id, "challenged": eighth.id}
+        assert submit(port, novice_edit, {**new_values, "mittab_challenge_revision": old_edit})[0] == 409
+        assert submit(port, novice_delete, {"post": "yes", "mittab_delete_scope": old_delete})[0] == 409
+        assert submit(port, root, {**bulk, "post": "yes", "mittab_delete_scope": old_bulk})[0] == 409
+
+        BreakingTeam.objects.filter(pk=novice_generation).delete()
+        novice_current = BreakingTeam.objects.filter(type_of_team=1).order_by("id").first().id
+        with transaction.atomic():
+            response = client.post(novice_edit, new_values)
+            assert response.status_code == 302
+            django_saved = OutroundChallenge.objects.filter(type_of_round=1).values("id", "challenger_id", "challenged_id").get()
+            assert TabSettings.get("challenge_pick_generation_1", use_cache=False) == novice_current
+            transaction.set_rollback(True)
+        assert submit(port, novice_edit, {**new_values, "mittab_challenge_revision": proof(port, novice_edit)})[0] == 302
+        rust_saved = OutroundChallenge.objects.filter(type_of_round=1).values("id", "challenger_id", "challenged_id").get()
+        assert rust_saved == django_saved and rust_saved["id"] == novice.id
+        assert TabSettings.get("challenge_pick_generation_1", use_cache=False) == novice_current
+        compare_admin_page(port, f"{root}{novice.id}/history/", client)
+
+        direct_scope = motion_delete_proof(request(port, novice_delete, cookie=staff)[2])
+        assert submit(port, novice_delete, {"post": "yes", "mittab_delete_scope": direct_scope})[0] == 302
+        bulk = {**bulk, "_selected_action": [str(created.id)]}
+        bulk_scope = motion_delete_proof(submit(port, root, bulk)[2])
+        assert submit(port, root, {**bulk, "post": "yes", "mittab_delete_scope": bulk_scope})[0] == 302
+        assert not OutroundChallenge.objects.exists()
+        TabSettings.set("challenge_pick_generation_0", str(current))
+        concurrent_proof = proof(port, add)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(submit, port, add, {**fields, "challenged": target.id,
+                                                          "mittab_challenge_revision": concurrent_proof})
+                       for target in (fourth, opp)]
+            assert sorted(future.result(timeout=15)[0] for future in futures) == [302, 409]
+        assert OutroundChallenge.objects.filter(type_of_round=0).count() == 1
+        assert TabSettings.get("challenge_pick_generation_0", use_cache=False) == current
+        assert list(Outround.objects.values()) == original_pairings and Outround.objects.filter(pk=live.id).exists()

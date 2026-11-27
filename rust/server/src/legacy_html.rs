@@ -199,6 +199,10 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/public/access_error.html"),
         ),
         (
+            "common/403.html",
+            include_str!("../../../mittab/templates/common/403.html"),
+        ),
+        (
             "public/home.html",
             include_str!("../../../mittab/templates/public/home.html"),
         ),
@@ -793,6 +797,20 @@ pub async fn shell(
         can_checkins => superuser || preset.is_some_and(Preset::checkins),
         can_data_entry => superuser || preset.is_some_and(Preset::data_entry),
     })
+}
+
+pub async fn forbidden(
+    db: &mut MySqlConnection,
+    actor: Actor,
+    path: &str,
+) -> Result<Response, sqlx::Error> {
+    let shell = shell(db, actor, path).await?;
+    Ok(render(
+        "common/403.html",
+        shell,
+        context! {},
+        StatusCode::FORBIDDEN,
+    ))
 }
 
 pub fn render(template: &str, shell: Value, page: Value, status: StatusCode) -> Response {

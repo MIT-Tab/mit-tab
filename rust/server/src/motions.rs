@@ -648,14 +648,13 @@ pub async fn public_error(State(app): State<App>, Extension(actor): Extension<Ac
     .await
 }
 
-pub async fn forbidden(Extension(actor): Extension<Actor>) -> Response {
-    html::render(
-        "error.html",
-        context! {
-            nav => Navigation::new(actor, false), title => "Access Denied", heading => "Access Denied",
-        },
-        StatusCode::FORBIDDEN,
-    )
+pub async fn forbidden(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
+    let Ok(mut db) = app.db.acquire().await else {
+        return unavailable();
+    };
+    legacy_html::forbidden(&mut db, actor, "/403/")
+        .await
+        .unwrap_or_else(|_| unavailable())
 }
 
 fn not_found(actor: Actor) -> Response {

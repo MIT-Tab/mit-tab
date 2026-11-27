@@ -12,6 +12,18 @@ pub struct Settings(HashMap<String, Value>);
 
 impl Settings {
     pub async fn load(db: &mut MySqlConnection, keys: &[&str]) -> Result<Self, sqlx::Error> {
+        Self::read(db, keys, false).await
+    }
+
+    pub async fn load_locked(db: &mut MySqlConnection, keys: &[&str]) -> Result<Self, sqlx::Error> {
+        Self::read(db, keys, true).await
+    }
+
+    async fn read(
+        db: &mut MySqlConnection,
+        keys: &[&str],
+        lock: bool,
+    ) -> Result<Self, sqlx::Error> {
         if keys.is_empty() {
             return Ok(Self(HashMap::new()));
         }
@@ -23,6 +35,9 @@ impl Settings {
             fields.push_bind(key);
         }
         query.push(") ORDER BY id");
+        if lock {
+            query.push(" FOR UPDATE");
+        }
         let rows = query
             .build_query_as::<(String, Option<i32>, Option<String>)>()
             .fetch_all(db)
