@@ -35,6 +35,7 @@ pub const MANAGED: &[&str] = &[
     "infolink",
     "infotext",
     "registrationlink",
+    "motion",
 ];
 
 pub struct Resource {
@@ -511,6 +512,33 @@ impl Resource {
                 const { &[Field::new("email_payload", "Email payload", Kind::Json).optional()] },
                 &[],
             ),
+            "motion" => (
+                const {
+                    &[
+                        Field::new("round_number", "Round number", Kind::Integer)
+                            .optional()
+                            .help("Round number for inrounds (1, 2, 3, etc.)"),
+                        Field::new(
+                            "outround_type",
+                            "Outround type",
+                            Kind::Choice(&[(0, "Varsity"), (1, "Novice")]),
+                        )
+                        .optional()
+                        .help("Type of outround (Varsity/Novice)"),
+                        Field::new("num_teams", "Num teams", Kind::Integer)
+                            .optional()
+                            .help("Number of teams in outround (e.g., 8 for quarterfinals)"),
+                        Field::new("info_slide", "Info slide", Kind::Textarea)
+                            .optional()
+                            .help("Optional context/info slide text shown before the motion"),
+                        Field::new("motion_text", "Motion text", Kind::Textarea)
+                            .help("The debate motion/resolution text"),
+                        checkbox("is_published", "Is published", "0")
+                            .help("Whether this motion is visible to the public"),
+                    ]
+                },
+                &[],
+            ),
             "infotext" => (
                 const {
                     &[
@@ -887,6 +915,10 @@ impl Resource {
         self.list.model.name == "registrationconfig"
     }
 
+    pub fn motion(&self) -> bool {
+        self.list.model.name == "motion"
+    }
+
     pub fn public_information(&self) -> bool {
         matches!(
             self.list.model.name,
@@ -943,7 +975,7 @@ impl Resource {
                 _ => format!("CAST(`{}` AS CHAR)", field.column),
             })
             .chain(
-                (self.registration_config() || self.public_information())
+                (self.registration_config() || self.public_information() || self.motion())
                     .then(|| "CAST(updated_at AS CHAR)".into()),
             )
             .collect::<Vec<_>>()
@@ -1070,7 +1102,7 @@ impl Resource {
                 columns.push("id = 1");
             }
         }
-        if self.registration() || self.public_information() {
+        if self.registration() || self.public_information() || self.motion() {
             columns.push("updated_at = UTC_TIMESTAMP(6)");
             if id.is_none() {
                 columns.push("created_at = UTC_TIMESTAMP(6)");
@@ -1251,6 +1283,25 @@ impl Form {
         {
             self.non_field_error = Some("Chair must be a judge in the round");
         }
+        if resource.motion() {
+            let has_value = |index: usize| {
+                values[index].is_some()
+                    || (self.fields[index].error.is_some()
+                        && initial.is_some_and(|initial| initial[index].is_some()))
+            };
+            self.non_field_error = match (has_value(0), has_value(2), has_value(1)) {
+                (true, true, _) => Some(
+                    "A motion cannot have both a round number (inround) and outround fields set.",
+                ),
+                (false, false, _) => Some(
+                    "A motion must have either a round number (inround) or outround fields set.",
+                ),
+                (false, true, false) => {
+                    Some("Outround motions must specify the outround type (Varsity/Novice).")
+                }
+                _ => None,
+            };
+        }
         self.check_duplicates(resource, db, id, &values).await?;
         if self.non_field_error.is_some() || self.fields.iter().any(|field| field.error.is_some()) {
             return Ok(None);
@@ -1311,7 +1362,9 @@ impl BoundField {
             return join_ids(ids);
         }
         if matches!(self.field.kind, Kind::Textarea) {
-            return if raw.contains('\0') {
+            return if self.field.required && raw.is_empty() {
+                invalid(&mut self.error, "This field is required.")
+            } else if raw.contains('\0') {
                 invalid(&mut self.error, "Null characters are not allowed.")
             } else {
                 Some(raw.into())
@@ -1468,7 +1521,7 @@ impl BoundField {
 
 fn eastern_date_input(stored: Option<&str>) -> Option<String> {
     stored
-        .and_then(crate::admin_registration::parse_db_date)
+        .and_then(crate::admin_model_list::parse_db_date)
         .map(|date| {
             New_York
                 .from_utc_datetime(&date)

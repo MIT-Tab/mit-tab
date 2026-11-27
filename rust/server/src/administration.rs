@@ -175,9 +175,6 @@ fn destination(application: &str, model: &str, record: Option<i32>) -> Option<St
                 format!("/outround/{id}/result/")
             }));
         }
-        ("tab", "motion") => {
-            return Some(record.map_or("/motions/".into(), |id| format!("/motions/{id}/edit/")));
-        }
         ("tab", "tabsettings") => ("/settings_form", None),
         ("tab", "judgecodeemaillog" | "writtenrfdemaillog")
         | ("registration", "registrationconfirmationemaillog") => ("/email_management/", None),

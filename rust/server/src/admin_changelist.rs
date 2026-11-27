@@ -78,6 +78,23 @@ impl DefaultList {
     }
 }
 
+macro_rules! motion_round_display {
+    () => {
+        "CASE
+            WHEN t.round_number IS NOT NULL THEN CONCAT('Round ', t.round_number)
+            WHEN t.num_teams IS NULL THEN 'Unknown Round'
+            ELSE CONCAT(IF(t.outround_type = 0, 'Varsity ', 'Novice '),
+                CASE t.num_teams
+                    WHEN 2 THEN 'Finals' WHEN 4 THEN 'Semifinals' WHEN 8 THEN 'Quarterfinals'
+                    WHEN 16 THEN 'Octofinals' WHEN 32 THEN 'Double Octofinals'
+                    WHEN 64 THEN 'Triple Octofinals' ELSE CONCAT('Round of ', t.num_teams)
+                END)
+            END"
+    };
+}
+
+pub(super) const MOTION_ROUND_DISPLAY: &str = motion_round_display!();
+
 pub(super) fn default_list(name: &str) -> Option<DefaultList> {
     let (name, singular, plural, source, label, ordering) = match name {
         "registration" => (
@@ -113,6 +130,11 @@ pub(super) fn default_list(name: &str) -> Option<DefaultList> {
                 JOIN registration_registration r ON t.registration_id = r.id JOIN tab_school s ON r.school_id = s.id",
             "CONCAT('Registration confirmation ', IF(t.successful, 'sent', 'failed'), ': ', t.email)",
             "t.sent_at DESC, t.id DESC",
+        ),
+        "motion" => (
+            "motion", "motion", "motions", "tab_motion t",
+            concat!("CONCAT('Motion for ', ", motion_round_display!(), ", ': ', LEFT(t.motion_text, 50), '...')"),
+            "t.round_number, t.outround_type, t.num_teams DESC, t.id DESC",
         ),
         "infolink" => (
             "infolink", "info link", "info links", "registration_infolink t",
@@ -457,10 +479,11 @@ pub async fn get(
     model: &str,
     raw: Option<String>,
 ) -> Option<Response> {
-    if application == "registration" {
-        let kind = crate::admin_registration::ListKind::find(model)?;
+    if let Some(kind) = crate::admin_model_list::ListKind::find(model)
+        && application == self::application(model)
+    {
         return Some(
-            crate::admin_registration::list(app, actor, headers, kind, Query::new(raw), None).await,
+            crate::admin_model_list::list(app, actor, headers, kind, Query::new(raw), None).await,
         );
     }
     if application != "tab" {

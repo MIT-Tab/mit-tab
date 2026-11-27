@@ -7,14 +7,16 @@ use axum::{
 use chrono::NaiveDateTime;
 use minijinja::context;
 use serde::{Deserialize, Serialize};
-use sqlx::{MySql, MySqlExecutor, QueryBuilder};
+use sqlx::{MySql, MySqlConnection, MySqlExecutor, QueryBuilder};
+use unicode_normalization::{UnicodeNormalization, char::canonical_combining_class};
 
 use crate::{
     App, access,
+    admin_model_forms::AdminFormProof,
     html::{self, Navigation},
     legacy_html,
     legacy_session::{Actor, cookie},
-    login,
+    login, private,
     public_cache::{self, Page},
     settings::Settings,
     unavailable,
@@ -35,12 +37,16 @@ pub struct MotionForm {
     info_slide: String,
     #[serde(default)]
     motion_text: String,
+    #[serde(default)]
+    motion_revision: String,
 }
 
 #[derive(Deserialize)]
 pub struct ActionForm {
     #[serde(default)]
     csrfmiddlewaretoken: String,
+    #[serde(default)]
+    motion_revision: String,
 }
 
 #[derive(Clone, Copy)]
@@ -133,6 +139,9 @@ struct Motion {
     published: bool,
     created: String,
     updated: String,
+    revision: Option<String>,
+    #[serde(skip)]
+    version: NaiveDateTime,
     #[serde(skip)]
     round: RoundKey,
 }
@@ -156,9 +165,42 @@ impl From<Row> for Motion {
             published,
             created: created.format("%b %d, %Y %H:%M").to_string(),
             updated: updated.format("%b %d, %Y %H:%M").to_string(),
+            revision: None,
+            version: updated,
             round,
         }
     }
+}
+
+impl Motion {
+    fn revision_state(&self) -> impl Serialize + '_ {
+        (
+            self.id,
+            self.round.preliminary,
+            self.round.division,
+            self.round.size,
+            &self.info_slide,
+            &self.motion_text,
+            self.published,
+            self.version,
+        )
+    }
+
+    fn proof(&self, headers: &HeaderMap) -> Option<AdminFormProof> {
+        AdminFormProof::for_target(
+            headers,
+            "staff motion revision",
+            MANAGE,
+            self.revision_state(),
+        )
+    }
+}
+
+fn motions_proof(motions: &[Motion], headers: &HeaderMap) -> Option<AdminFormProof> {
+    let mut ordered = motions.iter().collect::<Vec<_>>();
+    ordered.sort_by_key(|motion| motion.id);
+    let state: Vec<_> = ordered.into_iter().map(Motion::revision_state).collect();
+    AdminFormProof::for_target(headers, "staff motion list revision", MANAGE, state)
 }
 
 const SELECT: &str = "
@@ -170,6 +212,7 @@ const SELECT: &str = "
 async fn list<'e>(
     db: impl MySqlExecutor<'e>,
     public_only: bool,
+    lock: bool,
 ) -> Result<Vec<Motion>, sqlx::Error> {
     // The public projection is constrained in SQL before the rows are loaded.
     let mut query = QueryBuilder::<MySql>::new(SELECT);
@@ -177,23 +220,53 @@ async fn list<'e>(
         query.push(" WHERE is_published = TRUE");
     }
     query.push(" ORDER BY round_number, outround_type, num_teams DESC, id");
+    if lock {
+        query.push(" FOR UPDATE");
+    }
     let rows = query.build_query_as::<Row>().fetch_all(db).await?;
     Ok(rows.into_iter().map(Motion::from).collect())
 }
 
-async fn one(app: &App, id: i32) -> Result<Option<Motion>, sqlx::Error> {
-    let row = QueryBuilder::<MySql>::new(SELECT)
-        .push(" WHERE id = ")
-        .push_bind(id)
-        .build_query_as::<Row>()
-        .fetch_optional(&app.db)
-        .await?;
+async fn one<'e>(
+    db: impl MySqlExecutor<'e>,
+    id: i32,
+    lock: bool,
+) -> Result<Option<Motion>, sqlx::Error> {
+    let mut query = QueryBuilder::<MySql>::new(SELECT);
+    query.push(" WHERE id = ").push_bind(id);
+    if lock {
+        query.push(" FOR UPDATE");
+    }
+    let row = query.build_query_as::<Row>().fetch_optional(db).await?;
     Ok(row.map(Motion::from))
 }
 
-async fn page_settings(app: &App) -> Result<Settings, sqlx::Error> {
-    let mut db = app.db.acquire().await?;
-    Settings::load(&mut db, SETTINGS).await
+async fn reviewed_motion(
+    app: &App,
+    db: &mut MySqlConnection,
+    actor: Actor,
+    headers: &HeaderMap,
+    id: i32,
+    revision: &str,
+) -> Result<Motion, Box<Response>> {
+    let motion = one(db, id, true)
+        .await
+        .map_err(|_| Box::new(unavailable()))?
+        .ok_or_else(|| Box::new(not_found(actor)))?;
+    if !motion
+        .proof(headers)
+        .is_some_and(|proof| proof.verified(app, revision))
+    {
+        return Err(Box::new(motion_conflict()));
+    }
+    Ok(motion)
+}
+
+fn motion_conflict() -> Response {
+    private((
+        StatusCode::CONFLICT,
+        "Motions changed. Refresh and review the current motions before continuing.",
+    ))
 }
 
 pub async fn public(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
@@ -202,7 +275,7 @@ pub async fn public(State(app): State<App>, Extension(actor): Extension<Actor>) 
         if !settings.flag("motions_enabled", false) {
             return Ok(access::found(PUBLIC_ERROR));
         }
-        let mut rows = list(&mut *db, true).await?;
+        let mut rows = list(&mut *db, true, false).await?;
         rows.sort_by_key(|motion| std::cmp::Reverse(motion.round.sort_key()));
         let has_motions = !rows.is_empty();
         let [mut varsity, mut novice, mut preliminary] = [Vec::new(), Vec::new(), Vec::new()];
@@ -237,32 +310,43 @@ pub async fn manage(
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
 ) -> Response {
-    let Ok(settings) = page_settings(&app).await else {
+    let Ok(mut db) = app.db.acquire().await else {
+        return unavailable();
+    };
+    let Ok(settings) = Settings::load(&mut db, SETTINGS).await else {
         return unavailable();
     };
     if !settings.flag("motions_enabled", false) {
         return flash(&headers, "/settings_form", Notice::Disabled);
     }
-    let Ok(mut motions) = list(&app.db, false).await else {
+    let Ok(mut motions) = list(&mut *db, false, false).await else {
+        return unavailable();
+    };
+    let Ok(shell) = legacy_html::shell(&mut db, actor, MANAGE).await else {
         return unavailable();
     };
     motions.sort_by_key(|motion| motion.round.sort_key());
-    let Ok(csrf) = html::page_csrf(&headers) else {
+    for motion in &mut motions {
+        motion.revision = motion.proof(&headers).map(|proof| proof.token(&app));
+    }
+    let list_revision = motions_proof(&motions, &headers).map(|proof| proof.token(&app));
+    let Ok(csrf) = login::TemplateCsrf::new(&headers) else {
         return unavailable();
     };
     let notice = cookie(&headers, FLASH).and_then(Notice::from_code);
-    let response = html::render(
-        "manage_motions.html",
+    let mut response = legacy_html::render(
+        "motions/manage_motions.html",
+        shell,
         context! {
-            title => "Manage Motions", nav => Navigation::new(actor, true),
-            rounds => available_rounds(settings.integer("tot_rounds", 5)),
-            csrf => &csrf, motions,
-            message => notice.map(Notice::message),
-            has_error => notice.is_some_and(Notice::error),
+            title => "Manage Motions",
+            available_rounds => available_rounds(settings.integer("tot_rounds", 5)),
+            csrf_input => csrf.input(), motions, list_revision,
+            messages => notice.map(message_context),
+            DEFAULT_MESSAGE_LEVELS => context! { ERROR => 40 },
         },
         StatusCode::OK,
     );
-    let mut response = html::form_response(response, &headers, &csrf);
+    csrf.set_cookie(&mut response, &headers);
     if notice.is_some() {
         login::set_cookie(
             &mut response,
@@ -290,44 +374,53 @@ async fn render_edit(
     id: i32,
     actor: Actor,
     headers: &HeaderMap,
-    invalid: Option<(MotionForm, Notice)>,
+    invalid: Option<(Motion, MotionForm, Notice)>,
 ) -> Response {
-    let motion = match one(app, id).await {
-        Ok(Some(motion)) => motion,
-        Ok(None) => return not_found(actor),
-        Err(_) => return unavailable(),
-    };
-    let Ok(settings) = page_settings(app).await else {
+    let Ok(mut db) = app.db.acquire().await else {
         return unavailable();
     };
-    let Ok(csrf) = html::page_csrf(headers) else {
+    let (mut motion, form, error) = if let Some((motion, form, notice)) = invalid {
+        (motion, form, Some(notice))
+    } else {
+        let motion = match one(&mut *db, id, false).await {
+            Ok(Some(motion)) => motion,
+            Ok(None) => return not_found(actor),
+            Err(_) => return unavailable(),
+        };
+        let form = MotionForm {
+            round_selection: motion.round.selection(),
+            info_slide: motion.info_slide.clone(),
+            motion_text: motion.motion_text.clone(),
+            ..Default::default()
+        };
+        (motion, form, None)
+    };
+    motion.revision = motion.proof(headers).map(|proof| proof.token(app));
+    let Ok(settings) = Settings::load(&mut db, SETTINGS).await else {
         return unavailable();
     };
-    let (form, error) = match invalid {
-        Some((form, notice)) => (form, Some(notice.message())),
-        None => (
-            MotionForm {
-                round_selection: motion.round.selection(),
-                info_slide: motion.info_slide.clone(),
-                motion_text: motion.motion_text.clone(),
-                ..Default::default()
-            },
-            None,
-        ),
+    let Ok(shell) = legacy_html::shell(&mut db, actor, &format!("/motions/{id}/edit/")).await
+    else {
+        return unavailable();
     };
-    let response = html::render(
-        "edit_motion.html",
+    let Ok(csrf) = login::TemplateCsrf::new(headers) else {
+        return unavailable();
+    };
+    let mut response = legacy_html::render(
+        "motions/edit_motion.html",
+        shell,
         context! {
             title => format!("Edit Motion - {}", motion.round_display),
-            nav => Navigation::new(actor, settings.flag("motions_enabled", false)),
-            rounds => available_rounds(settings.integer("tot_rounds", 5)),
-            csrf => &csrf, motion, selected => form.round_selection,
-            info_slide => form.info_slide, motion_text => form.motion_text,
-            message => error, has_error => error.is_some(),
+            available_rounds => available_rounds(settings.integer("tot_rounds", 5)),
+            csrf_input => csrf.input(), motion, current_round_selection => form.round_selection,
+            submitted_info_slide => form.info_slide, submitted_motion_text => form.motion_text,
+            messages => error.map(message_context),
+            DEFAULT_MESSAGE_LEVELS => context! { ERROR => 40 },
         },
         StatusCode::OK,
     );
-    html::form_response(response, headers, &csrf)
+    csrf.set_cookie(&mut response, headers);
+    response
 }
 
 pub async fn add(
@@ -372,9 +465,22 @@ pub async fn save(
     if !login::valid_csrf(&headers, &form.csrfmiddlewaretoken) {
         return login::csrf_error();
     }
+    let Ok(mut tx) = app.db.begin().await else {
+        return unavailable();
+    };
+    let motion =
+        match reviewed_motion(&app, &mut tx, actor, &headers, id, &form.motion_revision).await {
+            Ok(motion) => motion,
+            Err(response) => return *response,
+        };
     let round = match validate(&form) {
         Ok(round) => round,
-        Err(notice) => return render_edit(&app, id, actor, &headers, Some((form, notice))).await,
+        Err(notice) => {
+            if tx.rollback().await.is_err() {
+                return unavailable();
+            }
+            return render_edit(&app, id, actor, &headers, Some((motion, form, notice))).await;
+        }
     };
     let result = sqlx::query(
         "
@@ -388,13 +494,12 @@ pub async fn save(
     .bind(form.info_slide.trim())
     .bind(form.motion_text.trim())
     .bind(id)
-    .execute(&app.db)
+    .execute(&mut *tx)
     .await;
-    match result {
-        Ok(row) if row.rows_affected() == 0 => not_found(actor),
-        Ok(_) => flash(&headers, MANAGE, Notice::Updated),
-        Err(_) => unavailable(),
+    if result.is_err() || tx.commit().await.is_err() {
+        return unavailable();
     }
+    flash(&headers, MANAGE, Notice::Updated)
 }
 
 pub async fn delete(
@@ -407,15 +512,24 @@ pub async fn delete(
     if !login::valid_csrf(&headers, &form.csrfmiddlewaretoken) {
         return login::csrf_error();
     }
-    match sqlx::query("DELETE FROM tab_motion WHERE id = ?")
-        .bind(id)
-        .execute(&app.db)
-        .await
+    let Ok(mut tx) = app.db.begin().await else {
+        return unavailable();
+    };
+    if let Err(response) =
+        reviewed_motion(&app, &mut tx, actor, &headers, id, &form.motion_revision).await
     {
-        Ok(row) if row.rows_affected() == 0 => not_found(actor),
-        Ok(_) => flash(&headers, MANAGE, Notice::Deleted),
-        Err(_) => unavailable(),
+        return *response;
     }
+    if sqlx::query("DELETE FROM tab_motion WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        || tx.commit().await.is_err()
+    {
+        return unavailable();
+    }
+    flash(&headers, MANAGE, Notice::Deleted)
 }
 
 pub async fn toggle(
@@ -431,23 +545,22 @@ pub async fn toggle(
     let Ok(mut tx) = app.db.begin().await else {
         return unavailable();
     };
-    let changed = sqlx::query("
-        UPDATE tab_motion SET is_published = NOT is_published, updated_at = UTC_TIMESTAMP(6) WHERE id = ?
-    ").bind(id).execute(&mut *tx).await;
-    match changed {
-        Ok(row) if row.rows_affected() == 0 => return not_found(actor),
-        Ok(_) => {}
-        Err(_) => return unavailable(),
-    }
-    let published =
-        sqlx::query_scalar::<_, bool>("SELECT is_published FROM tab_motion WHERE id = ?")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await;
-    let Ok(published) = published else {
-        return unavailable();
-    };
-    if tx.commit().await.is_err() {
+    let motion =
+        match reviewed_motion(&app, &mut tx, actor, &headers, id, &form.motion_revision).await {
+            Ok(motion) => motion,
+            Err(response) => return *response,
+        };
+    let published = !motion.published;
+    if sqlx::query(
+        "UPDATE tab_motion SET is_published = ?, updated_at = UTC_TIMESTAMP(6) WHERE id = ?",
+    )
+    .bind(published)
+    .bind(id)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+        || tx.commit().await.is_err()
+    {
         return unavailable();
     }
     flash(
@@ -481,22 +594,41 @@ async fn bulk(app: &App, headers: HeaderMap, form: ActionForm, publish: bool) ->
     if !login::valid_csrf(&headers, &form.csrfmiddlewaretoken) {
         return login::csrf_error();
     }
-    match sqlx::query("UPDATE tab_motion SET is_published = ?")
-        .bind(publish)
-        .execute(&app.db)
-        .await
+    let Ok(mut tx) = app.db.begin().await else {
+        return unavailable();
+    };
+    let Ok(motions) = list(&mut *tx, false, true).await else {
+        return unavailable();
+    };
+    if !motions_proof(&motions, &headers)
+        .is_some_and(|proof| proof.verified(app, &form.motion_revision))
     {
-        Ok(_) => flash(
-            &headers,
-            MANAGE,
-            if publish {
-                Notice::AllPublished
-            } else {
-                Notice::AllUnpublished
-            },
-        ),
-        Err(_) => unavailable(),
+        return motion_conflict();
     }
+    for motion in motions {
+        if motion.published != publish
+            && sqlx::query("UPDATE tab_motion SET is_published = ? WHERE id = ?")
+                .bind(publish)
+                .bind(motion.id)
+                .execute(&mut *tx)
+                .await
+                .is_err()
+        {
+            return unavailable();
+        }
+    }
+    if tx.commit().await.is_err() {
+        return unavailable();
+    }
+    flash(
+        &headers,
+        MANAGE,
+        if publish {
+            Notice::AllPublished
+        } else {
+            Notice::AllUnpublished
+        },
+    )
 }
 
 pub async fn back_to_manage() -> Response {
@@ -546,28 +678,21 @@ fn validate(form: &MotionForm) -> Result<RoundKey, Notice> {
     RoundKey::parse(&form.round_selection).ok_or(Notice::InvalidRound)
 }
 
-fn available_rounds(total: i32) -> [(&'static str, Vec<(String, String)>); 3] {
-    let preliminary = (1..=total)
-        .map(|number| (format!("inround_{number}"), format!("Round {number}")))
+fn available_rounds(total: i32) -> Vec<(&'static str, String, String)> {
+    let mut rounds: Vec<_> = (1..=total)
+        .map(|number| ("inround", number.to_string(), format!("Round {number}")))
         .collect();
-    let final_rounds = |division: i32| {
-        [64, 32, 16, 8, 4, 2]
-            .into_iter()
-            .map(|size| {
-                let key = RoundKey {
-                    preliminary: None,
-                    division: Some(division),
-                    size: Some(size),
-                };
-                (key.selection(), key.display())
-            })
-            .collect()
-    };
-    [
-        ("Preliminary Rounds", preliminary),
-        ("Varsity Outrounds", final_rounds(0)),
-        ("Novice Outrounds", final_rounds(1)),
-    ]
+    for size in [64, 32, 16, 8, 4, 2] {
+        for division in [0, 1] {
+            let key = RoundKey {
+                preliminary: None,
+                division: Some(division),
+                size: Some(size),
+            };
+            rounds.push(("outround", format!("{division}_{size}"), key.display()));
+        }
+    }
+    rounds
 }
 
 fn elimination_name(size: i32) -> String {
@@ -584,13 +709,16 @@ fn elimination_name(size: i32) -> String {
 }
 
 fn truncate(value: &str, limit: usize) -> String {
-    if let Some((cutoff, _)) = value.char_indices().nth(limit) {
-        let mut preview: String = value[..cutoff].chars().take(limit - 1).collect();
-        preview.push('…');
-        preview
-    } else {
-        value.into()
+    let value: String = value.nfc().collect();
+    let mut bases = value
+        .char_indices()
+        .filter(|(_, character)| canonical_combining_class(*character) == 0);
+    if let Some((cutoff, _)) = bases.nth(limit - 1)
+        && bases.next().is_some()
+    {
+        return format!("{}…", &value[..cutoff]);
     }
+    value
 }
 
 #[derive(Clone, Copy)]
@@ -654,6 +782,14 @@ impl Notice {
     fn error(self) -> bool {
         self.values().2
     }
+}
+
+fn message_context(notice: Notice) -> [minijinja::Value; 1] {
+    let error = notice.error();
+    [
+        context! { text => notice.message(), level => if error { 40 } else { 25 },
+        tags => if error { "error" } else { "success" } },
+    ]
 }
 
 fn flash(headers: &HeaderMap, target: &str, notice: Notice) -> Response {

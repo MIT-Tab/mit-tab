@@ -71,14 +71,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/public_footer.html"),
         ),
         (
-            "manage_motions.html",
-            include_str!("../templates/manage_motions.html"),
-        ),
-        (
-            "edit_motion.html",
-            include_str!("../templates/edit_motion.html"),
-        ),
-        (
             "motion_fields.html",
             include_str!("../templates/motion_fields.html"),
         ),

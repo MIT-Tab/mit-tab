@@ -150,6 +150,14 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/public/motions.html"),
         ),
         (
+            "motions/manage_motions.html",
+            include_str!("../../../mittab/templates/motions/manage_motions.html"),
+        ),
+        (
+            "motions/edit_motion.html",
+            include_str!("../../../mittab/templates/motions/edit_motion.html"),
+        ),
+        (
             "public/public_ballots.html",
             include_str!("../../../mittab/templates/public/public_ballots.html"),
         ),
@@ -388,6 +396,9 @@ fn translate(name: &str, source: &str) -> String {
                 output.push_str("/apda-board/inrounds/{{ number }}/");
             }
             ["url", "'view_judge'", "judge.id"] => output.push_str("/judge/{{ judge.id }}/"),
+            ["url", "'edit_motion'", "motion.pk"] => output.push_str("/motions/{{ motion.id }}/edit/"),
+            ["url", "'toggle_motion_published'", "motion.pk"] => output.push_str("/motions/{{ motion.id }}/toggle-published/"),
+            ["url", "'delete_motion'", "motion.pk"] => output.push_str("/motions/{{ motion.id }}/delete/"),
             ["return_to_input"] => output.push_str(
                 "{{ round_input|safe }}{% with redirect_target=return_path|default(request.path) %}{% include 'common/_return_to_input.html' %}{% endwith %}",
             ),
@@ -499,6 +510,29 @@ fn translate(name: &str, source: &str) -> String {
         "tab/start_tournament.html" | "tab/_custom_staff_role_form.html" => {
             setup_widgets(translated)
         }
+        "motions/manage_motions.html" => translated
+            .replace("motion.is_published", "motion.published")
+            .replace("motion.info_slide|truncatechars:100", "motion.info_preview")
+            .replace("motion.motion_text|truncatechars:150", "motion.motion_preview")
+            .replace(
+                "{{ csrf_input|safe }}\n                                                <button",
+                "{{ csrf_input|safe }}{% if motion.revision %}<input type=\"hidden\" name=\"motion_revision\" value=\"{{ motion.revision }}\">{% endif %}\n                                                <button",
+            )
+            .replace(
+                "{{ csrf_input|safe }}\n                        <button",
+                "{{ csrf_input|safe }}{% if list_revision %}<input type=\"hidden\" name=\"motion_revision\" value=\"{{ list_revision }}\">{% endif %}\n                        <button",
+            ),
+        "motions/edit_motion.html" => translated
+            .replace("motion.is_published", "motion.published")
+            .replace("motion.created_at|date:\"M d, Y H:i\"", "motion.created")
+            .replace("motion.updated_at|date:\"M d, Y H:i\"", "motion.updated")
+            .replace("round_id|stringformat:\"s\"", "round_id")
+            .replace("\"inround_\"|add:inround_value", "(\"inround_\" ~ inround_value)")
+            .replace("\"outround_\"|add:round_id", "(\"outround_\" ~ round_id)")
+            .replace(
+                "{{ csrf_input|safe }}",
+                "{{ csrf_input|safe }}{% if motion.revision %}<input type=\"hidden\" name=\"motion_revision\" value=\"{{ motion.revision }}\">{% endif %}",
+            ),
         "tab/settings_form.html" => translated
             .replace("{{ field }}", "{{ field.html|safe }}")
             .replace("{{ field.errors }}", "{{ field.errors|safe }}"),

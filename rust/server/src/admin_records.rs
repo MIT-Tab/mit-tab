@@ -262,15 +262,30 @@ pub(super) fn choice_filter(
     title: &str,
     values: impl IntoIterator<Item = (String, String)>,
 ) -> Result<String, minijinja::Error> {
+    choice_filter_with_clear_parameters(query, field, title, values, &[])
+}
+
+pub(super) fn choice_filter_with_clear_parameters(
+    query: &Query,
+    field: &str,
+    title: &str,
+    values: impl IntoIterator<Item = (String, String)>,
+    clear_parameters: &[&str],
+) -> Result<String, minijinja::Error> {
     let mut params = query.params.clone();
     let selected = params.remove(field);
+    for name in clear_parameters {
+        params.remove(*name);
+    }
     let mut choices = vec![context! {
-        display => "All", selected => selected.is_none(), query_string => Query::encode(params),
+        display => "All", selected => selected.is_none(), query_string => Query::encode(params.clone()),
     }];
     choices.extend(values.into_iter().map(|(value, label)| {
+        let mut params = params.clone();
+        params.insert(field.into(), value.clone());
         context! {
             display => label, selected => selected.as_deref() == Some(value.as_str()),
-            query_string => query.url(field, &value),
+            query_string => Query::encode(params),
         }
     }));
     admin_html::render_fragment("admin/filter.html", context! { title, choices })

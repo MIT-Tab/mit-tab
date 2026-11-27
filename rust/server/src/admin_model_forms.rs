@@ -19,8 +19,8 @@ use crate::{
     admin_changelist::{self, Query, filter_ids},
     admin_html::{self, Shell},
     admin_model_data::{BoundField, Form, Kind, MANAGED, Resource},
+    admin_model_list::{self, ListKind},
     admin_records::readonly,
-    admin_registration::{self, ListKind},
     admin_registration_inlines::Inlines,
     admin_repairs::{self, LATER_STAGE},
     admin_scores::score_audit,
@@ -184,7 +184,7 @@ async fn entry(
         && let Some(kind) = ListKind::find(model).filter(|kind| kind.editable())
         && let Some(post) = post.as_ref().filter(|post| !post.all("_save").is_empty())
     {
-        return admin_registration::list(&app, actor, &headers, kind, query, Some((post, user)))
+        return admin_model_list::list(&app, actor, &headers, kind, query, Some((post, user)))
             .await;
     }
     let shell = match Shell::load(&app, actor, &headers, uri.path()).await {
@@ -225,7 +225,7 @@ async fn change(
     if post.is_some() {
         lock_round_if_configured(&mut db).await?;
     }
-    let can_add = admin_registration::can_add(&mut db, resource.list.model.name).await?;
+    let can_add = admin_model_list::can_add(&mut db, resource.list.model.name).await?;
     if id.is_none() && !can_add {
         return Ok(crate::motions::forbidden(Extension(page.actor)).await);
     }
@@ -251,6 +251,8 @@ async fn change(
         ))
     } else if resource.public_information() {
         Some(("mittab_content_revision", "admin public information edit"))
+    } else if resource.motion() {
+        Some(("mittab_motion_revision", "admin motion edit"))
     } else {
         None
     };
@@ -304,7 +306,7 @@ async fn change(
     form.pairing_revision = pairing_revision.map(|revision| revision.token(app));
     form.resource_revision = resource_revision.map(|(name, proof)| (name, proof.token(app)));
     form.readonly =
-        admin_registration::readonly_fields(&mut db, resource.list.model.name, id).await?;
+        admin_model_list::readonly_fields(&mut db, resource.list.model.name, id).await?;
     form.can_add = can_add;
     if let Some(inlines) = &mut inlines {
         inlines.token = registration_revision.map(|proof| proof.token(app));
@@ -316,6 +318,8 @@ async fn change(
             "This registration changed. Review the current values before saving."
         } else if stale_resource && resource.registration_config() {
             "This registration configuration changed. Review the current values before saving."
+        } else if stale_resource && resource.motion() {
+            "This motion changed. Review the current values before saving."
         } else if stale_resource {
             "This content changed. Review the current values before saving."
         } else {
@@ -785,7 +789,7 @@ fn changed_fields(
                 Kind::EasternDateTime => {
                     let time = |raw: &Option<String>| {
                         raw.as_deref()
-                            .and_then(admin_registration::parse_db_date)
+                            .and_then(admin_model_list::parse_db_date)
                             .map(|date| date.and_utc().timestamp())
                     };
                     time(old) == time(new)
@@ -850,7 +854,7 @@ pub(super) fn render_widget(
             )
         }
         Kind::Textarea => format!(
-            "<textarea name=\"{name}\" cols=\"40\" rows=\"10\" class=\"vLargeTextField\" id=\"id_{name}\">\n{}</textarea>",
+            "<textarea name=\"{name}\" cols=\"40\" rows=\"10\" class=\"vLargeTextField\"{required} id=\"id_{name}\">\n{}</textarea>",
             escape(bound.value.as_deref().unwrap_or_default()),
         ),
         Kind::Json => {
@@ -1089,7 +1093,10 @@ impl AdminFormProof {
         cascade: &Cascade,
         pairings: &CascadePairings,
     ) -> Option<Self> {
-        if !page.resource.cascading_deletion() && !page.resource.registration_config() {
+        if !page.resource.cascading_deletion()
+            && !page.resource.registration_config()
+            && !page.resource.motion()
+        {
             return None;
         }
         Self::for_session(
@@ -1097,7 +1104,7 @@ impl AdminFormProof {
             "admin deletion preview",
             (
                 &records.rows,
-                &records.config_updates,
+                &records.revisions,
                 cascade.scope(),
                 pairings.scope(),
             ),
@@ -1280,7 +1287,7 @@ impl CascadePairings {
 #[derive(Default)]
 struct Removed {
     rows: Vec<(i32, String)>,
-    config_updates: Vec<Option<NaiveDateTime>>,
+    revisions: Vec<Option<String>>,
 }
 
 impl Removed {
@@ -1293,13 +1300,15 @@ impl Removed {
         lock: bool,
     ) -> Result<Self, sqlx::Error> {
         let list = &resource.list;
-        let config_update = if resource.registration_config() {
-            "t.updated_at"
+        let revision = if resource.registration_config() {
+            "CAST(t.updated_at AS CHAR)"
+        } else if resource.motion() {
+            "CAST(JSON_ARRAY(t.updated_at, t.round_number, t.outround_type, t.num_teams, t.info_slide, t.motion_text, t.is_published) AS CHAR)"
         } else {
             "NULL"
         };
         let mut sql = QueryBuilder::new(format!(
-            "SELECT t.id, {}, {config_update} FROM {} WHERE TRUE",
+            "SELECT t.id, {}, {revision} FROM {} WHERE TRUE",
             list.label, list.source
         ));
         filter_ids(&mut sql, filter);
@@ -1322,17 +1331,14 @@ impl Removed {
             sql.push(" FOR UPDATE");
         }
         let selected = sql
-            .build_query_as::<(i32, String, Option<NaiveDateTime>)>()
+            .build_query_as::<(i32, String, Option<String>)>()
             .fetch_all(db)
             .await?;
-        let (rows, config_updates) = selected
+        let (rows, revisions) = selected
             .into_iter()
             .map(|(id, label, update)| ((id, label), update))
             .unzip();
-        Ok(Self {
-            rows,
-            config_updates,
-        })
+        Ok(Self { rows, revisions })
     }
 
     async fn cascade(

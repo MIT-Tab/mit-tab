@@ -9,11 +9,14 @@ use sqlx::{AssertSqlSafe, MySql, MySqlConnection, QueryBuilder};
 
 use crate::{
     App, access,
-    admin_changelist::{DefaultList, Page, Query, default_list, filter_ids},
+    admin_changelist::{DefaultList, MOTION_ROUND_DISPLAY, Page, Query, default_list, filter_ids},
     admin_html::{self, Shell, django_datetime},
     admin_model_data::{BoundField, Field, INFO_ACTIVE, INFO_ORDER},
     admin_model_forms::{AdminFormProof, error_list, render_widget},
-    admin_records::{Column, choice_filter, headings, order_sql, order_sql_with, search_terms},
+    admin_records::{
+        Column, choice_filter, choice_filter_with_clear_parameters, headings, order_sql,
+        order_sql_with, search_terms,
+    },
     legacy_html::escape,
     legacy_session::Actor,
     private,
@@ -125,6 +128,29 @@ const INFO_TEXTS: &[Column] = &[
 ];
 const LIST_REVISION: &str = "mittab_list_revision";
 
+const MOTIONS: &[Column] = &[
+    Column::new(
+        "round_display",
+        "Round display",
+        MOTION_ROUND_DISPLAY,
+        false,
+    )
+    .unsortable(),
+    Column::new(
+        "motion_text_truncated",
+        "Motion Text",
+        "CONCAT(LEFT(t.motion_text, 100), IF(CHAR_LENGTH(t.motion_text) > 100, '...', ''))",
+        false,
+    )
+    .unsortable(),
+    Column::new("is_published", "Is published", "t.is_published", false),
+    Column::new("updated_at", "Updated at", "t.updated_at", true),
+];
+const MOTION_PUBLISHED: &str = "is_published__exact";
+const MOTION_DIVISION: &str = "outround_type__exact";
+const MOTION_DIVISION_NULL: &str = "outround_type__isnull";
+const MOTION_FILTERS: &[&str] = &[MOTION_PUBLISHED, MOTION_DIVISION, MOTION_DIVISION_NULL];
+
 const SUCCESS_FILTER: &str = "successful__exact";
 const REGISTRATION_LABEL: &str = "CONCAT(s.name, ' — ', r.email)";
 
@@ -137,6 +163,7 @@ pub(super) enum ListKind {
     InfoLink,
     InfoText,
     RegistrationLink,
+    Motion,
 }
 
 impl ListKind {
@@ -149,6 +176,7 @@ impl ListKind {
             "infolink" => Some(Self::InfoLink),
             "infotext" => Some(Self::InfoText),
             "registrationlink" => Some(Self::RegistrationLink),
+            "motion" => Some(Self::Motion),
             _ => None,
         }
     }
@@ -162,6 +190,7 @@ impl ListKind {
             Self::InfoLink => "infolink",
             Self::InfoText => "infotext",
             Self::RegistrationLink => "registrationlink",
+            Self::Motion => "motion",
         }
     }
 
@@ -173,6 +202,7 @@ impl ListKind {
             Self::Emails => EMAILS,
             Self::InfoLink | Self::RegistrationLink => INFO_LINKS,
             Self::InfoText => INFO_TEXTS,
+            Self::Motion => MOTIONS,
         }
     }
 
@@ -183,18 +213,31 @@ impl ListKind {
         )
     }
 
+    fn filter_fields(self) -> &'static [&'static str] {
+        match self {
+            Self::Emails => &[SUCCESS_FILTER],
+            Self::Motion => MOTION_FILTERS,
+            _ => &[],
+        }
+    }
+
     pub fn ids(self, query: &Query) -> Option<Vec<i32>> {
-        if matches!(self, Self::Emails) {
-            if query
-                .get(SUCCESS_FILTER)
-                .is_some_and(|value| !matches!(value, "0" | "1"))
-            {
+        let filters = self.filter_fields();
+        for &field in filters {
+            if query.get(field).is_some_and(|value| {
+                if field == MOTION_DIVISION_NULL {
+                    !matches!(
+                        value.to_ascii_lowercase().as_str(),
+                        "true" | "false" | "1" | "0"
+                    )
+                } else {
+                    !matches!(value, "0" | "1")
+                }
+            }) {
                 return None;
             }
-            query.record_ids(&[SUCCESS_FILTER])
-        } else {
-            query.record_ids(&[])
         }
+        query.record_ids(filters)
     }
 
     pub fn filter(self, sql: &mut QueryBuilder<MySql>, query: &Query) {
@@ -209,6 +252,7 @@ impl ListKind {
             Self::Emails => &["s.name", "t.email", "t.error_message"],
             Self::InfoLink | Self::RegistrationLink => &["t.title", "t.url"],
             Self::InfoText => &["t.title", "t.text"],
+            Self::Motion => &["t.motion_text", "t.info_slide"],
             Self::Config => return,
         };
         if matches!(self, Self::Emails)
@@ -216,6 +260,23 @@ impl ListKind {
         {
             sql.push(" AND t.successful = ")
                 .push_bind(successful == "1");
+        }
+        if matches!(self, Self::Motion) {
+            if let Some(published) = query.get(MOTION_PUBLISHED) {
+                sql.push(" AND t.is_published = ")
+                    .push_bind(published == "1");
+            }
+            if let Some(division) = query.get(MOTION_DIVISION) {
+                sql.push(" AND t.outround_type = ")
+                    .push_bind(i32::from(division == "1"));
+            }
+            if let Some(missing) = query.get(MOTION_DIVISION_NULL) {
+                sql.push(if missing.eq_ignore_ascii_case("true") || missing == "1" {
+                    " AND t.outround_type IS NULL"
+                } else {
+                    " AND t.outround_type IS NOT NULL"
+                });
+            }
         }
         for term in search_terms(query.get("q").unwrap_or_default()) {
             let pattern = format!(
@@ -289,6 +350,7 @@ impl ListKind {
             }
             "successful"
             | "is_active"
+            | "is_published"
             | "allow_new_registrations"
             | "allow_registration_edits"
             | "crash_housing_enabled" => boolean_icon(value == "1"),
@@ -377,7 +439,7 @@ pub async fn list(
         ));
         filter_ids(&mut selection, &ids);
         kind.filter(&mut selection, &query);
-        let ordering = if kind.editable() {
+        let ordering = if kind.editable() || matches!(kind, ListKind::Motion) {
             if query.get("o").is_none() { config.ordering.into() } else { order_sql_with(columns, &order, config.ordering) }
         } else { order_sql(columns, &order) };
         selection.push(" ORDER BY ").push(ordering)
@@ -449,15 +511,11 @@ pub async fn list(
             }) else { return Ok(unavailable()); };
             markup
         };
-        let mut filters = Vec::new();
+        let Ok(filters) = list_filters(kind, &query) else { return Ok(unavailable()); };
         let mut filter_params = query.params.clone();
-        let active_filter = filter_params.remove(SUCCESS_FILTER).is_some();
-        if matches!(kind, ListKind::Emails) {
-            let options = [("1".into(), "Yes".into()), ("0".into(), "No".into())];
-            let Ok(filter) = choice_filter(&query, SUCCESS_FILTER, "successful", options) else {
-                return Ok(unavailable());
-            };
-            filters.push(filter);
+        let mut active_filter = false;
+        for field in kind.filter_fields() {
+            active_filter |= filter_params.remove(*field).is_some();
         }
         let opts = model.opts();
         let pager = page.context(&query);
@@ -508,7 +566,7 @@ pub async fn list(
                 has_filters => !filters.is_empty(), filter_specs => filters,
                 has_active_filters => active_filter, clear_all_filters_qs => Query::encode(filter_params),
             },
-            app_url => "/admin/registration/", model_url => &path,
+            app_url => format!("/admin/{}/", model.application()), model_url => &path,
             filter_suffix => query.add_suffix(),
             module_name => model.plural, has_add_permission => can_add,
             actions_on_top => true, action_form => !popup,
@@ -529,6 +587,34 @@ pub async fn list(
         Ok::<_, sqlx::Error>(response)
     }.await;
     result.unwrap_or_else(|_| unavailable())
+}
+
+fn list_filters(kind: ListKind, query: &Query) -> Result<Vec<String>, minijinja::Error> {
+    let boolean = |field, title| {
+        choice_filter(
+            query,
+            field,
+            title,
+            [("1".into(), "Yes".into()), ("0".into(), "No".into())],
+        )
+    };
+    match kind {
+        ListKind::Emails => Ok(vec![boolean(SUCCESS_FILTER, "successful")?]),
+        ListKind::Motion => Ok(vec![
+            boolean(MOTION_PUBLISHED, "is published")?,
+            choice_filter_with_clear_parameters(
+                query,
+                MOTION_DIVISION,
+                "outround type",
+                [
+                    ("0".into(), "Varsity".into()),
+                    ("1".into(), "Novice".into()),
+                ],
+                &[MOTION_DIVISION_NULL],
+            )?,
+        ]),
+        _ => Ok(Vec::new()),
+    }
 }
 
 type ListRow = (i32, Vec<Option<String>>);

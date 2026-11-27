@@ -1012,6 +1012,10 @@ def test_native_motion_workflow_add_edit_and_publish():
 
         def post(path, form=None, *, token=csrf):
             body = {"csrfmiddlewaretoken": token, **(form or {})}
+            if path != "/motions/add/":
+                editing = path.endswith("/edit/")
+                page = request(port, path if editing else "/motions/", extra_headers=jar)[2]
+                body["motion_revision"] = staff_motion_proof(page, None if editing else path)
             return request(port, path, method="POST", extra_headers=jar, form=body)
 
         data = {
@@ -6049,10 +6053,18 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
 
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
                        registration_revision=False, configuration_revision=False, list_revision=False,
-                       content_revision=False):
+                       content_revision=False, motion_revision=False, staff_motion_revision=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
+    if staff_motion_revision and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["motion_revision"] = staff_motion_proof(previous)
+    if motion_revision and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["mittab_motion_revision"] = motion_edit_proof(previous)
     if list_revision and form is not None:
         status, _, previous = request(port, path, cookie=session)
         assert status == 200
@@ -6101,6 +6113,16 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
                 rb'<input type="hidden" name="mittab_configuration_revision" value="[a-f0-9]{64}">', b"", body,
             )
             assert metadata == 1
+        if staff_motion_revision:
+            body, metadata = re.subn(
+                rb'<input type="hidden" name="motion_revision" value="[a-f0-9]{64}">', b"", body,
+            )
+            assert metadata >= 1
+        if motion_revision:
+            body, metadata = re.subn(
+                rb'<input type="hidden" name="mittab_motion_revision" value="[a-f0-9]{64}">', b"", body,
+            )
+            assert metadata == 1
         if content_revision:
             body, metadata = re.subn(
                 rb'<input type="hidden" name="mittab_content_revision" value="[a-f0-9]{64}">', b"", body,
@@ -6112,6 +6134,21 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
             )
             assert metadata == 1
         assert_html_bytes(body, reference.content)
+
+
+def staff_motion_proof(body, action=None):
+    if action:
+        actions = re.findall(rb'<form[^>]*action="([^"]+)"[^>]*>(.*?)</form>', body, flags=re.DOTALL)
+        body = next(form for url, form in actions if url.decode() == action)
+    return re.search(rb'name="motion_revision" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+def motion_delete_proof(body):
+    return re.search(rb'name="mittab_delete_scope" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+def motion_edit_proof(body):
+    return re.search(rb'name="mittab_motion_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
 
 def content_edit_proof(body):
@@ -6612,6 +6649,122 @@ def test_registration_and_public_information_admin_link_parity(html_assets, subt
                 assert model.objects.filter(id=other.id).exists()
                 if model is not InfoText:
                     assert model.objects.get(id=added.id).url == content["url"]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_motion_admin_matches_django_and_publishes_current_motion(html_assets, subtests):
+    session = legacy_tab_session("motions-admin")
+    board = legacy_tab_session("motions-board")
+    get_user_model().objects.get(username="motions-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("motions_enabled", 1)
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Motion School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Gov", "Opp")]
+    Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+    preliminary = Motion.objects.create(
+        round_number=2, motion_text="This house would protect the coastline. " + "x\u030b" * 112,
+        info_slide="Only in this folder <&>.", is_published=True,
+    )
+    varsity = Motion.objects.create(outround_type=Motion.VARSITY, num_teams=4, motion_text="Varsity fixture motion " + "x" * 60)
+    novice = Motion.objects.create(
+        outround_type=Motion.NOVICE, num_teams=64, motion_text="Novice fixture motion", is_published=True,
+    )
+    Motion.objects.create(motion_text="Unassigned fixture motion")
+    root = "/admin/tab/motion/"
+    edit = f"{root}{preliminary.pk}/change/"
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = session
+    client.cookies["csrftoken"] = csrf
+
+    def submit(port, path, fields, sid=session):
+        return request(port, path, method="POST", form={**fields, "csrfmiddlewaretoken": csrf},
+                       extra_headers={"Cookie": f"sessionid={sid}; csrftoken={csrf}"})
+
+    valid = {"round_number": "3", "outround_type": "", "num_teams": "",
+             "motion_text": "This house would subsidize ferries <and buses>.", "info_slide": "Second <line>.",
+             "is_published": "on"}
+    with rust_server(overrides=html_assets) as port:
+        for suffix in ("", "?q=coastline", "?q=folder", "?q=missing", "?o=-3", "?is_published__exact=1",
+                       "?outround_type__exact=1", "?is_published__exact=1&outround_type__isnull=True",
+                       "?_popup=1&_to_field=id", "add/", f"{preliminary.pk}/change/", f"{novice.pk}/change/",
+                       f"{preliminary.pk}/history/", f"{varsity.pk}/delete/"):
+            with subtests.test(suffix=suffix):
+                compare_admin_page(port, root + suffix, client, motion_revision=suffix.endswith("/change/"),
+                                   deletion_scope=suffix.endswith("/delete/"))
+        for fields in (
+            {},
+            {**valid, "motion_text": ""},
+            {**valid, "num_teams": 4, "outround_type": "0"},
+            {**valid, "round_number": "", "num_teams": 4},
+            {**valid, "round_number": "", "num_teams": ""},
+            {**valid, "outround_type": "unknown", "round_number": "word"},
+        ):
+            with subtests.test(fields=fields):
+                compare_admin_page(port, root + "add/", client, fields)
+
+        staff_edit = f"/motions/{preliminary.pk}/edit/"
+        toggle = f"/motions/{preliminary.pk}/toggle-published/"
+        publish_all = "/motions/publish-all/"
+        compare_admin_page(port, "/motions/", client, staff_motion_revision=True)
+        compare_admin_page(port, staff_edit, client, staff_motion_revision=True)
+        compare_admin_page(port, staff_edit, client, {
+            "round_selection": "outround_1_8", "motion_text": "", "info_slide": "Preserved",
+        }, staff_motion_revision=True)
+
+        assert request(port, root, cookie=board)[1]["Location"] == "/403/"
+        assert submit(port, edit, valid, sid=board)[1]["Location"] == "/403/"
+        assert request(port, "/public/motions/")[0] == 200
+        assert b"protect the coastline" in request(port, "/public/motions/")[2]
+
+        proof = motion_edit_proof(request(port, edit, cookie=session)[2])
+        staff_page = request(port, "/motions/", cookie=session)[2]
+        old_toggle = staff_motion_proof(staff_page, toggle)
+        old_bulk = staff_motion_proof(staff_page, publish_all)
+        old_staff = staff_motion_proof(request(port, staff_edit, cookie=session)[2])
+        Motion.objects.filter(pk=preliminary.pk).update(is_published=False)
+        assert submit(port, edit, {**valid, "mittab_motion_revision": proof})[0] == 409
+        preliminary.refresh_from_db()
+        assert not preliminary.is_published and preliminary.round_number == 2
+        assert submit(port, toggle, {"motion_revision": old_toggle})[0] == 409
+        stale_form = {"motion_revision": old_staff, "round_selection": "inround_2"}
+        assert submit(port, staff_edit, {**stale_form, "motion_text": ""})[0] == 409
+        assert submit(port, staff_edit, {**stale_form, "motion_text": "Stale staff content"})[0] == 409
+        late_draft = Motion.objects.create(round_number=1, motion_text="Private until reviewed")
+        assert submit(port, publish_all, {"motion_revision": old_bulk})[0] == 409
+        assert not Motion.objects.get(pk=late_draft.pk).is_published
+        late_draft.delete()
+
+        assert b"protect the coastline" not in request(port, "/public/motions/")[2]
+        proof = motion_edit_proof(request(port, edit, cookie=session)[2])
+        assert submit(port, edit, {**valid, "mittab_motion_revision": proof})[0] == 302
+        preliminary.refresh_from_db()
+        assert preliminary.is_published and preliminary.round_number == 3
+        body = request(port, "/public/motions/")[2]
+        assert b"subsidize ferries &lt;and buses&gt;" in body and b"protect the coastline" not in body
+        compare_admin_page(port, edit, client, motion_revision=True)
+        compare_admin_page(port, f"{root}{preliminary.pk}/history/", client)
+
+        other_fields = {**valid, "motion_text": "New varsity motion", "round_number": "",
+                        "num_teams": 12, "outround_type": "0", "is_published": "off"}
+        assert submit(port, root + "add/", other_fields)[0] == 302
+        added = Motion.objects.get(motion_text=other_fields["motion_text"])
+        assert added.num_teams == 12 and not added.is_published
+        path = root + "?outround_type__exact=0"
+        preview = {
+            "action": "delete_selected", "index": 0, "select_across": 1,
+            "_selected_action": [str(added.pk), str(varsity.pk), str(novice.pk)],
+        }
+        compare_admin_page(port, path, client, preview, deletion_scope=True)
+        old_scope = motion_delete_proof(submit(port, path, preview)[2])
+        Motion.objects.filter(pk=varsity.pk).update(motion_text=varsity.motion_text + "revised ending")
+        confirmation = {"action": "delete_selected", "post": "yes", "_selected_action": preview["_selected_action"]}
+        assert submit(port, path, {**confirmation, "mittab_delete_scope": old_scope})[0] == 409
+        scope = motion_delete_proof(submit(port, path, preview)[2])
+        assert submit(port, path, {**confirmation, "mittab_delete_scope": scope})[0] == 302
+        assert not Motion.objects.filter(pk__in=(added.pk, varsity.pk)).exists()
+        assert Motion.objects.filter(pk=novice.pk).exists()
 
 
 @pytest.mark.django_db(transaction=True)
