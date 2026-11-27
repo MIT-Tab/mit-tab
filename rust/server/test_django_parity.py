@@ -557,40 +557,6 @@ def test_board_api_reads_fail_closed_before_and_after_access_opens():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_missing_session_signing_key_does_not_remove_staff_restrictions():
-    user = get_user_model().objects.create_user(username="staff-test", password="synthetic", is_staff=True)
-    client = Client()
-    client.force_login(user)
-    cookie = client.cookies["sessionid"].value
-    with rust_server() as port:
-        for path in API_PATHS:
-            assert request(port, path, cookie=cookie)[0] == client.get(path).status_code == 302
-    visitor = Client().session
-    visitor["_return_to"] = "/public/pairings/"
-    visitor.save()
-    with rust_server(session_key_configured=False) as port:
-        assert request(port, "/public/", cookie=visitor.session_key)[0] == 200
-        status, headers, _ = request(port, COUNTS, cookie=cookie)
-        assert status == 303 and headers["Location"] == "/public/login/"
-        assert headers["Cache-Control"] == "private, no-store"
-        login_status, login_headers, _ = request(port, headers["Location"], cookie=cookie)
-        assert login_status == 200
-        csrf = load_cookies(login_headers)["csrftoken"].value
-        posted, signed_in, _ = request(port, "/public/login/", method="POST",
-            extra_headers={"Cookie": f"sessionid={cookie}; csrftoken={csrf}"},
-            form={"username": user.username, "password": "synthetic", "csrfmiddlewaretoken": csrf})
-        assert posted == 302
-        replacement = load_cookies(signed_in)["sessionid"].value
-        assert replacement != cookie and request(port, COUNTS, cookie=replacement)[0] == 302
-        assert request(port, COUNTS)[0] == 200
-    client = Client()
-    client.force_login(user)
-    with rust_server(overrides={"MITTAB_DJANGO_SECRET_KEY": "wrong-fixture-key"}) as port:
-        status, headers, _ = request(port, COUNTS, cookie=client.cookies["sessionid"].value)
-        assert status == 303 and headers["Location"] == "/public/login/"
-
-
-@pytest.mark.django_db(transaction=True)
 def test_legacy_placements_match_django_with_forfeits_and_byes():
     school = School.objects.create(name="Examples")
     teams = [
@@ -956,6 +922,42 @@ def test_native_staff_login_honors_csrf_role_and_session_revocation():
         status, headers, _ = request(port, COUNTS, cookie=first.value)
         assert status == 200  # A revoked session sees only the anonymous response.
         assert "Location" not in headers
+
+
+@pytest.mark.django_db(transaction=True)
+def test_missing_session_signing_key_does_not_remove_staff_restrictions():
+    migrated = rust_command("migrate", connection.settings_dict["NAME"])
+    assert migrated.returncode == 0, migrated.stderr
+    user = get_user_model().objects.create_user(username="staff-test", password="synthetic", is_staff=True)
+    client = Client()
+    client.force_login(user)
+    cookie = client.cookies["sessionid"].value
+    with rust_server() as port:
+        for path in API_PATHS:
+            assert request(port, path, cookie=cookie)[0] == client.get(path).status_code == 302
+    visitor = Client().session
+    visitor["_return_to"] = "/public/pairings/"
+    visitor.save()
+    with rust_server(session_key_configured=False) as port:
+        assert request(port, "/public/", cookie=visitor.session_key)[0] == 200
+        status, headers, _ = request(port, COUNTS, cookie=cookie)
+        assert status == 303 and headers["Location"] == "/public/login/"
+        assert headers["Cache-Control"] == "private, no-store"
+        login_status, login_headers, _ = request(port, headers["Location"], cookie=cookie)
+        assert login_status == 200
+        csrf = load_cookies(login_headers)["csrftoken"].value
+        posted, signed_in, _ = request(port, "/public/login/", method="POST",
+            extra_headers={"Cookie": f"sessionid={cookie}; csrftoken={csrf}"},
+            form={"username": user.username, "password": "synthetic", "csrfmiddlewaretoken": csrf})
+        assert posted == 302
+        replacement = load_cookies(signed_in)["sessionid"].value
+        assert replacement != cookie and request(port, COUNTS, cookie=replacement)[0] == 302
+        assert request(port, COUNTS)[0] == 200
+    client = Client()
+    client.force_login(user)
+    with rust_server(overrides={"MITTAB_DJANGO_SECRET_KEY": "wrong-fixture-key"}) as port:
+        status, headers, _ = request(port, COUNTS, cookie=client.cookies["sessionid"].value)
+        assert status == 303 and headers["Location"] == "/public/login/"
 
 
 @pytest.mark.django_db(transaction=True)
