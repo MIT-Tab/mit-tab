@@ -158,6 +158,34 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/common/_quick_search.html"),
         ),
         (
+            "apda_board/outrounds.html",
+            include_str!("../../../mittab/templates/apda_board/outrounds.html"),
+        ),
+        (
+            "apda_board/_pairing.html",
+            include_str!("../../../mittab/templates/apda_board/_pairing.html"),
+        ),
+        (
+            "outrounds/pairing_base.html",
+            include_str!("../../../mittab/templates/outrounds/pairing_base.html"),
+        ),
+        (
+            "outrounds/pairing_card.html",
+            include_str!("../../../mittab/templates/outrounds/pairing_card.html"),
+        ),
+        (
+            "outrounds/ballot.html",
+            include_str!("../../../mittab/templates/outrounds/ballot.html"),
+        ),
+        (
+            "outrounds/_form.html",
+            include_str!("../../../mittab/templates/outrounds/_form.html"),
+        ),
+        (
+            "outrounds/forum_result.html",
+            include_str!("../../../mittab/templates/outrounds/forum_result.html"),
+        ),
+        (
             "pairing/judge_dropdown.html",
             include_str!("../../../mittab/templates/pairing/judge_dropdown.html"),
         ),
@@ -281,13 +309,25 @@ fn translate(source: &str) -> String {
                 assert!(URLS.contains_key(&name), "unknown legacy URL {name}");
                 output.push_str(&format!("{{% set {variable} = urls.{name} %}}"));
             }
+            ["url", "'next_outround'", "pending.type", "pending.previous_size"] => {
+                output.push_str("/outround_pairing/pair/{{ pending.kind }}/{{ pending.previous_size }}/");
+            }
+            ["url", "'outround_pretty_pair'", "section.type_of_round"] => {
+                output.push_str("/public/outrounds/{{ section.type_of_round }}/");
+            }
+            ["return_to_input", "return_path"] => output.push_str(
+                "{% with redirect_target=return_path %}{% include 'common/_return_to_input.html' %}{% endwith %}",
+            ),
+            ["url", "'board_outround_edit'", "pairing.id"] => {
+                output.push_str("/apda-board/outround/{{ pairing.id }}/");
+            }
             ["url", "'view_round'", "number"] => output.push_str("/round/{{ number }}/"),
             ["url", "'board_inrounds'", "number"] => {
                 output.push_str("/apda-board/inrounds/{{ number }}/");
             }
             ["url", "'view_judge'", "judge.id"] => output.push_str("/judge/{{ judge.id }}/"),
             ["return_to_input"] => output.push_str(
-                "{{ round_input|safe }}{% with redirect_target=request.path %}{% include 'common/_return_to_input.html' %}{% endwith %}",
+                "{{ round_input|safe }}{% with redirect_target=return_path|default(request.path) %}{% include 'common/_return_to_input.html' %}{% endwith %}",
             ),
             ["return_to_input", "request.path"] => output.push_str(
                 "{{ round_input|safe }}{% with redirect_target=request.path %}{% include 'common/_return_to_input.html' %}{% endwith %}",
@@ -326,7 +366,7 @@ fn translate(source: &str) -> String {
                 ));
             }
             ["include", template, "with", fields @ ..] => {
-                let fields = fields.join(", ");
+                let fields = fields.join(", ").replace("=True", "=true").replace("=False", "=false");
                 output.push_str(&format!(
                     "{{% with {fields} %}}{{% include {template} %}}{{% endwith %}}"
                 ));
@@ -338,10 +378,14 @@ fn translate(source: &str) -> String {
             ["for", "filter_group", "in", "filters"] => output.push_str(
                 "{% for filter_group in filters %}{% set filter_group_index = loop.index %}",
             ),
+            ["outround_form", "form"] => output.push_str("{% include 'outrounds/_form.html' %}"),
             ["csrf_token"] => output.push_str("{{ csrf_input|safe }}"),
-            ["render_field", field, ..] => output.push_str(&format!(
-                "{{% with field=widgets.{field}.field, checkbox=widgets.{field}.checkbox, widget_html=widgets.{field}.input|safe %}}{{% include \"ui/field.html\" %}}{{% endwith %}}"
-            )),
+            ["render_field", field, ..] => {
+                let field = field.strip_prefix("form.").unwrap_or(field);
+                output.push_str(&format!(
+                    "{{% with field=widgets.{field}.field, checkbox=widgets.{field}.checkbox, widget_html=widgets.{field}.input|safe %}}{{% include \"ui/field.html\" %}}{{% endwith %}}"
+                ));
+            }
             _ => {
                 output.push_str("{%");
                 output.push_str(raw);

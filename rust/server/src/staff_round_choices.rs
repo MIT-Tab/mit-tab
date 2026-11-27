@@ -8,7 +8,7 @@ use crate::{
 
 #[derive(Serialize)]
 pub struct Choice {
-    id: i32,
+    pub(crate) id: i32,
     name: String,
     pub(crate) occupied: bool,
     badges: Vec<String>,

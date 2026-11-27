@@ -186,6 +186,10 @@ pub struct History {
     pub actor: String,
     pub time: String,
     pub changes: Vec<Change>,
+    #[serde(skip)]
+    pub legacy_time: String,
+    #[serde(skip)]
+    pub label: &'static str,
 }
 
 #[derive(Serialize)]
@@ -210,6 +214,10 @@ pub struct StaffEdits {
 }
 
 impl Histories {
+    pub fn manual_judge_names(&self, id: i32) -> Option<&std::collections::BTreeSet<String>> {
+        self.current_judges.get(&id)
+    }
+
     pub fn take_staff_edits(&mut self, id: i32) -> StaffEdits {
         let history = self.retained.remove(&id).unwrap_or_default();
         let changed = |field| {
@@ -328,6 +336,16 @@ pub async fn histories(
         if !changes.is_empty() {
             retained.entry(id).or_default().push(History {
                 actor, time: time.format("%b %d %H:%M UTC").to_string(), changes,
+                legacy_time: time.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+                label: match kind.as_str() {
+                    "create" => "Created",
+                    "edit" => "Edited",
+                    "manual_judge_assign" => "Manual judge assignment",
+                    "manual_judge_remove" => "Manual judge removal",
+                    "manual_chair_change" => "Manual chair change",
+                    "judges_paired" => "Automatic judge assignment",
+                    _ => "Changed",
+                },
             });
         }
     }

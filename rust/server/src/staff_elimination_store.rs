@@ -258,6 +258,20 @@ pub struct ChallengeState {
     once: bool,
 }
 
+impl ChallengeState {
+    pub fn display_seed(&self, entry: &Entry) -> i32 {
+        if self.basis == SeedBasis::Original {
+            entry.seed
+        } else {
+            entry.effective
+        }
+    }
+
+    pub fn uses_original_seeds(&self) -> bool {
+        self.basis == SeedBasis::Original
+    }
+}
+
 fn generation_key(division: i32) -> String {
     format!("challenge_pick_generation_{division}")
 }
@@ -656,11 +670,21 @@ pub async fn ballot(
     Ok(stage)
 }
 
-pub async fn choice(app: &App, user: i32, id: i32) -> Result<(Stage, i32), Error> {
+pub async fn choice(
+    app: &App,
+    user: i32,
+    id: i32,
+    revision: &str,
+) -> Result<(Stage, i32, String), Error> {
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
     let before = board_snapshot::capture(&mut db, Pairings::Outround).await?;
     let original = before.get(&id).ok_or(Error::Missing)?;
+    if !revision.is_empty() && original.revision() != revision {
+        return Err(Error::Invalid(
+            "This pairing changed. Reload it before saving.",
+        ));
+    }
     let stage = Stage::new(
         original.division.ok_or(Error::Missing)?,
         original.num_teams.ok_or(Error::Missing)?,
@@ -674,6 +698,7 @@ pub async fn choice(app: &App, user: i32, id: i32) -> Result<(Stage, i32), Error
         .await?;
     let mut after = original.clone();
     after.choice = Some(value);
+    let current_revision = after.revision();
     board_snapshot::audit_pairings(
         &mut db,
         &BTreeMap::from([(id, original.clone())]),
@@ -683,5 +708,5 @@ pub async fn choice(app: &App, user: i32, id: i32) -> Result<(Stage, i32), Error
     )
     .await?;
     db.commit().await?;
-    Ok((stage, value))
+    Ok((stage, value, current_revision))
 }

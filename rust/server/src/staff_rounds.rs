@@ -1,7 +1,7 @@
 use axum::{
     Extension, Json, Router,
     body::Bytes,
-    extract::{MatchedPath, Path, State},
+    extract::{MatchedPath, Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::Response,
     routing::{get, post},
@@ -385,20 +385,38 @@ async fn sides(
     .await
 }
 
-async fn alts(State(app): State<App>, path: MatchedPath, Path(id): Path<i32>) -> Response {
-    alternatives(&app, path.as_str(), id, None, None).await
+async fn alts(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    path: MatchedPath,
+    Path(id): Path<i32>,
+    Query(selection): Query<crate::staff_elimination_page::Selection>,
+) -> Response {
+    alternatives(&app, actor, path.as_str(), id, None, None, selection).await
 }
 
 async fn alts_fixed(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     path: MatchedPath,
     Path((id, current)): Path<(i32, i32)>,
+    Query(selection): Query<crate::staff_elimination_page::Selection>,
 ) -> Response {
-    alternatives(&app, path.as_str(), id, Some(current), None).await
+    alternatives(
+        &app,
+        actor,
+        path.as_str(),
+        id,
+        Some(current),
+        None,
+        selection,
+    )
+    .await
 }
 
 async fn alts_teams(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     path: MatchedPath,
     Path((id, current, side)): Path<(i32, i32, String)>,
 ) -> Response {
@@ -407,17 +425,31 @@ async fn alts_teams(
         "opp" => false,
         _ => return error_response(Error::Invalid("Choose a side.")),
     };
-    alternatives(&app, path.as_str(), id, Some(current), Some(side)).await
+    alternatives(
+        &app,
+        actor,
+        path.as_str(),
+        id,
+        Some(current),
+        Some(side),
+        Default::default(),
+    )
+    .await
 }
 
 async fn alternatives(
     app: &App,
+    actor: Actor,
     path: &str,
     id: i32,
     current: Option<i32>,
     side: Option<bool>,
+    selection: crate::staff_elimination_page::Selection,
 ) -> Response {
-    let Ok(mut db) = app.db.acquire().await else {
+    if !matches!(actor, Actor::User { board: false, .. }) {
+        return access::access_denied();
+    }
+    let Ok(mut db) = app.db.begin().await else {
         return unavailable();
     };
     let kind = Debate::route(path);
@@ -426,26 +458,18 @@ async fn alternatives(
         Ok(None) => return error_response(Error::Missing),
         Err(_) => return unavailable(),
     };
-    if kind == Debate::Inround {
-        return match crate::pairing_dropdowns::render(&mut db, &detail, path, current, side).await {
-            Ok(response) => response,
-            Err(sqlx::Error::RowNotFound) => error_response(Error::Missing),
-            Err(_) => unavailable(),
-        };
-    }
-    let options = if let Some(side) = side {
-        choices::teams(&mut db, kind, &detail, side).await
-    } else if path.contains("alternative_judges") {
-        choices::judges(&mut db, kind, &detail).await
-    } else {
-        choices::rooms(&mut db, kind, &detail).await
-    };
-    match options {
-        Ok(options) => html::render(
-            "staff_round_choices.html",
-            context! { options },
-            StatusCode::OK,
-        ),
-        Err(_) => unavailable(),
+    let response =
+        crate::pairing_dropdowns::render(&mut db, kind, &detail, (path, current, side), selection)
+            .await;
+    match response {
+        Ok(response) => {
+            if db.commit().await.is_ok() {
+                response
+            } else {
+                unavailable()
+            }
+        }
+        Err(sqlx::Error::RowNotFound) => error_response(Error::Missing),
+        _ => unavailable(),
     }
 }

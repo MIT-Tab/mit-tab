@@ -2,13 +2,19 @@ import $ from "jquery";
 
 import quickSearchInit from "./quickSearch";
 
-function pairingWrite(url, data) {
+export function pairingWrite(url, data) {
   return {
     url,
     data,
     type: "POST",
     headers: { "X-CSRFToken": $("[name=csrfmiddlewaretoken]").first().val() },
   };
+}
+
+export function savePairingRevision($card, result) {
+  if (result.revision) {
+    $card.attr("data-revision", result.revision);
+  }
 }
 
 function populateTabCards() {
@@ -97,14 +103,17 @@ function handleSwitchSides(event) {
   const $target = $(event.currentTarget);
   const roundId = $target.attr("round-id");
   const isOutround = Boolean($target.data("outround"));
+  const $card = $target.closest(".pairing-card");
+  const revision = $target.attr("data-revision");
   const baseUrl = isOutround ? "/outround" : "/round";
   const url = `${baseUrl}/${roundId}/switch_sides/`;
   const alertMsg = "Unable to switch sides. Refresh and try again.";
 
   $.ajax({
-    ...pairingWrite(url),
+    ...pairingWrite(url, revision ? { revision } : undefined),
     success(result) {
       if (result.success) {
+        savePairingRevision($card, result);
         updateTeamSection(roundId, "gov", result.gov_team);
         updateTeamSection(roundId, "opp", result.opp_team);
         if (isOutround) {
@@ -126,12 +135,13 @@ function handleSwitchSides(event) {
   });
 }
 
-function assignRoom(e) {
+function assignRoom(e, $card, revision) {
   e.preventDefault();
-  const $parent = $(this).parent().parent();
-  const roundId = $(e.target).attr("round-id");
-  const roomId = $(e.target).attr("room-id");
-  const curRoomId = $(e.target).attr("current-room-id");
+  const $item = $(e.currentTarget);
+  const $parent = $item.parent().parent();
+  const roundId = $item.attr("round-id");
+  const roomId = $item.attr("room-id");
+  const curRoomId = $item.attr("current-room-id");
   const outround = $parent.attr("outround") === "true";
   const baseUrl = outround ? "/outround" : "/round";
   const url = `${baseUrl}/${roundId}/assign_room/${roomId}/`;
@@ -149,8 +159,9 @@ function assignRoom(e) {
   $button.addClass("disabled");
 
   $.ajax({
-    ...pairingWrite(url),
+    ...pairingWrite(url, revision ? { revision } : undefined),
     success(result) {
+      savePairingRevision($card, result);
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
       $buttonWrapper.attr("room-id", result.room_id);
@@ -165,6 +176,10 @@ function assignRoom(e) {
         result.room_color,
       );
     },
+    error() {
+      $button.removeClass("disabled");
+      window.alert("Unable to assign the room. Refresh and try again.");
+    },
   });
 }
 
@@ -173,6 +188,8 @@ function populateAlternativeRooms() {
   const roomId = $parent.attr("room-id");
   const roundId = $parent.attr("round-id");
   const outround = $parent.attr("outround") === "true";
+  const $card = $parent.closest(".pairing-card");
+  const revision = $card.attr("data-revision");
   const baseUrl = outround ? "/outround" : "/round";
   const query = outround ? window.location.search || "" : "";
   const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId ? `${roomId}/` : ""}${query}`;
@@ -181,7 +198,10 @@ function populateAlternativeRooms() {
     url,
     success(result) {
       $parent.find(".dropdown-menu").html(result);
-      $parent.find(".dropdown-menu").find(".room-assign").click(assignRoom);
+      $parent
+        .find(".dropdown-menu")
+        .find(".room-assign")
+        .click((event) => assignRoom(event, $card, revision));
       quickSearchInit($parent.find("#quick-search"));
       $parent.find("#quick-search").focus();
     },

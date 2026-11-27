@@ -1849,7 +1849,7 @@ def test_native_board_bracket_operations_allow_only_team_room_and_result_fields(
         assert request(port, outrounds, cookie=tab)[0] == 403
         Round.objects.filter(id=debate.id).update(victor=Round.GOV)
         status, headers, body = request(port, outrounds, cookie=board)
-        assert status == 200 and b"Pair Next Varsity Round" in body
+        assert status == 200 and b"Pair next varsity round (teams and rooms)" in body
         csrf = load_cookies(headers)["csrftoken"].value
         jar = {"Cookie": f"sessionid={board}; csrftoken={csrf}"}
 
@@ -1884,9 +1884,13 @@ def test_native_board_bracket_operations_allow_only_team_room_and_result_fields(
                 "scratches": ["protected scratch fixture"],
             }}},
         )
-        before = {path: request(port, path, extra_headers=jar)[2] for path in paths}
+        def page_without_csrf(path):
+            body = request(port, path, extra_headers=jar)[2]
+            return re.sub(rb'name="csrfmiddlewaretoken" value="[A-Za-z0-9]{64}"', b'name="csrfmiddlewaretoken"', body)
+
+        before = {path: page_without_csrf(path) for path in paths}
         assert b"(chair)" in before[inrounds] and b"New Chair" in before[inrounds]
-        assert b"Manual edits" in before[outrounds]
+        assert b"manual edits" in before[outrounds]
         assert b"New Chair" in request(port, f"{inrounds}?manual=1", extra_headers=jar)[2]
         for body in before.values():
             assert b"protected" not in body and b"private reason fixture" not in body
@@ -1895,7 +1899,7 @@ def test_native_board_bracket_operations_allow_only_team_room_and_result_fields(
         Scratch.objects.create(team=teams[0], judge=judges[0], scratch_type=Scratch.TAB_SCRATCH)
         Judge.objects.filter(id=judges[0].id).update(rank=Decimal("9.57"), wing_only=True,
                                                    request_wing=True, no_wings=True)
-        assert {path: request(port, path, extra_headers=jar)[2] for path in paths} == before
+        assert {path: page_without_csrf(path) for path in paths} == before
         assert request(port, f"{home}inrounds/1/", method="HEAD", extra_headers=jar)[0] == 200
         assert post(inrounds, {"action": "result", "victor": 1})[1]["Location"] == "/403/"
         assert request(port, pair, extra_headers=jar)[1]["Location"] == "/403/"
@@ -3817,6 +3821,147 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path)
 
 
 @pytest.mark.django_db(transaction=True)
+def test_elimination_staff_and_board_pages_match_django_bytes(html_assets, subtests):
+    from mittab.apps.tab.models import OutroundChallenge
+
+    staff = legacy_tab_session("elimination-html")
+    board = legacy_tab_session("elimination-html-board")
+    user = get_user_model().objects.get(username="elimination-html")
+    get_user_model().objects.get(username="elimination-html-board").groups.add(Group.objects.create(name="APDA Board"))
+    for key, value in {
+        "cur_round": 2, "tot_rounds": 1, "var_teams_to_break": 4, "nov_teams_to_break": 2,
+        "var_panel_size": 3, "nov_panel_size": 2, "choice": 1, "var_teams_visible": 4,
+        "outround_pairing_mode": 0,
+    }.items():
+        TabSettings.set(key, value)
+    school = School.objects.create(name="Example & Company")
+    names = ["North & East", "South", "West", "Northwest", "Varsity Alternate", "Novice North", "Novice South"]
+    teams = [Team.objects.create(name=name, school=school, seed=0) for name in names]
+    for index, team in enumerate(teams):
+        team.debaters.add(Debater.objects.create(name=f"Avery {index}", novice_status=0),
+                          Debater.objects.create(name=f"Taylor {index}", novice_status=0))
+        BreakingTeam.objects.create(team=team, type_of_team=int(index >= 5), seed=index + 1, effective_seed=index + 1)
+    Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
+    first_room = Room.objects.create(name="Room & 101", rank=3)
+    second_room = Room.objects.create(name="Room 205", rank=4)
+    for room in (first_room, second_room):
+        RoomCheckIn.objects.create(room=room, round_number=0)
+    chair = Judge.objects.create(name="Casey & Co", rank=Decimal("7.25"), request_wing=True)
+    wing = Judge.objects.create(name="Avery Wing", rank=Decimal("4.75"), wing_only=True)
+    unavailable = Judge.objects.create(name="Absent Judge", rank=Decimal("8.00"))
+    eligible = Judge.objects.create(name="Eligible Judge", rank=5)
+    for judge in (chair, wing, eligible):
+        CheckIn.objects.create(judge=judge, round_number=0)
+    var = Outround.objects.create(num_teams=4, type_of_round=0, gov_team=teams[0], opp_team=teams[1],
+                                  chair=chair, room=first_room, choice=Outround.GOV)
+    var.judges.add(chair, wing)
+    ended = Outround.objects.create(num_teams=4, type_of_round=0, gov_team=teams[2], opp_team=teams[3], victor=Outround.OPP)
+    nov = Outround.objects.create(num_teams=2, type_of_round=1, gov_team=teams[5], opp_team=teams[6], room=second_room)
+    nov.judges.add(eligible)
+    needed = RoomTag.objects.create(tag="Accessible", priority=1)
+    teams[0].required_room_tags.add(needed)
+    second_room.tags.add(needed)
+    AuditEvent.record(var, AuditEvent.MANUAL_CHAIR_CHANGE, user,
+                      changes={"new_chair": chair.name}, note="Private staff-only note")
+    AuditEvent.record(var, AuditEvent.EDIT, user, changes={"public": {
+        "source": "staff team correction",
+        "before": {"gov_team": {"id": teams[4].id, "name": teams[4].name}},
+        "after": {"gov_team": {"id": teams[0].id, "name": teams[0].name}},
+    }})
+    selected = "?select_varsity=4&select_novice=2"
+    paths = [
+        "/outround_pairing/0/4", "/outround_pairing/0/4?select_varsity=4&select_novice=",
+        f"/outround_pairing/1/2{selected}", "/outround_pairing/0/4?select_varsity=99",
+        f"/outround/{var.id}/{teams[0].id}/alternative_teams/gov/",
+        f"/outround/{var.id}/alternative_judges/{chair.id}/{selected}",
+        f"/outround/{var.id}/alternative_judges/{selected}",
+        f"/outround/{var.id}/alternative_rooms/{first_room.id}/{selected}",
+        "/outround_pairing/pair/0/4/", "/outround_result/0",
+        f"/outround/{var.id}/result/", f"/outround/{ended.id}/result/",
+    ]
+
+    def compare(port, path, session):
+        client = Client()
+        client.cookies["sessionid"] = session
+        client.cookies["csrftoken"] = "a" * 32
+        status, _, body = request(port, path, extra_headers={"Cookie": f"sessionid={session}; csrftoken=" + "a" * 32})
+        token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+        with patch("django.middleware.csrf._get_new_csrf_string", return_value=token[1][:32].decode() if token else "a" * 32):
+            reference = client.get(path)
+        assert status == reference.status_code == 200, (path, status)
+        # The native revisions use a different digest and a ballot rejects stale saves.
+        if path.startswith("/outround_pairing/") and "/pair/" not in path:
+            body = re.sub(rb' data-revision="[a-f0-9]{64}"', b"", body)
+        elif "/result/" in path:
+            body = re.sub(rb'<input type="hidden" name="revision" value="[a-f0-9]+">', b"", body)
+        elif path == "/apda-board/outrounds/":
+            body = re.sub(rb'name="revision" value="[a-zA-Z0-9]+"', b'name="revision" value="<revision>"', body)
+            reference.content = re.sub(rb'name="revision" value="[a-zA-Z0-9]+"', b'name="revision" value="<revision>"', reference.content)
+        assert_html_bytes(body, reference.content)
+        return body
+
+    with rust_server(overrides=html_assets) as port:
+        for path in paths:
+            with subtests.test(path=path):
+                compare(port, path, staff)
+                assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+
+        board_path = "/apda-board/outrounds/"
+        with subtests.test(path=board_path):
+            shown = compare(port, board_path, board)
+            assert b"Private staff-only note" not in shown and b"Absent Judge" not in shown
+            assert b"7.25" not in shown and b"Requests Wing" not in shown
+            assert b"Casey &amp; Co" in shown and b"manual edits" in shown
+        with subtests.test(path=board_path, protected_edit=True):
+            # Change protected data while leaving every public pairing field alone.
+            _, _, before = request(port, board_path, extra_headers={"Cookie": f"sessionid={board}; csrftoken=" + "a" * 32})
+            Judge.objects.filter(pk=chair.id).update(rank=9.12, wing_only=True, request_wing=False, no_wings=True)
+            Scratch.objects.create(judge=unavailable, team=teams[0], scratch_type=Scratch.TAB_SCRATCH)
+            _, _, after = request(port, board_path, extra_headers={"Cookie": f"sessionid={board}; csrftoken=" + "a" * 32})
+            strip_token = lambda body: re.sub(rb'name="csrfmiddlewaretoken" value="[A-Za-z0-9]{64}"', b'name="csrfmiddlewaretoken"', body)
+            assert strip_token(before) == strip_token(after)
+
+        with subtests.test(case="stale staff correction"):
+            csrf = "a" * 32
+            headers = {"Cookie": f"sessionid={staff}; csrftoken={csrf}", "X-CSRFToken": csrf}
+            path = "/outround_pairing/0/4"
+            revision = re.search(
+                rb'data-revision="([a-f0-9]{64})"[^>]*>\s*<div[^>]*>\s*<div class="row" round-id="'
+                + str(var.id).encode() + rb'"',
+                request(port, path, extra_headers=headers)[2],
+            )[1].decode()
+
+            def correction(path, revision):
+                return request(port, path, method="POST", extra_headers=headers, form={"revision": revision})
+
+            room_path = f"/outround/{var.id}/assign_room/{second_room.id}/"
+            team_path = f"/outround/pairings/assign_team/{var.id}/gov/{teams[4].id}/"
+            status, _, body = correction(room_path, revision)
+            assert status == 200 and (updated := json.loads(body)["revision"]) != revision
+            assert correction(team_path, revision)[0] == 422
+            assert correction(f"/outround/{var.id}/switch_sides/", revision)[0] == 422
+            assert correction(f"/outround_choice/{var.id}", revision)[0] == 422
+            var.refresh_from_db()
+            assert (var.gov_team_id, var.room_id, var.choice) == (teams[0].id, second_room.id, Outround.GOV)
+            status, _, body = correction(team_path, updated)
+            assert status == 200 and json.loads(body)["revision"] != updated
+            var.refresh_from_db()
+            assert var.gov_team_id == teams[4].id
+
+        # Challenge entry before the opening varsity round, with and without a saved pick.
+        Outround.objects.filter(type_of_round=0).delete()
+        BreakingTeam.objects.filter(team=teams[4]).delete()
+        TabSettings.set("outround_pairing_mode", 1)
+        TabSettings.set("challenge_pick_generation_0", BreakingTeam.objects.filter(type_of_team=0).order_by("id").first().id)
+        path = "/outround_pairing/pair/0/8/"
+        for case in ("waiting", "picked", "checks"):
+            with subtests.test(path=path, case=case):
+                if case == "picked":
+                    OutroundChallenge.objects.create(type_of_round=0, num_teams=4, challenger=teams[0], challenged=teams[2])
+                compare(port, path + ("?stage=pairing" if case == "checks" else ""), staff)
+
+
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize("imported", (False, True))
 def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imported):
     from mittab.apps.tab.models import OutroundChallenge
@@ -3847,11 +3992,11 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
 
         assert post("/break/")[0] == 302
         assert BreakingTeam.objects.filter(type_of_team=0).count() == 4 and not Outround.objects.exists()
-        assert b"Prepare Challenges" in request(port, "/outround_pairing/0/4", cookie=tab)[2]
+        assert b"Enter Challenge Outs" in request(port, "/outround_pairing/0/4", cookie=tab)[2]
         path = "/outround_pairing/pair/0/8/"
         seeds = list(BreakingTeam.objects.order_by("seed"))
         a, b, c, d = [seed.team_id for seed in seeds]
-        assert b"Challenge Picks" in request(port, path, cookie=tab)[2]
+        assert b"Recorded matchups" in request(port, path, cookie=tab)[2]
         action = {"action": "set_challenge", "challenger_id": a, "challenged_id": c}
         assert post(path, {**action, "challenged_id": a})[0] == 422
         assert post(path, action)[0] == 302
@@ -3882,9 +4027,9 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
             code = Outround.GOV if winning_team == challenged_match.gov_team_id else Outround.OPP
             assert post(ballot, {"winner": code, "round_instance": challenged_match.id})[0] == 302
         assert BreakingTeam.objects.get(team_id=c).effective_seed == 1
-        assert b"Manual edits" in request(port, "/apda-board/outrounds/", cookie=board)[2]
+        assert b"manual edits" in request(port, "/apda-board/outrounds/", cookie=board)[2]
         preview = request(port, "/outround_pairing/0/4", cookie=tab)[2]
-        assert b"Manual edits" in preview
+        assert b"GOV win" in preview or b"OPP win" in preview
         assert any(event.get("public", {}).get("source") == "staff outround result"
                    for event in AuditEvent.objects.filter(object_id=challenged_match.id, content_type__model="outround")
                    .values_list("changes", flat=True))

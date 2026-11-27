@@ -20,8 +20,9 @@ use crate::{
     App, access,
     board::{BoardError, csrf_valid, lock_board, respond_error},
     board_snapshot::{self, Identity, Pairings, Snapshot},
-    html::{self, Navigation},
+    legacy_html,
     legacy_session::Actor,
+    login::TemplateCsrf,
     publication,
     settings::Settings,
     tournament_data::TournamentData,
@@ -59,40 +60,57 @@ async fn seeds(db: &mut MySqlConnection) -> Result<Vec<Seed>, sqlx::Error> {
     .collect())
 }
 
-#[derive(Serialize)]
-struct Round<'a> {
-    id: i32,
-    data: &'a Snapshot,
-    revision: String,
-    outcome: &'static str,
-    choice: &'static str,
-    history: Option<&'a Vec<board_snapshot::History>>,
-}
-
-#[derive(Serialize)]
-struct Stage<'a> {
-    size: i32,
-    rounds: Vec<Round<'a>>,
-}
-
-#[derive(Serialize)]
-struct Division<'a> {
-    id: i32,
-    name: &'static str,
-    stages: Vec<Stage<'a>>,
-    teams: Vec<&'a Seed>,
-    removed: Vec<Round<'a>>,
-    problems: Vec<String>,
-}
-
-fn row<'a>(id: i32, snapshot: &'a Snapshot, history: &'a board_snapshot::Histories) -> Round<'a> {
-    Round {
-        id,
-        data: snapshot,
-        revision: snapshot.revision(),
-        outcome: board_snapshot::outcome(snapshot.victor.unwrap_or(0)),
-        choice: board_snapshot::choice_name(snapshot.choice.unwrap_or(0)),
-        history: history.retained.get(&id),
+fn pairing(id: i32, snapshot: &Snapshot, history: &board_snapshot::Histories) -> minijinja::Value {
+    let events = history.retained.get(&id);
+    let mut positions = Vec::new();
+    if let Some(events) = events {
+        for (field, side) in [("government", "gov"), ("opposition", "opp")] {
+            if events
+                .iter()
+                .any(|event| event.changes.iter().any(|change| change.field == field))
+            {
+                positions.push(side);
+            }
+        }
+    }
+    let manual_judge_names = history.manual_judge_names(id);
+    let history: Vec<_> = events.into_iter().flatten().map(|event| {
+        let mut changes: Vec<_> = event.changes.iter().map(|change| {
+            let field = match change.field {
+                "government" => "gov team",
+                "opposition" => "opp team",
+                "outcome" => "victor",
+                "stage" => "num teams",
+                field => field,
+            };
+            let text = |value: &str| -> String {
+                let value = match (field, value) {
+                    ("choice", "Government") => "Gov",
+                    ("choice", "Opposition") => "Opp",
+                    ("choice", "No choice") => "No",
+                    ("victor", "Pending") => "UNKNOWN",
+                    ("victor", "Government") => "GOV",
+                    ("victor", "Opposition") => "OPP",
+                    ("victor", "Government by forfeit") => "GOV via Forfeit",
+                    ("victor", "Opposition by forfeit") => "OPP via Forfeit",
+                    (_, other) => other,
+                };
+                value.to_owned()
+            };
+            (field, context! {field, before => text(&change.before), after => text(&change.after)})
+        }).collect();
+        if changes.iter().all(|(_, detail)| detail.get_attr("before").is_ok_and(|before| before.is_true())) {
+            changes.sort_by_key(|(field, _)| *field);
+        }
+        let changes: Vec<_> = changes.into_iter().map(|(_, detail)| detail).collect();
+        context! { actor => &event.actor, time => &event.legacy_time, label => event.label, changes }
+    }).collect();
+    context! {
+        id, revision => snapshot.revision(), gov_team => &snapshot.gov_team, opp_team => &snapshot.opp_team,
+        room => &snapshot.room, judges => &snapshot.judges, chair => snapshot.chair, victor => snapshot.victor,
+        choice => snapshot.choice, num_teams => snapshot.num_teams,
+        manual_team_positions => positions, manual_judge_names => manual_judge_names.cloned().unwrap_or_default(),
+        history,
     }
 }
 
@@ -101,6 +119,9 @@ pub async fn list(
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
 ) -> Response {
+    if !matches!(actor, Actor::User { board: true, .. }) {
+        return access::access_denied();
+    }
     let result = async {
         let mut db = app.db.begin().await?;
         let snapshots = board_snapshot::capture(&mut db, Pairings::Outround).await?;
@@ -109,27 +130,32 @@ pub async fn list(
         let rooms: Vec<_> = sqlx::query_as::<_, (i32, String)>(
             "SELECT id, name FROM tab_room ORDER BY name, id",
         ).fetch_all(&mut *db).await?.into_iter().map(|(id, name)| Identity { id, name }).collect();
+        let shell = legacy_html::shell(&mut db, actor, PATH).await?;
         db.commit().await?;
         let mut divisions = Vec::new();
-        for (id, name) in [(0, "Varsity"), (1, "Novice")] {
+        for (id, label) in [(0, "Varsity"), (1, "Novice")] {
             let mut by_stage: BTreeMap<_, Vec<_>> = BTreeMap::new();
-            for (&pairing, data) in snapshots.iter().filter(|(_, snapshot)| snapshot.division == Some(id)) {
-                by_stage.entry(data.num_teams.unwrap_or(0)).or_default().push(row(pairing, data, &history));
+            for (&round, data) in snapshots.iter().filter(|(_, snapshot)| snapshot.division == Some(id)) {
+                by_stage.entry(data.num_teams.unwrap_or(0)).or_default().push(pairing(round, data, &history));
             }
-            let stages = by_stage.into_iter().rev().map(|(size, rounds)| Stage { size, rounds }).collect();
-            let removed = history.removed.iter().filter(|(pairing, snapshot)| {
-                snapshot.division == Some(id) && !snapshots.contains_key(pairing)
-            }).map(|(&pairing, snapshot)| row(pairing, snapshot, &history)).collect();
-            let teams = teams.iter().filter(|team| team.division == id).collect();
+            let stages: Vec<_> = by_stage.into_iter().rev()
+                .map(|(size, pairings)| context! {size, pairings}).collect();
+            let deleted: Vec<_> = history.removed.iter().filter(|(round, snapshot)| {
+                snapshot.division == Some(id) && !snapshots.contains_key(round)
+            }).map(|(&round, snapshot)| pairing(round, snapshot, &history)).collect();
+            let teams: Vec<_> = teams.iter().filter(|team| team.division == id).map(|team| context! {
+                team_id => team.team, team__name => &team.name, seed => team.original,
+            }).collect();
             let problems = problems(&snapshots, id);
-            divisions.push(Division { id, name, stages, teams, removed, problems });
+            divisions.push(context! { id, label, stages, teams, deleted, problems });
         }
-        let Ok(csrf) = html::page_csrf(&headers) else { return Ok(unavailable()); };
-        let response = html::render("board_outrounds.html", context! {
-            title => "Outrounds", divisions, rooms, csrf, outcomes => &crate::ballot_entry::OUTCOMES[..4],
-            nav => Navigation::new(actor, true),
+        let Ok(csrf) = TemplateCsrf::new(&headers) else { return Ok(unavailable()); };
+        let mut response = legacy_html::render("apda_board/outrounds.html", shell, context! {
+            divisions, rooms, csrf_input => csrf.input(),
+            outcomes => [(0, "UNKNOWN"), (1, "GOV"), (2, "OPP"), (3, "GOV via Forfeit"), (4, "OPP via Forfeit")],
         }, StatusCode::OK);
-        Ok::<_, sqlx::Error>(html::form_response(response, &headers, &csrf))
+        csrf.set_cookie(&mut response, &headers);
+        Ok::<_, sqlx::Error>(response)
     }.await;
     result.unwrap_or_else(|_| unavailable())
 }

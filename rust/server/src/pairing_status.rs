@@ -28,7 +28,7 @@ struct Team {
 }
 
 #[derive(Serialize)]
-struct Judge {
+pub(crate) struct Judge {
     id: i32,
     name: String,
     rank: String,
@@ -42,7 +42,7 @@ struct Judge {
 }
 
 impl Judge {
-    fn from_row(
+    pub(crate) fn from_row(
         id: i32,
         name: String,
         rank: String,
@@ -67,7 +67,7 @@ impl Judge {
 }
 
 #[derive(Serialize)]
-struct ManualEvent {
+pub(crate) struct ManualEvent {
     label: &'static str,
     user_display: String,
     note: String,
@@ -267,7 +267,7 @@ async fn pairings(db: &mut MySqlConnection, round: i32) -> Result<Vec<Pairing>, 
         return Ok(Vec::new());
     }
     let mut panels = panels(db, round).await?;
-    let mut events = manual_events(db, round).await?;
+    let mut events = manual_events(db, board_snapshot::Pairings::Inround(round)).await?;
     let mut edits = board_snapshot::histories(db, "round").await?;
     Ok(rows
         .into_iter()
@@ -354,22 +354,26 @@ async fn panels(
     Ok(panels)
 }
 
-async fn manual_events(
+pub(crate) async fn manual_events(
     db: &mut MySqlConnection,
-    round: i32,
+    scope: board_snapshot::Pairings,
 ) -> Result<HashMap<i32, Vec<ManualEvent>>, sqlx::Error> {
+    let (model, round_number) = match scope {
+        board_snapshot::Pairings::Inround(round_number) => ("round", Some(round_number)),
+        board_snapshot::Pairings::Outround => ("outround", None),
+    };
     let mut events: HashMap<_, Vec<_>> = HashMap::new();
     for (id, kind, user_display, note) in sqlx::query_as::<_, (i32, String, String, String)>(
-        "SELECT r.id, a.event_type, COALESCE(u.username, 'Unknown'), a.note
-         FROM tab_round r JOIN tab_auditevent a ON a.object_id = r.id
-         JOIN django_content_type t ON t.id = a.content_type_id
+        "SELECT CAST(a.object_id AS SIGNED), a.event_type, COALESCE(u.username, 'Unknown'), a.note
+         FROM tab_auditevent a JOIN django_content_type t ON t.id = a.content_type_id
          LEFT JOIN auth_user u ON u.id = a.user_id
-         WHERE r.round_number = ? AND t.app_label = 'tab' AND t.model = 'round'
+         WHERE t.app_label = 'tab' AND t.model = ?
+           AND (? IS NULL OR EXISTS(SELECT 1 FROM tab_round r WHERE r.id = a.object_id AND r.round_number = ?))
            AND a.event_type IN ('manual_judge_assign', 'manual_judge_remove', 'manual_chair_change')
-           AND NOT EXISTS (SELECT 1 FROM tab_auditevent reset WHERE reset.object_id = r.id
+           AND NOT EXISTS (SELECT 1 FROM tab_auditevent reset WHERE reset.object_id = a.object_id
               AND reset.content_type_id = a.content_type_id AND reset.event_type = 'judges_paired' AND reset.id > a.id)
          ORDER BY a.created_at DESC, a.id DESC",
-    ).bind(round).fetch_all(db).await? {
+    ).bind(model).bind(round_number).bind(round_number).fetch_all(db).await? {
         let label = match kind.as_str() {
             "manual_judge_assign" => "Manual judge assignment",
             "manual_judge_remove" => "Manual judge removal",

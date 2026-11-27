@@ -140,10 +140,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/board_judges.html"),
         ),
         (
-            "board_outrounds.html",
-            include_str!("../templates/board_outrounds.html"),
-        ),
-        (
             "tournament_setup.html",
             include_str!("../templates/tournament_setup.html"),
         ),
@@ -258,22 +254,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "staff_break.html",
             include_str!("../templates/staff_break.html"),
-        ),
-        (
-            "staff_elimination.html",
-            include_str!("../templates/staff_elimination.html"),
-        ),
-        (
-            "elimination_prepare.html",
-            include_str!("../templates/elimination_prepare.html"),
-        ),
-        (
-            "elimination_ballot.html",
-            include_str!("../templates/elimination_ballot.html"),
-        ),
-        (
-            "elimination_forum.html",
-            include_str!("../templates/elimination_forum.html"),
         ),
         (
             "backup_detail.html",

@@ -1,5 +1,6 @@
 import $ from "jquery";
 
+import { pairingWrite, savePairingRevision } from "./pairing";
 import quickSearchInit from "./quickSearch";
 
 function cycleChoice(event) {
@@ -7,10 +8,19 @@ function cycleChoice(event) {
   event.preventDefault();
 
   const outroundId = button.data("outround-id");
+  const $card = button.closest(".pairing-card");
+  const revision = $card.attr("data-revision");
   $.ajax({
-    url: `/outround_choice/${outroundId}`,
+    ...pairingWrite(
+      `/outround_choice/${outroundId}`,
+      revision ? { revision } : undefined,
+    ),
     success(result) {
-      button.html(result.data);
+      savePairingRevision($card, result);
+      button.text(result.data);
+    },
+    error() {
+      window.alert("Unable to update the choice. Refresh and try again.");
     },
   });
 }
@@ -42,7 +52,7 @@ function populateTabCards() {
 
   roundNumbers.forEach((roundNumber) => {
     $.ajax({
-      url: `/outround/${roundNumber}/stats`,
+      url: `/outround/${roundNumber}/stats/`,
       success(result) {
         Object.entries(result).forEach(([teamId, stats]) => {
           const tabCardElement = $(`.outround-tabcard[team-id=${teamId}]`);
@@ -60,7 +70,7 @@ function populateTabCards() {
             "Effective Seed / Outround Seed / In-round Wins" +
               " / Speaks / Govs / Opps / Seed",
           );
-          tabCardElement.attr("href", `/team/card/${teamId}`);
+          tabCardElement.attr("href", `/team/card/${teamId}/`);
           tabCardElement.text(text);
         });
       },
@@ -68,21 +78,23 @@ function populateTabCards() {
   });
 }
 
-function assignTeam(e) {
+function assignTeam(e, $card, revision) {
   e.preventDefault();
-  const teamId = $(e.target).attr("team-id");
-  const roundId = $(e.target).attr("round-id");
-  const position = $(e.target).attr("position");
-  const url = `/outround/pairings/assign_team/${roundId}/${position}/${teamId}`;
+  const $item = $(e.currentTarget);
+  const teamId = $item.attr("team-id");
+  const roundId = $item.attr("round-id");
+  const position = $item.attr("position");
+  const url = `/outround/pairings/assign_team/${roundId}/${position}/${teamId}/`;
   const alertMsg = `
   An error occured.
   Refresh the page and try to fix any inconsistencies you may notice.
   `;
 
   $.ajax({
-    url,
+    ...pairingWrite(url, revision ? { revision } : undefined),
     success(result) {
       if (result.success) {
+        savePairingRevision($card, result);
         const $container = $(`.row[round-id=${roundId}] .${position}-team`);
         if (
           Number($container.find(".team-assign-button").attr("team-id")) !==
@@ -99,7 +111,7 @@ function assignTeam(e) {
         window.alert(alertMsg);
       }
     },
-    failure() {
+    error() {
       window.alert(alertMsg);
     },
   });
@@ -110,49 +122,69 @@ function populateAlternativeTeams() {
   const teamId = $parent.attr("team-id");
   const roundId = $parent.attr("round-id");
   const position = $parent.attr("position");
-  const url = `/outround/${roundId}/${teamId}/alternative_teams/${position}`;
+  const $card = $parent.closest(".pairing-card");
+  const revision = $card.attr("data-revision");
+  const url = `/outround/${roundId}/${teamId}/alternative_teams/${position}/`;
 
   $.ajax({
     url,
     success(result) {
-      $parent.find(".dropdown-menu").html(result);
-      $parent.find(".dropdown-menu").find(".team-assign").click(assignTeam);
+      const $menu = $parent.find(".dropdown-menu").html(result);
+      if (revision) {
+        $menu.find(".team-switch-sides").attr("data-revision", revision);
+      }
+      $menu
+        .find(".team-assign")
+        .click((event) => assignTeam(event, $card, revision));
       quickSearchInit($parent.find("#quick-search"));
       $parent.find("#quick-search").focus();
     },
   });
 }
 
-function assignJudge(e) {
+function assignJudge(e, $card, revision) {
   e.preventDefault();
-  const roundId = $(e.target).attr("round-id");
-  const judgeId = $(e.target).attr("judge-id");
-  const curJudgeId = $(e.target).attr("current-judge-id");
+  const $item = $(e.currentTarget);
+  const roundId = $item.attr("round-id");
+  const judgeId = $item.attr("judge-id");
+  const curJudgeId = $item.attr("current-judge-id");
   const url = `/outround/${roundId}/assign_judge/${judgeId}/${
-    curJudgeId || ""
+    curJudgeId ? `${curJudgeId}/` : ""
   }`;
 
   let $buttonWrapper;
   if (curJudgeId) {
     $buttonWrapper = $(`span[round-id=${roundId}][judge-id=${curJudgeId}]`);
   } else {
-    $buttonWrapper = $(`span[round-id=${roundId}].unassigned`).first();
+    $buttonWrapper = $(`.judges span[round-id=${roundId}].unassigned`).first();
   }
   const $button = $buttonWrapper.find(".btn-sm");
   $button.addClass("disabled");
 
   $.ajax({
-    url,
+    ...pairingWrite(url, revision ? { revision } : undefined),
     success(result) {
+      savePairingRevision($card, result);
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
       $buttonWrapper.attr("judge-id", result.judge_id);
 
       const rank = result.judge_rank.toFixed(2);
-      $button.html(`${result.judge_name} <small>(${rank})</small>`);
-      $(`.judges span[round-id=${roundId}] .judge-toggle`).removeClass("chair");
+      $button
+        .empty()
+        .append(
+          document.createTextNode(`${result.judge_name} `),
+          $("<small>").text(`(${rank})`),
+        );
+      $(`.judges span[round-id=${roundId}] .outround-judge-toggle`).removeClass(
+        "chair",
+      );
       $(`.judges span[round-id=${roundId}][judge-id=${result.chair_id}]
-    .judge-toggle`).addClass("chair");
+    .outround-judge-toggle`).addClass("chair");
+    },
+    error() {
+      $button.removeClass("disabled");
+      window.alert("Unable to assign the judge. Refresh and try again.");
     },
   });
 }
@@ -161,14 +193,19 @@ function populateAlternativeJudges() {
   const $parent = $(this).parent();
   const judgeId = $parent.attr("judge-id");
   const roundId = $parent.attr("round-id");
+  const $card = $parent.closest(".pairing-card");
+  const revision = $card.attr("data-revision");
   const query = window.location.search || "";
-  const url = `/outround/${roundId}/alternative_judges/${judgeId || ""}${query}`;
+  const url = `/outround/${roundId}/alternative_judges/${judgeId ? `${judgeId}/` : ""}${query}`;
 
   $.ajax({
     url,
     success(result) {
       $parent.find(".dropdown-menu").html(result);
-      $parent.find(".dropdown-menu").find(".judge-assign").click(assignJudge);
+      $parent
+        .find(".dropdown-menu")
+        .find(".judge-assign")
+        .click((event) => assignJudge(event, $card, revision));
       quickSearchInit($parent.find("#quick-search"));
       $parent.find("#quick-search").focus();
     },
@@ -183,7 +220,7 @@ function togglePairingRelease(event) {
 
   event.preventDefault();
   $.ajax({
-    url: `/outround_pairing/release/${numTeams}/${typeOfRound}`,
+    ...pairingWrite(`/outround_pairing/release/${numTeams}/${typeOfRound}/`),
     success(result) {
       const groupSelector = `.outround-release[data-release-key='${releaseKey}']`;
       const closeBtn = `${groupSelector}.close-pairings-btn`;

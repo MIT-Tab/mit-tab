@@ -79,6 +79,7 @@ mod speakers;
 mod spreadsheets;
 mod staff_elimination;
 mod staff_elimination_assign;
+mod staff_elimination_page;
 mod staff_elimination_store;
 mod staff_invites;
 mod staff_pairing;

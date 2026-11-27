@@ -174,7 +174,7 @@ pub async fn adjust(
         None
     };
 
-    let result = match operation {
+    let mut result = match operation {
         Adjustment::Team { government, team } => {
             assign_team(&mut tx, kind, &before, government, team).await?
         }
@@ -189,16 +189,21 @@ pub async fn adjust(
     if let Some(audit_before) = audit_before {
         let after = round_audit::capture_one(&mut tx, before.stage, id).await?;
         round_audit::record(&mut tx, &audit_before, &after, user, operation.source()).await?;
-    } else if kind == Debate::Outround && !operation.is_judge() {
+    } else if kind == Debate::Outround && (!operation.is_judge() || !revision.is_empty()) {
         let after = load(&mut tx, kind, id).await?.ok_or(Error::Missing)?;
-        board_snapshot::audit_pairings(
-            &mut tx,
-            &BTreeMap::from([(id, before.snapshot)]),
-            &BTreeMap::from([(id, after.snapshot)]),
-            user,
-            operation.source(),
-        )
-        .await?;
+        if !revision.is_empty() {
+            result["revision"] = json!(after.snapshot.revision());
+        }
+        if !operation.is_judge() {
+            board_snapshot::audit_pairings(
+                &mut tx,
+                &BTreeMap::from([(id, before.snapshot)]),
+                &BTreeMap::from([(id, after.snapshot)]),
+                user,
+                operation.source(),
+            )
+            .await?;
+        }
     }
     tx.commit().await?;
     Ok(result)
