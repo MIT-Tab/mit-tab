@@ -237,7 +237,7 @@ jobs:
             cargo test --locked --workspace --all-targets --manifest-path "$manifest"
             DJANGO_SETTINGS_MODULE=mittab.settings uv run --frozen python -m rust.tabulation.compare_with_django
             cargo build --locked --manifest-path "$manifest" -p mittab-server
-            uv run --frozen pytest rust/server/test_django_parity.py
+            MITTAB_FAKE_WEBPACK_LOADER=1 uv run --frozen pytest rust/server/test_django_parity.py
   docs:
     docker:
       - image: cimg/python:3.10.16
@@ -278,6 +278,10 @@ jobs:
           name: Build and test Dockerfile
           command: |
             docker build -t mittab:test -f Dockerfile .
+            docker build -t mittab-static:test -f Dockerfile.static .
+            docker run --rm mittab-static:test sh -c '
+              test -f /var/www/tab/staticfiles/img/favicon.ico &&
+              test -f /var/www/tab/assets/webpack_bundles/main.css'
       - run:
           name: Start the Rust runtime with a new MySQL database
           command: |
@@ -295,7 +299,7 @@ jobs:
             for attempt in 1 2; do
               docker run -d --name mittab-web --network container:mittab-mysql \
                 -e MYSQL_PASSWORD=fixture-mysql -e TAB_PASSWORD=fixture-tab-password mittab:test
-              curl -fsS --retry 30 --retry-connrefused --retry-delay 1 http://127.0.0.1:18000/healthz
+              curl -fsS --retry 30 --retry-all-errors --retry-delay 1 http://127.0.0.1:18000/healthz
               curl -fsS http://127.0.0.1:18000/public/ | grep -F 'MIT-TAB'
               curl -fsS http://127.0.0.1:18000/static/webpack_bundles/main.css > /dev/null
               cookies=$(mktemp)
