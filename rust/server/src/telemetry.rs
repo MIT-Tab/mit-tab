@@ -51,19 +51,23 @@ pub async fn request(request: Request, next: Next) -> Response {
     let Some(route) = route.filter(|route| route != "/healthz" && route != "/500/") else {
         return next.run(request).await;
     };
+    let started = crate::diagnostics::start();
+    let method = request.method().to_string();
     if !sentry::Hub::current()
         .client()
         .is_some_and(|client| client.is_enabled())
     {
-        return next.run(request).await;
+        let response = next.run(request).await;
+        crate::diagnostics::record(started, &method, &route, response.status());
+        return response;
     }
-    let method = request.method().to_string();
     let transaction = sentry::start_transaction(TransactionContext::new(
         &format!("{method} {route}"),
         "http.server",
     ));
     let response = next.run(request).await;
     let status = response.status();
+    crate::diagnostics::record(started, &method, &route, status);
     transaction.set_data("http.status_code", serde_json::Value::from(status.as_u16()));
     if status.is_server_error() {
         transaction.set_status(SpanStatus::InternalError);

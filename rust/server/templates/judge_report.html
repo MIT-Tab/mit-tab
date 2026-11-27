@@ -30,7 +30,7 @@
   <form method="get" class="d-flex align-items-end flex-wrap gap-3 mb-3">
     <label class="form-label">Minimum rounds<input name="minimum_rounds" type="number" min="1" class="form-control" value="{{ minimum }}" required></label>
     {% if alphabetic %}
-    <label class="form-label">Highlight judges<select name="judge" class="form-select" multiple size="4">
+    <label class="form-label">Highlight judges<select name="judge" class="custom-select" multiple size="4">
       {% for judge in alphabetic %}<option value="{{ judge.id }}"{% if judge.highlight %} selected{% endif %}>{{ judge.name }}</option>{% endfor %}
     </select></label>
     {% endif %}

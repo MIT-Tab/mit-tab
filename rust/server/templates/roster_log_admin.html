@@ -6,7 +6,7 @@
   <form method="post">
     <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
     <label class="form-label d-block mb-3">Public list
-      <select name="list_kind" class="form-select">
+      <select name="list_kind" class="custom-select">
         <option value="teams"{% if row.kind == "teams" %} selected{% endif %}>Teams</option>
         <option value="judges"{% if row.kind == "judges" %} selected{% endif %}>Judges</option>
       </select>
@@ -33,7 +33,7 @@
   {% else %}<p>Logging is paused while registration is open.</p>{% endif %}
   <form method="get" class="d-flex gap-2 align-items-end mb-3">
     <label class="form-label mb-0">Public list
-      <select name="kind" class="form-select">
+      <select name="kind" class="custom-select">
         <option value="">All entries</option>
         <option value="teams"{% if kind == "teams" %} selected{% endif %}>Teams</option>
         <option value="judges"{% if kind == "judges" %} selected{% endif %}>Judges</option>

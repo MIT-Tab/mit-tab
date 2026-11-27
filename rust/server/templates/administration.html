@@ -4,9 +4,16 @@
   {% if not sections %}<a class="btn btn-outline-primary btn-sm mb-3" href="/admin/">Administration</a>{% endif %}
   <h1 class="h3">{{ title }}</h1>
   {% if sections %}
-    <ul class="list-group">
-      {% for label, path in sections %}<li class="list-group-item"><a href="{{ path }}">{{ label }}</a></li>{% endfor %}
-    </ul>
+    <div class="row">
+      {% for title, links in sections %}
+      <section class="col-12 col-md-4 mb-3">
+        <h2 class="h5">{{ title }}</h2>
+        <ul class="list-group">
+          {% for label, path in links %}<li class="list-group-item"><a href="{{ path }}">{{ label }}</a></li>{% endfor %}
+        </ul>
+      </section>
+      {% endfor %}
+    </div>
   {% elif detail %}
     <p>Record {{ id }}</p>
     <dl>{% for label, value in detail %}

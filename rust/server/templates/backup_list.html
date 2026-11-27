@@ -25,13 +25,13 @@
   </div>
   {% if categories %}
   <form class="d-flex align-items-end flex-wrap gap-2 mb-3" method="get">
-    <label class="form-label">Type<select name="type" class="form-select">
+    <label class="form-label">Type<select name="type" class="custom-select">
       <option value="">All types</option>{% for label in categories %}<option{% if options.type == label %} selected{% endif %}>{{ label }}</option>{% endfor %}
     </select></label>
-    <label class="form-label">Round<select name="round" class="form-select">
+    <label class="form-label">Round<select name="round" class="custom-select">
       <option value="">All rounds</option>{% for label in rounds %}<option{% if options.round == label %} selected{% endif %}>{{ label }}</option>{% endfor %}
     </select></label>
-    <label class="form-label">Scratches<select name="scratches" class="form-select">
+    <label class="form-label">Scratches<select name="scratches" class="custom-select">
       <option value="">All</option>{% for label in ["Yes", "No", "Unknown"] %}<option{% if options.scratches == label %} selected{% endif %}>{{ label }}</option>{% endfor %}
     </select></label>
     <button class="btn btn-outline-primary mb-2">Filter</button>

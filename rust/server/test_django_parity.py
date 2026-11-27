@@ -3991,3 +3991,28 @@ def test_native_sentry_reports_route_templates_without_sensitive_request_values(
     assert b"/backup/download/{key}/" in payload
     assert b"private-fixture-file" not in payload and b"private-fixture-query" not in payload
     assert staff.encode() not in payload
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_diagnostics_gate_and_javascript_catalog():
+    staff = legacy_tab_session("diagnostic-staff")
+    board = legacy_tab_session("diagnostic-board")
+    get_user_model().objects.get(username="diagnostic-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Diagnostic School")
+    first = Team.objects.create(name="Diagnostic first", school=school, seed=0)
+    second = Team.objects.create(name="Diagnostic second", school=school, seed=0)
+    Round.objects.create(round_number=1, gov_team=first, opp_team=second, victor=Round.GOV)
+    for environment, code in (("production", 404), ("development", 200)):
+        with rust_server(overrides={"SILK_ENABLED": "1", "MITTAB_ENV": environment}) as port:
+            path = "/dynamic-media/jsi18n/?ignored=private-fixture-query"
+            status, headers, script = request(port, path)
+            assert status == 200 and headers["Content-Type"] == "application/javascript; charset=utf-8"
+            assert b"django.ngettext" in script
+            assert request(port, "/silk/", cookie=board)[1]["Location"] == "/403/"
+            status, _, body = request(port, "/silk/", cookie=staff)
+            assert status == code
+            if code == 200:
+                assert b"/dynamic-media/jsi18n/" in body
+                assert b"private-fixture-query" not in body

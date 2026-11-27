@@ -79,6 +79,7 @@ pub async fn public_tournament(
                 | "/favicon.ico"
                 | "/tournament-logo/"
                 | "/public/motions/"
+                | "/dynamic-media/jsi18n/"
                 | "/public/pairings/"
                 | "/public/missing-ballots/"
                 | "/public/team-rankings/"

@@ -16,36 +16,53 @@ use crate::{
     private, unavailable,
 };
 
-const LINKS: &[(&str, &str)] = &[
-    ("Users", "/admin/auth/user/"),
-    ("Groups", "/admin/auth/group/"),
-    ("Invite Staff", "/staff/invite/"),
-    ("Tournament Settings", "/settings_form"),
-    ("Registration", "/registration/manage/"),
-    ("Schools", "/view_schools/"),
-    ("Teams", "/view_teams/"),
-    ("Debaters", "/view_debaters/"),
-    ("Judges", "/view_judges/"),
-    ("Rooms", "/view_rooms/"),
-    ("Room Tags", "/manage-room-tags"),
-    ("Ranking Groups", "/manage-ranking-groups"),
-    ("Scratches", "/scratches/view/"),
-    ("Check-In", "/batch_checkin/"),
-    ("Preliminary Pairings", "/pairings/view_rounds/"),
-    ("Elimination Pairings", "/outround_pairing"),
-    ("Motions", "/motions/"),
-    ("Email History", "/email_management/"),
-    ("Public Change Log", "/setup/public-change-log/"),
-    ("Audit Events", "/admin/tab/auditevent/"),
+type AdminSection = (&'static str, &'static [(&'static str, &'static str)]);
+
+const LINKS: &[AdminSection] = &[
     (
-        "Manual Judge Assignments",
-        "/admin/tab/manualjudgeassignment/",
+        "Staff and Access",
+        &[
+            ("Users", "/admin/auth/user/"),
+            ("Groups", "/admin/auth/group/"),
+            ("Invite Staff", "/staff/invite/"),
+            ("Audit Events", "/admin/tab/auditevent/"),
+            ("Email History", "/email_management/"),
+            ("Backups", "/pairing/view_backups/"),
+        ],
     ),
     (
-        "Registration Changes",
-        "/admin/registration/registrationchangelog/",
+        "Tournament Setup",
+        &[
+            ("Tournament Settings", "/settings_form"),
+            ("Registration", "/registration/manage/"),
+            (
+                "Registration Changes",
+                "/admin/registration/registrationchangelog/",
+            ),
+            ("Schools", "/view_schools/"),
+            ("Teams", "/view_teams/"),
+            ("Debaters", "/view_debaters/"),
+            ("Judges", "/view_judges/"),
+            ("Rooms", "/view_rooms/"),
+            ("Room Tags", "/manage-room-tags"),
+            ("Ranking Groups", "/manage-ranking-groups"),
+        ],
     ),
-    ("Backups", "/pairing/view_backups/"),
+    (
+        "Rounds and Publication",
+        &[
+            ("Scratches", "/scratches/view/"),
+            ("Check-In", "/batch_checkin/"),
+            ("Preliminary Pairings", "/pairings/view_rounds/"),
+            ("Elimination Pairings", "/outround_pairing"),
+            (
+                "Manual Judge Assignments",
+                "/admin/tab/manualjudgeassignment/",
+            ),
+            ("Motions", "/motions/"),
+            ("Public Change Log", "/setup/public-change-log/"),
+        ],
+    ),
 ];
 
 pub fn routes() -> Router<App> {

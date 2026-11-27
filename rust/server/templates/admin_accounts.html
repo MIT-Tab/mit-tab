@@ -43,7 +43,7 @@
       <label class="d-block"><input name="active" type="checkbox"{% if not user or user.active %} checked{% endif %}> Active</label>
       <label class="d-block"><input name="staff" type="checkbox"{% if user and user.staff %} checked{% endif %}> Staff access</label>
       <label class="d-block"><input name="elevated" type="checkbox"{% if user and user.elevated %} checked{% endif %}> Superuser</label>
-      <label class="form-label mt-3">Groups<select class="form-select" name="groups" size="6" multiple>
+      <label class="form-label mt-3">Groups<select class="custom-select" name="groups" size="6" multiple>
         {% for row in memberships %}<option value="{{ row.id }}"{% if row.selected %} selected{% endif %}>{{ row.label }}</option>{% endfor %}
       </select></label>
     {% else %}
@@ -54,7 +54,7 @@
       <label class="form-label">Confirm password<input name="confirmation" class="form-control" type="password" autocomplete="new-password" minlength="8" required></label>
     {% endif %}
     {% if action == "edit" %}
-      <label class="form-label mt-3">Permissions<select class="form-select" name="permissions" size="8" multiple>
+      <label class="form-label mt-3">Permissions<select class="custom-select" name="permissions" size="8" multiple>
         {% for row in permissions %}<option value="{{ row.id }}"{% if row.selected %} selected{% endif %}>{{ row.label }}</option>{% endfor %}
       </select></label>
     {% endif %}

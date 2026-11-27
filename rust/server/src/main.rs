@@ -20,6 +20,7 @@ mod checklist;
 mod codes;
 mod config;
 mod dev_fixture;
+mod diagnostics;
 mod elimination_seeds;
 mod email;
 mod email_admin;
@@ -221,6 +222,7 @@ fn router(app: App) -> Router {
                 .route("/favicon.ico", get(home::favicon))
                 .route("/tournament-logo/", get(home::logo))
                 .route("/public/motions/", get(motions::public))
+                .route("/dynamic-media/jsi18n/", get(diagnostics::js_catalog))
                 .route("/public/pairings/", get(public_pairings::current))
                 .route("/public/pairings/{round}/", get(public_pairings::previous))
                 .route("/public/missing-ballots/", get(public_pairings::missing))
@@ -554,6 +556,14 @@ fn router(app: App) -> Router {
                 app.clone(),
                 access::administration,
             )),
+        )
+        .merge(
+            Router::new()
+                .route("/silk/", get(diagnostics::page))
+                .route_layer(axum::middleware::from_fn_with_state(
+                    app.clone(),
+                    access::administration,
+                )),
         )
         .route("/404/", get(administration::not_found))
         .route("/500/", get(administration::internal_error))
