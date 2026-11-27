@@ -60,7 +60,11 @@ async fn seeds(db: &mut MySqlConnection) -> Result<Vec<Seed>, sqlx::Error> {
     .collect())
 }
 
-fn pairing(id: i32, snapshot: &Snapshot, history: &board_snapshot::Histories) -> minijinja::Value {
+pub(super) fn pairing(
+    id: i32,
+    snapshot: &Snapshot,
+    history: &board_snapshot::Histories,
+) -> minijinja::Value {
     let events = history.retained.get(&id);
     let mut positions = Vec::new();
     if let Some(events) = events {

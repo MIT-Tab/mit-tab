@@ -3421,12 +3421,12 @@ def test_native_tab_cards_and_export_honor_board_and_public_release():
         assert request(port, staff)[1]["Location"].startswith("/public/login/")
         assert request(port, staff, cookie=tab)[0] == 200
         assert request(port, board_url, cookie=tab)[0] == 403
-        assert b"Choose a team" in request(port, board_url, cookie=board)[2]
+        assert b"Card Team 0</a>" in request(port, board_url, cookie=board)[2]
 
         status, headers, page = request(port, board_card, cookie=board)
         assert status == 200 and headers["cache-control"] == "private, no-store"
         assert b"Card Debater 0" in page and b"Card Debater 2" not in page
-        assert b"Byes" in page and b"New Chair" in page
+        assert b"Byes" in page and b"new chair: Card Judge Chair" in page
         assert b"private notes" not in page and b"protected" not in page
         assert request(port, private_card, cookie=board)[2] == page
         assert request(port, private_card, cookie=board, method="POST")[1]["Location"] == "/403/"
@@ -3447,11 +3447,112 @@ def test_native_tab_cards_and_export_honor_board_and_public_release():
 
         TabSettings.set("var_teams_visible", 2)
         status, _, page = request(port, public)
-        assert status == 200 and b"Card Debater 2" in page and b"No-shows" in page
+        assert status == 200 and b"Card Debater 2" in page and b"Print tab cards" in page
         assert b"31.25" in page and b"Card Judge Chair" in page
         assert b"Manual edits" not in page and b"private notes" not in page
         TabSettings.set("publish_tab_cards_with_first_outround", 0)
         assert request(port, public)[1]["Location"] == "/public/access-error/"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_tab_card_pages_match_django(html_assets, subtests):
+    staff = legacy_tab_session("score-card-reference-staff")
+    board = legacy_tab_session("score-card-reference-board")
+    board_user = get_user_model().objects.get(username="score-card-reference-board")
+    board_user.groups.create(name="APDA Board")
+    helper = get_user_model().objects.create_user(username="score-card-reference-helper", is_staff=True)
+    helper.groups.create(name="MIT-TAB: Data entry helper")
+    helper_browser = Client()
+    helper_browser.force_login(helper)
+    helper_cookie = helper_browser.cookies["sessionid"].value
+    for key, value in {"cur_round": 3, "tot_rounds": 3, "var_teams_visible": 4,
+                       "publish_tab_cards_with_first_outround": 1}.items():
+        TabSettings.set(key, value)
+    school = School.objects.create(name="Tab Cards & School")
+    zeta, beta, alpha, delta = [Team.objects.create(name=name, school=school, seed=0) for name in
+                                ("Zeta & East", "Beta", "Alpha Empty", "Delta")]
+    z1, z2, b1, d1 = [Debater.objects.create(name=name, novice_status=index % 2) for index, name in
+                      enumerate(("Rae <One>", "Ren Two", "Iron Solo", "Outside Speaker"))]
+    zeta.debaters.add(z1, z2)
+    beta.debaters.add(b1)
+    delta.debaters.add(d1)
+    chair = Judge.objects.create(name="Judge Z", rank=8)
+    wing = Judge.objects.create(name="Judge A", rank=2)
+    first = Round.objects.create(round_number=1, gov_team=zeta, opp_team=beta, victor=Round.GOV, chair=chair)
+    first.judges.add(chair, wing)
+    for speaker, speaks, ranks, role in ((z1, "28.00", "2", "pm"), (z2, "25.01", "4", "mg"),
+                                         (b1, "27", "1", "lo"), (b1, "24", "3", "mo")):
+        RoundStats.objects.create(round=first, debater=speaker, speaks=Decimal(speaks), ranks=Decimal(ranks),
+                                  debater_role=role)
+    second = Round.objects.create(round_number=1, gov_team=delta, opp_team=zeta, victor=Round.OPP)
+    RoundStats.objects.create(round=second, debater=z1, speaks=Decimal("26.125"), ranks=1)
+    RoundStats.objects.create(round=second, debater=d1, speaks=Decimal("20.4321"), ranks=4, debater_role="pm")
+    future = Round.objects.create(round_number=3, gov_team=zeta, opp_team=delta, victor=Round.UNKNOWN)
+    RoundStats.objects.create(round=future, debater=z1, speaks=Decimal("28.17"), ranks=1, debater_role="pm")
+    off_grid = Round.objects.create(round_number=5, gov_team=beta, opp_team=zeta, victor=Round.GOV)
+    RoundStats.objects.create(round=off_grid, debater=z2, speaks=Decimal("21.7890"), ranks=1, debater_role="lo")
+    Bye.objects.create(round_number=2, bye_team=zeta)
+    Bye.objects.create(round_number=2, bye_team=delta)
+    Bye.objects.create(round_number=3, bye_team=delta)
+    NoShow.objects.create(round_number=2, no_show_team=beta)
+    Outround.objects.create(num_teams=4, gov_team=zeta, opp_team=beta)
+    AuditEvent.record(first, AuditEvent.MANUAL_CHAIR_CHANGE, board_user,
+                      changes={"new_chair": chair.name, "remarks": "sensitive remark fixture"},
+                      note="secret note fixture")
+
+    def client_for(session_id):
+        client = Client()
+        if session_id:
+            client.cookies["sessionid"] = session_id
+        return client
+
+    with rust_server(overrides=html_assets) as port:
+        public = "/public/tab-cards/"
+        printable = "/all_tab_cards/"
+        board_card = f"/apda-board/tab-card/{zeta.id}/"
+        raw = f"/team/card/{zeta.id}/"
+        pretty = raw + "pretty/"
+        cases = [
+            (None, public), (helper_cookie, public), (staff, printable), (staff, raw), (staff, pretty),
+            (staff, f"/team/card/{alpha.id}/"), (staff, f"/team/card/{alpha.id}/pretty/"),
+            (board, "/apda-board/tab-cards/"), (board, printable), (board, board_card), (board, raw), (board, pretty),
+            (board, f"/apda-board/tab-card/{alpha.id}/"),
+        ]
+        for session_id, path in cases:
+            with subtests.test(path=path, role="anonymous" if session_id is None else
+                               "board" if session_id == board else "helper" if session_id == helper_cookie else "tab"):
+                status, headers, body = request(port, path, cookie=session_id)
+                reference = client_for(session_id).get(path)
+                assert status == reference.status_code == 200
+                assert_html_bytes(body, reference.content)
+                if session_id == board:
+                    assert headers["cache-control"] == "private, no-store"
+        _, _, detail = request(port, board_card, cookie=board)
+        assert detail.count(b"<h5>Round 1</h5>") == 2 and b"<h5>Round 5</h5>" in detail
+        assert b"21.7890" in detail and b"20.4321" not in detail and b"Outside Speaker" not in detail
+        assert b"sensitive remark fixture" not in detail and b"secret note fixture" not in detail
+        Scratch.objects.create(team=zeta, judge=wing, scratch_type=Scratch.TAB_SCRATCH)
+        Judge.objects.filter(pk=wing.pk).update(rank=10, wing_only=True, ballot_code="Fixture-Card-Secrets")
+        for path in (board_card, raw, pretty):
+            assert request(port, path, cookie=board)[2] == detail
+        assert request(port, "/apda-board/tab-card/999999/", cookie=board)[0] == 404
+        assert request(port, "/team/card/999999/pretty/", cookie=staff)[0] == 404
+        assert request(port, printable, cookie=board, method="POST")[1]["Location"] == "/403/"
+        assert request(port, public, cookie=helper_cookie)[1]["Cache-Control"] == "private, no-store"
+
+        warm = request(port, public)[2]
+        assert b'href="/public/team-rankings/"' not in warm
+        PublicDisplaySetting.objects.update_or_create(slug="team", defaults={
+            "label": "Team rankings", "display_type": PublicDisplaySetting.RANKING, "is_enabled": True,
+        })
+        assert b'href="/public/team-rankings/"' in request(port, public)[2]
+        Outround.objects.all().delete()
+        assert request(port, public)[1]["Location"] == "/public/access-error/"
+        for path in (board_card, raw, pretty):
+            assert request(port, path, cookie=board)[0] == 403
+        Outround.objects.create(num_teams=4, type_of_round=Outround.NOVICE, gov_team=zeta, opp_team=beta)
+        TabSettings.set("nov_teams_visible", 4)
+        assert request(port, public)[0] == 200
 
 
 def multipart_request(port, path, *, fields, file, cookie, file_field="file"):

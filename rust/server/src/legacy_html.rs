@@ -565,6 +565,26 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/apda_board/_pairing.html"),
         ),
         (
+            "apda_board/tab_cards.html",
+            include_str!("../../../mittab/templates/apda_board/tab_cards.html"),
+        ),
+        (
+            "public/tab_cards.html",
+            include_str!("../../../mittab/templates/public/tab_cards.html"),
+        ),
+        (
+            "tab/tab_card.html",
+            include_str!("../../../mittab/templates/tab/tab_card.html"),
+        ),
+        (
+            "tab/pretty_tab_card.html",
+            include_str!("../../../mittab/templates/tab/pretty_tab_card.html"),
+        ),
+        (
+            "tab/all_tab_cards.html",
+            include_str!("../../../mittab/templates/tab/all_tab_cards.html"),
+        ),
+        (
             "outrounds/pairing_base.html",
             include_str!("../../../mittab/templates/outrounds/pairing_base.html"),
         ),
@@ -751,6 +771,10 @@ fn translate(name: &str, source: &str) -> String {
                 output.push_str("/apda-board/outround/{{ pairing.id }}/");
             }
             ["url", "'view_round'", "number"] => output.push_str("/round/{{ number }}/"),
+            ["url", "'board_tab_card'", "item.id"] => {
+                output.push_str("/apda-board/tab-card/{{ item.id }}/");
+            }
+            ["static", "'css/tab-cards-print.css'"] => output.push_str("/static/css/tab-cards-print.css"),
             ["url", "'board_inrounds'", "number"] => {
                 output.push_str("/apda-board/inrounds/{{ number }}/");
             }
@@ -918,7 +942,7 @@ fn translate(name: &str, source: &str) -> String {
         .replace("|date:'Y-m-d H:i:s T'", "")
         .replace(
             "|floatformat:2",
-            if name == "tab/round_stats.html" {
+            if matches!(name, "tab/round_stats.html" | "tab/tab_card.html") {
                 "|django_floatformat(2)"
             } else {
                 ""
@@ -992,6 +1016,15 @@ fn translate(name: &str, source: &str) -> String {
             "event.changes.fields|join:\", \"",
             "event.changes.fields|join(\", \")",
         ),
+        "tab/all_tab_cards.html" => translated.replace("loop.index|divisibleby:2", "loop.index % 2 == 0"),
+        "tab/tab_card.html" => {
+            let mut translated = translated.replace("|slice:\":1\"", "");
+            for index in 0..7 {
+                translated = translated.replace(&format!("round_stat.{index}"), &format!("round_stat[{index}]"));
+            }
+            translated
+        }
+        "apda_board/tab_cards.html" => translated.replace("|join:\", \"", "|join(\", \")"),
         "common/data_upload.html" => translated.replace("kind|capfirst", "kind|capitalize"),
         "common/data_entry_multiple.html" => translated
             .replace("event.changes.fields|join:\", \" ", "event.changes.fields|join(\", \") ")

@@ -81,10 +81,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/ranking_control.html"),
         ),
         (
-            "tab_cards.html",
-            include_str!("../templates/tab_cards.html"),
-        ),
-        (
             "board_apda_id.html",
             include_str!("../templates/board_apda_id.html"),
         ),

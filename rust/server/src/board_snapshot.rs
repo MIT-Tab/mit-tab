@@ -4,7 +4,7 @@ use chrono::NaiveDateTime;
 use ring::digest;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sqlx::MySqlConnection;
+use sqlx::{AssertSqlSafe, MySqlConnection};
 
 #[derive(Clone, Deserialize, PartialEq, Serialize)]
 pub struct Identity {
@@ -61,22 +61,40 @@ pub async fn capture(
     db: &mut MySqlConnection,
     scope: Pairings,
 ) -> Result<BTreeMap<i32, Snapshot>, sqlx::Error> {
-    let prelim = match scope {
-        Pairings::Inround(number) => Some(number),
-        Pairings::Outround => None,
-    };
-    let query = if prelim.is_some() {
-        "SELECT r.id, g.id, g.name, o.id, o.name, m.id, m.name, r.chair_id, r.victor,
+    match scope {
+        Pairings::Inround(number) => {
+            capture_selection(db, Some(("r.round_number = ?", number))).await
+        }
+        Pairings::Outround => capture_selection(db, None).await,
+    }
+}
+
+pub(super) async fn capture_team(
+    db: &mut MySqlConnection,
+    team: i32,
+) -> Result<BTreeMap<i32, Snapshot>, sqlx::Error> {
+    capture_selection(db, Some(("? IN (r.gov_team_id, r.opp_team_id)", team))).await
+}
+
+async fn capture_selection(
+    db: &mut MySqlConnection,
+    prelim: Option<(&'static str, i32)>,
+) -> Result<BTreeMap<i32, Snapshot>, sqlx::Error> {
+    let query = if let Some((condition, _)) = prelim {
+        format!(
+            "SELECT r.id, g.id, g.name, o.id, o.name, m.id, m.name, r.chair_id, r.victor,
                     r.round_number, NULL, NULL, NULL
          FROM tab_round r JOIN tab_team g ON g.id = r.gov_team_id
          JOIN tab_team o ON o.id = r.opp_team_id LEFT JOIN tab_room m ON m.id = r.room_id
-         WHERE r.round_number = ? ORDER BY r.id"
+         WHERE {condition} ORDER BY r.id"
+        )
     } else {
         "SELECT r.id, g.id, g.name, o.id, o.name, m.id, m.name, r.chair_id, r.victor,
                     r.num_teams, r.type_of_round, r.choice, r.sidelock
          FROM tab_outround r JOIN tab_team g ON g.id = r.gov_team_id
          JOIN tab_team o ON o.id = r.opp_team_id LEFT JOIN tab_room m ON m.id = r.room_id
          ORDER BY r.id"
+            .into()
     };
     type Row = (
         i32,
@@ -93,9 +111,9 @@ pub async fn capture(
         Option<i32>,
         Option<bool>,
     );
-    let mut selection = sqlx::query_as::<_, Row>(query);
-    if let Some(number) = prelim {
-        selection = selection.bind(number);
+    let mut selection = sqlx::query_as::<_, Row>(AssertSqlSafe(query));
+    if let Some((_, value)) = prelim {
+        selection = selection.bind(value);
     }
     let mut snapshots: BTreeMap<_, _> = selection
         .fetch_all(&mut *db)
@@ -144,13 +162,13 @@ pub async fn capture(
         )
         .collect();
 
-    let judges = if let Some(number) = prelim {
-        sqlx::query_as::<_, (i32, i32, String)>(
+    let judges = if let Some((condition, value)) = prelim {
+        sqlx::query_as::<_, (i32, i32, String)>(AssertSqlSafe(format!(
             "SELECT x.round_id, j.id, j.name FROM tab_round_judges x
              JOIN tab_round r ON r.id = x.round_id JOIN tab_judge j ON j.id = x.judge_id
-             WHERE r.round_number = ? ORDER BY j.name, j.id",
-        )
-        .bind(number)
+             WHERE {condition} ORDER BY j.name, j.id",
+        )))
+        .bind(value)
         .fetch_all(&mut *db)
         .await?
     } else {
@@ -166,13 +184,13 @@ pub async fn capture(
             snapshot.judges.push(Identity { id, name });
         }
     }
-    if let Some(number) = prelim {
-        for (round, debater, name, role, speaks, ranks) in sqlx::query_as::<_, (i32, i32, String, Option<String>, String, String)>(
+    if let Some((condition, value)) = prelim {
+        for (round, debater, name, role, speaks, ranks) in sqlx::query_as::<_, (i32, i32, String, Option<String>, String, String)>(AssertSqlSafe(format!(
             "SELECT s.round_id, d.id, d.name, s.debater_role, CAST(s.speaks AS CHAR), CAST(s.ranks AS CHAR)
              FROM tab_roundstats s JOIN tab_round r ON r.id = s.round_id
-             JOIN tab_debater d ON d.id = s.debater_id WHERE r.round_number = ?
+             JOIN tab_debater d ON d.id = s.debater_id WHERE {condition}
              ORDER BY s.debater_role, s.id",
-        ).bind(number).fetch_all(&mut *db).await? {
+        ))).bind(value).fetch_all(&mut *db).await? {
             if let Some(snapshot) = snapshots.get_mut(&round) && let Some(scores) = &mut snapshot.scores {
                 scores.push(Scores { debater, name, role, speaks, ranks });
             }

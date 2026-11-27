@@ -159,6 +159,7 @@ impl Page {
             ],
             Self::TabCards => &[
                 SETTINGS,
+                DISPLAY,
                 TEAMS,
                 MEMBERS,
                 DEBATERS,
@@ -237,6 +238,7 @@ impl Page {
                 | Self::TeamRankings
                 | Self::SpeakerRankings
                 | Self::Ballots
+                | Self::TabCards
                 | Self::Pairings(_)
                 | Self::MissingBallots
                 | Self::Outrounds(_)
@@ -552,7 +554,8 @@ async fn render_response(
     let (Some(key), Some(version), Some(generation)) = (cache_key, version, generation) else {
         return Ok(response);
     };
-    let public_redirect = response.status() == StatusCode::FOUND
+    let public_redirect = page != Page::TabCards
+        && response.status() == StatusCode::FOUND
         && response
             .headers()
             .get(header::LOCATION)
