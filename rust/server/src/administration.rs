@@ -40,7 +40,6 @@ pub fn routes() -> Router<App> {
         .route("/admin/{application}/{model}/{id}/history/", get(history))
         .merge(records)
         .merge(admin_accounts::routes())
-        .merge(crate::admin_repairs::routes())
         .merge(crate::admin_scores::routes())
         .merge(crate::admin_model_forms::routes())
 }

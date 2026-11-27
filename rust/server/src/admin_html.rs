@@ -271,6 +271,10 @@ fn translate(source: &str) -> String {
     let source = source
         .replace("{{ block.super }}", "{{ super() }}")
         .replace(
+            "{% csrf_token %}{% block form_top %}",
+            r#"{% csrf_token %}{% if pairing_revision %}<input type="hidden" name="mittab_pairing_revision" value="{{ pairing_revision }}">{% endif %}{% block form_top %}"#,
+        )
+        .replace(
             r#"<input type="hidden" name="post" value="yes">"#,
             r#"<input type="hidden" name="post" value="yes">{% if delete_scope %}<input type="hidden" name="mittab_delete_scope" value="{{ delete_scope }}">{% endif %}"#,
         )

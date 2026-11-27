@@ -160,14 +160,14 @@ pub async fn list(
     result.unwrap_or_else(|_| unavailable())
 }
 
-fn teams(snapshot: &Snapshot) -> [i32; 2] {
+pub(super) fn teams(snapshot: &Snapshot) -> [i32; 2] {
     [
         snapshot.gov_team.as_ref().map_or(0, |team| team.id),
         snapshot.opp_team.as_ref().map_or(0, |team| team.id),
     ]
 }
 
-fn winner_loser(snapshot: &Snapshot) -> Option<(i32, i32)> {
+pub(super) fn winner_loser(snapshot: &Snapshot) -> Option<(i32, i32)> {
     let [gov, opp] = teams(snapshot);
     match snapshot.victor {
         Some(1 | 3) => Some((gov, opp)),

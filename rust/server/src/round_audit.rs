@@ -129,10 +129,14 @@ pub async fn record(
             continue;
         }
         let reference = new.or(old).expect("audit event snapshot");
-        let object = format!(
-            "Round {} between {} and {}",
-            reference.round_number, reference.gov_team.name, reference.opp_team.name
-        );
+        let object = if source == "admin deletion" && new.is_none() {
+            format!("Round {id}")
+        } else {
+            format!(
+                "Round {} between {} and {}",
+                reference.round_number, reference.gov_team.name, reference.opp_team.name
+            )
+        };
         let changes = json!({ "public": { "before": old, "after": new, "source": source } });
         sqlx::query(
             "INSERT INTO tab_auditevent

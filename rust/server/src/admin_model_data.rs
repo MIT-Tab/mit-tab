@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use sqlx::{AssertSqlSafe, MySql, MySqlConnection, QueryBuilder};
 
 use crate::{
-    admin_changelist::{self, DefaultList},
+    admin_changelist::{self, DefaultList, Query},
     codes::{self, Credential},
     registration_form::Fields,
 };
@@ -21,6 +21,8 @@ pub const MANAGED: &[&str] = &[
     "room",
     "rankinggroup",
     "scratch",
+    "round",
+    "outround",
     "team",
     "judge",
     "tabsettings",
@@ -41,11 +43,14 @@ pub struct Field {
     pub initial: Option<&'static str>,
     pub filter_label: Option<&'static str>,
     pub help_text: Option<&'static str>,
+    pub related_widget: bool,
+    pub can_delete_related: bool,
 }
 
 #[derive(Clone, Copy)]
 pub enum Kind {
     Text(usize),
+    Textarea,
     Email(usize),
     Integer,
     Experience,
@@ -135,6 +140,23 @@ impl Multiple {
             .build()
             .execute(&mut *db)
             .await?;
+        }
+        if self.table == "tab_round_judges" {
+            for &judge in before.difference(&after) {
+                sqlx::query(
+                    "DELETE FROM tab_manualjudgeassignment WHERE round_id = ? AND judge_id = ?",
+                )
+                .bind(owner)
+                .bind(judge)
+                .execute(&mut *db)
+                .await?;
+            }
+            for &judge in after.difference(&before) {
+                sqlx::query(
+                    "INSERT INTO tab_manualjudgeassignment (round_id, judge_id, created_by_id, created_at)
+                     VALUES (?, ?, NULL, UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE id = id",
+                ).bind(owner).bind(judge).execute(&mut *db).await?;
+            }
         }
         Ok(())
     }
@@ -233,6 +255,25 @@ const JUDGE_TAGS: Multiple = Multiple {
     singular: "Judge-roomtag relationship",
     plural: "judge-roomtag relationships",
 };
+const ROUND_PANEL: Multiple = Multiple {
+    relation: JUDGE,
+    table: "tab_round_judges",
+    owner: "round_id",
+    column: "judge_id",
+    through: "Round_judges",
+    singular: "Round-judge relationship",
+    plural: "round-judge relationships",
+};
+const OUTROUND_PANEL: Multiple = Multiple {
+    relation: JUDGE,
+    table: "tab_outround_judges",
+    owner: "outround_id",
+    column: "judge_id",
+    through: "Outround_judges",
+    singular: "Outround-judge relationship",
+    plural: "outround-judge relationships",
+};
+
 const GROUP_TEAMS: Multiple = Multiple {
     relation: TEAM,
     table: "tab_rankinggroup_teams",
@@ -263,6 +304,8 @@ impl Field {
             initial: None,
             filter_label: None,
             help_text: None,
+            related_widget: true,
+            can_delete_related: false,
         }
     }
 
@@ -281,6 +324,20 @@ impl Field {
     const fn optional(self) -> Self {
         Self {
             required: false,
+            ..self
+        }
+    }
+
+    const fn unwrapped(self) -> Self {
+        Self {
+            related_widget: false,
+            ..self
+        }
+    }
+
+    const fn allow_related_delete(self) -> Self {
+        Self {
+            can_delete_related: true,
             ..self
         }
     }
@@ -310,6 +367,27 @@ impl Field {
 const APDA_ID: Field = Field::new("apda_id", "Apda id", Kind::Integer)
     .optional()
     .initial("-1");
+
+const GOV_TEAM: Field = Field::relation("gov_team", "gov_team_id", "Gov team", TEAM);
+const OPP_TEAM: Field = Field::relation("opp_team", "opp_team_id", "Opp team", TEAM);
+const CHAIR: Field = Field::relation("chair", "chair_id", "Chair", JUDGE).unwrapped();
+const PAIRING_ROOM: Field = Field::relation("room", "room_id", "Room", ROOM).optional();
+const ROUND_RESULTS: &[(i32, &str)] = &[
+    (0, "UNKNOWN"),
+    (1, "GOV"),
+    (2, "OPP"),
+    (3, "GOV via Forfeit"),
+    (4, "OPP via Forfeit"),
+    (5, "ALL DROP"),
+    (6, "ALL WIN"),
+];
+const OUTROUND_RESULTS: &[(i32, &str)] = &[
+    (0, "UNKNOWN"),
+    (1, "GOV"),
+    (2, "OPP"),
+    (3, "GOV via Forfeit"),
+    (4, "OPP via Forfeit"),
+];
 
 const REGISTRATION_FIELD: Field = Field::relation(
     "registration",
@@ -458,7 +536,9 @@ impl Resource {
                         Field::new("qualified", "Qualified", Kind::Checkbox).optional(),
                         TIEBREAKER,
                         APDA_ID,
-                        Field::relation("school", "school_id", "School", SCHOOL).optional(),
+                        Field::relation("school", "school_id", "School", SCHOOL)
+                            .optional()
+                            .allow_related_delete(),
                     ]
                 },
                 &[
@@ -514,7 +594,8 @@ impl Resource {
                             "Hybrid school",
                             SCHOOL,
                         )
-                        .optional(),
+                        .optional()
+                        .allow_related_delete(),
                         Field::new("debaters", "Debaters", Kind::Multiple(TEAM_DEBATERS))
                             .filtered("debaters"),
                         REGISTRATION_FIELD,
@@ -598,6 +679,58 @@ impl Resource {
                     ],
                 )
             }
+            "round" => (
+                const {
+                    &[
+                        ROUND,
+                        GOV_TEAM,
+                        OPP_TEAM,
+                        CHAIR,
+                        Field::new("judges", "Judges", Kind::Multiple(ROUND_PANEL))
+                            .optional()
+                            .filtered("judges"),
+                        Field::new(
+                            "pullup",
+                            "Pullup",
+                            Kind::Choice(&[(0, "NONE"), (1, "GOV"), (2, "OPP")]),
+                        )
+                        .initial("0"),
+                        PAIRING_ROOM.allow_related_delete(),
+                        Field::new("victor", "Victor", Kind::Choice(ROUND_RESULTS)).initial("0"),
+                        Field::new("rfd", "Rfd", Kind::Textarea).optional(),
+                    ]
+                },
+                &[],
+            ),
+            "outround" => (
+                const {
+                    &[
+                        Field::new("num_teams", "Num teams", Kind::Integer),
+                        Field::new(
+                            "type_of_round",
+                            "Type of round",
+                            Kind::Choice(&[(0, "Varsity"), (1, "Novice")]),
+                        )
+                        .initial("0"),
+                        GOV_TEAM,
+                        OPP_TEAM,
+                        CHAIR,
+                        Field::new("judges", "Judges", Kind::Multiple(OUTROUND_PANEL))
+                            .optional()
+                            .filtered("judges"),
+                        PAIRING_ROOM,
+                        Field::new("victor", "Victor", Kind::Choice(OUTROUND_RESULTS)).initial("0"),
+                        Field::new("sidelock", "Sidelock", Kind::Checkbox).optional(),
+                        Field::new(
+                            "choice",
+                            "Choice",
+                            Kind::Choice(&[(0, "No"), (1, "Gov"), (2, "Opp")]),
+                        )
+                        .initial("0"),
+                    ]
+                },
+                &[],
+            ),
             "scratch" => (
                 const {
                     &[
@@ -631,6 +764,14 @@ impl Resource {
             .zip(values)
             .find(|(field, _)| field.name == name)
             .and_then(|(_, value)| value.as_deref())
+    }
+
+    pub fn pairing(&self) -> bool {
+        matches!(self.list.model.name, "round" | "outround")
+    }
+
+    pub fn cascading_deletion(&self) -> bool {
+        self.pairing() || matches!(self.list.model.name, "team" | "judge" | "room")
     }
 
     pub fn attributed(&self) -> bool {
@@ -786,6 +927,25 @@ impl Resource {
             columns.push("created_by_id = ").push_bind_unseparated(user);
             columns.push("created_at = UTC_TIMESTAMP(6)");
         }
+        if model == "round" {
+            if self.value("victor", values) == Some("0") {
+                columns.push("result_entered_at = NULL");
+            } else if initial
+                .and_then(|row| self.value("victor", row))
+                .unwrap_or("0")
+                == "0"
+            {
+                columns.push("result_entered_at = UTC_TIMESTAMP(6)");
+            }
+            sqlx::query(
+                "DELETE FROM tab_noshow WHERE round_number = ? AND no_show_team_id IN (?, ?)",
+            )
+            .bind(self.value("round_number", values))
+            .bind(self.value("gov_team", values))
+            .bind(self.value("opp_team", values))
+            .execute(&mut *db)
+            .await?;
+        }
         if let Some(id) = id {
             sql.push(" WHERE id = ").push_bind(id);
         }
@@ -811,6 +971,7 @@ fn join_ids(ids: BTreeSet<i32>) -> Option<String> {
 pub struct Form {
     pub fields: Vec<BoundField>,
     pub non_field_error: Option<&'static str>,
+    pub pairing_revision: Option<String>,
 }
 
 pub struct BoundField {
@@ -827,6 +988,7 @@ impl Form {
         db: &mut MySqlConnection,
         initial: Option<&[Option<String>]>,
         post: Option<&Fields>,
+        query: &Query,
     ) -> Result<Self, sqlx::Error> {
         let mut fields = Vec::new();
         for (index, field) in resource.fields.iter().enumerate() {
@@ -838,7 +1000,7 @@ impl Form {
             } else if let Some(initial) = initial {
                 initial[index].clone()
             } else {
-                field.initial.map(str::to_owned)
+                query.get(field.name).or(field.initial).map(str::to_owned)
             };
             let options = match field.kind {
                 Kind::Relation(relation) => relation.options(db).await?,
@@ -868,6 +1030,7 @@ impl Form {
         Ok(Self {
             fields,
             non_field_error: None,
+            pairing_revision: None,
         })
     }
 
@@ -878,6 +1041,21 @@ impl Form {
         id: Option<i32>,
     ) -> Result<Option<Vec<Option<String>>>, sqlx::Error> {
         let values: Vec<_> = self.fields.iter_mut().map(BoundField::clean).collect();
+        if resource.pairing()
+            && let Some(chair) = resource.value("chair", &values)
+            && self
+                .fields
+                .iter()
+                .find(|field| field.field.name == "judges")
+                .is_some_and(|field| field.error.is_none())
+            && !resource
+                .value("judges", &values)
+                .unwrap_or_default()
+                .split(',')
+                .any(|judge| judge == chair)
+        {
+            self.non_field_error = Some("Chair must be a judge in the round");
+        }
         self.check_duplicates(resource, db, id, &values).await?;
         if self.non_field_error.is_some() || self.fields.iter().any(|field| field.error.is_some()) {
             return Ok(None);
@@ -936,6 +1114,13 @@ impl BoundField {
                 ids.insert(id);
             }
             return join_ids(ids);
+        }
+        if matches!(self.field.kind, Kind::Textarea) {
+            return if raw.contains('\0') {
+                invalid(&mut self.error, "Null characters are not allowed.")
+            } else {
+                Some(raw.into())
+            };
         }
         if raw.is_empty() {
             return if self.field.required {
@@ -1015,7 +1200,7 @@ impl BoundField {
                 Err(reason) => invalid(&mut self.error, reason),
             },
             Kind::Checkbox => Some(raw.into()),
-            Kind::Multiple(_) => unreachable!("Multiple choices are cleaned above"),
+            Kind::Multiple(_) | Kind::Textarea => unreachable!("Field was cleaned above"),
             Kind::Relation(_) | Kind::Choice(_) => {
                 let id = raw.parse::<i32>().ok();
                 if self.options.iter().any(|&(option, _)| {

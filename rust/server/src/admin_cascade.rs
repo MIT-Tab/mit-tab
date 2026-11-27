@@ -202,6 +202,23 @@ fn children(table: &str) -> &'static [(Model, &'static str)] {
             (MANUAL_ASSIGNMENT, "round_id"),
             (Registered("roundstats"), "round_id"),
         ],
+        "tab_room" => {
+            const {
+                &[
+                    (
+                        Model::other(
+                            "tab_room_tags",
+                            "Room_tags",
+                            "room-roomtag relationship",
+                            "room-roomtag relationships",
+                        ),
+                        "room_id",
+                    ),
+                    (Registered("outround"), "room_id"),
+                    (Registered("roomcheckin"), "room_id"),
+                ]
+            }
+        }
         "tab_outround" => &[(OUTROUND_JUDGES, "outround_id")],
         _ => &[],
     }
@@ -259,6 +276,7 @@ impl Cascade {
             let related_order = match (model.table, column) {
                 ("tab_team_debaters", "team_id") => Some("debater_id"),
                 ("tab_team_required_room_tags", "team_id")
+                | ("tab_room_tags", "room_id")
                 | ("tab_judge_required_room_tags", "judge_id") => Some("roomtag_id"),
                 ("tab_judge_schools", "judge_id") => Some("school_id"),
                 ("tab_round_judges", "round_id") | ("tab_outround_judges", "outround_id") => {

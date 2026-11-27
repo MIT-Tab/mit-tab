@@ -469,18 +469,22 @@ pub async fn audit_pairings(
         let new = after.get(&id);
         if old != new {
             let snapshot = new.or(old).expect("pairing audit snapshot");
-            let reference = format!(
-                "Outround {} between {} and {}",
-                snapshot.num_teams.unwrap_or(0),
-                snapshot
-                    .gov_team
-                    .as_ref()
-                    .map_or("", |team| team.name.as_str()),
-                snapshot
-                    .opp_team
-                    .as_ref()
-                    .map_or("", |team| team.name.as_str())
-            );
+            let reference = if source == "admin deletion" && new.is_none() {
+                format!("Outround {id}")
+            } else {
+                format!(
+                    "Outround {} between {} and {}",
+                    snapshot.num_teams.unwrap_or(0),
+                    snapshot
+                        .gov_team
+                        .as_ref()
+                        .map_or("", |team| team.name.as_str()),
+                    snapshot
+                        .opp_team
+                        .as_ref()
+                        .map_or("", |team| team.name.as_str())
+                )
+            };
             let changes = json!({"public": {"source": source, "before": old, "after": new}});
             record(db, "outround", id, user, reference, changes, old.is_none()).await?;
         }

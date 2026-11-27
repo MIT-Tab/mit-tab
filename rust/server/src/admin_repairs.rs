@@ -1,174 +1,173 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use axum::{
-    Extension, Form, Router,
-    extract::{Path, State},
-    http::{HeaderMap, StatusCode},
-    response::Response,
-    routing::get,
-};
-use minijinja::context;
-use serde::Deserialize;
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access,
-    admin_scores::score_audit,
-    board_snapshot,
-    html::{self, Navigation},
-    legacy_session::Actor,
-    login, private, publication, round_audit,
-    settings::Settings,
-    staff_pairing::lock_round,
-    unavailable,
+    admin_scores::score_audit, board_snapshot, publication, round_audit, settings::Settings,
 };
 
-pub fn routes() -> Router<App> {
-    Router::new().route(
-        "/admin/tab/{model}/{id}/delete/",
-        get(confirm_delete).post(delete),
-    )
+use crate::board_outrounds::{teams, winner_loser};
+
+pub(super) enum Edit {
+    Inround(BTreeMap<i32, round_audit::Snapshot>),
+    Outround(BTreeMap<i32, board_snapshot::Snapshot>),
 }
 
-#[derive(Clone, Copy)]
-enum Record {
-    Round,
-    Outround,
-}
-
-impl Record {
-    fn parse(model: &str) -> Option<Self> {
-        match model {
-            "round" => Some(Self::Round),
-            "outround" => Some(Self::Outround),
-            _ => None,
+impl Edit {
+    pub(super) async fn capture(
+        db: &mut MySqlConnection,
+        model: &str,
+        id: Option<i32>,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        match (model, id) {
+            ("round", Some(id)) => Ok(Some(Self::Inround(score_audit(db, id).await?))),
+            ("round", None) => Ok(Some(Self::Inround(BTreeMap::new()))),
+            ("outround", _) => Ok(Some(Self::Outround(
+                board_snapshot::capture(db, board_snapshot::Pairings::Outround).await?,
+            ))),
+            _ => Ok(None),
         }
     }
 
-    fn cancel(self, id: i32) -> String {
-        match self {
-            Self::Round => format!("/round/{id}/result/"),
-            Self::Outround => format!("/outround/{id}/result/"),
-        }
-    }
-
-    async fn describe(
+    pub(super) async fn record(
         self,
         db: &mut MySqlConnection,
         id: i32,
-    ) -> Result<Option<String>, sqlx::Error> {
-        let sql = match self {
-            Self::Round => "SELECT CONCAT(g.name, ' vs. ', o.name) FROM tab_round r
-                            JOIN tab_team g ON g.id = r.gov_team_id JOIN tab_team o ON o.id = r.opp_team_id
-                            WHERE r.id = ?",
-            Self::Outround => "SELECT CONCAT(g.name, ' vs. ', o.name) FROM tab_outround r
-                            JOIN tab_team g ON g.id = r.gov_team_id JOIN tab_team o ON o.id = r.opp_team_id
-                            WHERE r.id = ?",
-        };
-        sqlx::query_scalar(sql).bind(id).fetch_optional(db).await
-    }
-}
-
-async fn confirm_delete(
-    State(app): State<App>,
-    Extension(actor): Extension<Actor>,
-    Path((model, id)): Path<(String, i32)>,
-    headers: HeaderMap,
-) -> Response {
-    let Some(record) = Record::parse(&model) else {
-        return missing();
-    };
-
-    let result = async {
-        let mut db = app.db.acquire().await?;
-        let Some(description) = record.describe(&mut db, id).await? else {
-            return Ok(missing());
-        };
-        let Ok(csrf) = html::page_csrf(&headers) else {
-            return Ok(unavailable());
-        };
-        let response = html::render(
-            "admin_repair.html",
-            context! {
-                title => "Confirm Deletion", nav => Navigation::new(actor, true), csrf, description,
-                cancel => record.cancel(id),
-            },
-            StatusCode::OK,
-        );
-        Ok::<_, sqlx::Error>(html::form_response(response, &headers, &csrf))
-    }
-    .await;
-    result.unwrap_or_else(|_| unavailable())
-}
-
-#[derive(Deserialize)]
-struct DeleteForm {
-    csrfmiddlewaretoken: String,
-    confirm: Option<String>,
-}
-
-async fn delete(
-    State(app): State<App>,
-    Extension(actor): Extension<Actor>,
-    Path((model, id)): Path<(String, i32)>,
-    headers: HeaderMap,
-    Form(form): Form<DeleteForm>,
-) -> Response {
-    if !login::valid_csrf(&headers, &form.csrfmiddlewaretoken) {
-        return login::csrf_error();
-    }
-    if form.confirm.as_deref() != Some("on") {
-        return private((
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "Confirm the deletion first.",
-        ));
-    }
-    let Actor::User { id: user, .. } = actor else {
-        return access::access_denied();
-    };
-    let Some(record) = Record::parse(&model) else {
-        return missing();
-    };
-    let result = async {
-        let mut db = app.db.begin().await?;
-        lock_round(&mut db).await?;
-        let destination = match record {
-            Record::Round => {
-                let before = score_audit(&mut db, id).await?;
-                if before.is_empty() {
-                    return Ok(missing());
+        user: i32,
+    ) -> Result<Option<&'static str>, sqlx::Error> {
+        match self {
+            Self::Inround(before) => {
+                let after = score_audit(db, id).await?;
+                round_audit::record(db, &before, &after, user, "admin correction").await?;
+            }
+            Self::Outround(before) => {
+                let after = board_snapshot::capture(db, board_snapshot::Pairings::Outround).await?;
+                let updated = after.get(&id).ok_or(sqlx::Error::RowNotFound)?;
+                let old = before.get(&id);
+                if old == Some(updated) {
+                    return Ok(None);
                 }
-                crate::entity_store::delete_rounds(&mut db, &[id]).await?;
-                round_audit::record(
-                    &mut db,
-                    &before,
-                    &Default::default(),
+                let changed = old.is_none_or(|previous| {
+                    competitive_values(previous) != competitive_values(updated)
+                });
+                if changed && breaks_qualification(id, old, updated, &after) {
+                    return Ok(Some(
+                        "Re-pair the later stage before changing its qualifying team.",
+                    ));
+                }
+                let entrants_changed = old.is_none_or(|previous| {
+                    previous.division != updated.division
+                        || previous.num_teams != updated.num_teams
+                        || teams(previous) != teams(updated)
+                });
+                if entrants_changed && invalid_entrants(id, updated, &after) {
+                    return Ok(Some(
+                        "Choose distinct teams that are still eligible for this stage.",
+                    ));
+                }
+                let edit_before = old
+                    .map(|previous| (id, previous.clone()))
+                    .into_iter()
+                    .collect();
+                let edit_after = BTreeMap::from([(id, updated.clone())]);
+                board_snapshot::audit_pairings(
+                    db,
+                    &edit_before,
+                    &edit_after,
                     user,
-                    "admin deletion",
+                    "admin correction",
                 )
                 .await?;
-                "/pairings/view_rounds/"
-            }
-            Record::Outround => {
-                let before =
-                    board_snapshot::capture(&mut db, board_snapshot::Pairings::Outround).await?;
-                if !before.contains_key(&id) {
-                    return Ok(missing());
+                if let Some(previous) = old
+                    && (previous.division != updated.division
+                        || previous.num_teams != updated.num_teams
+                        || previous.gov_team != updated.gov_team
+                        || previous.opp_team != updated.opp_team)
+                    && let (Some(division), Some(size)) = (previous.division, previous.num_teams)
+                {
+                    prune_published_stage(db, division, size, previous, &after).await?;
                 }
-                let removed = BTreeSet::from([id]);
-                if later_stage_depends_on(&before, &removed) {
-                    return Ok(private((StatusCode::CONFLICT, LATER_STAGE)));
+                if changed {
+                    let divisions: BTreeSet<_> = old
+                        .and_then(|round| round.division)
+                        .into_iter()
+                        .chain(updated.division)
+                        .collect();
+                    for division in divisions {
+                        crate::board_outrounds::recompute_staff_seeds(db, user, &after, division)
+                            .await?;
+                    }
                 }
-                crate::entity_store::delete_outrounds(&mut db, &[id]).await?;
-                finish_outround_changes(&mut db, user, &before, &removed).await?;
-                "/outround_pairing"
+                let settings = Settings::load(db, publication::VISIBILITY_KEYS).await?;
+                publication::refresh_placements(db, &settings).await?;
             }
-        };
-        db.commit().await?;
-        Ok::<_, sqlx::Error>(access::found(destination))
+        }
+        Ok(None)
     }
-    .await;
-    result.unwrap_or_else(|_| unavailable())
+}
+
+fn breaks_qualification(
+    id: i32,
+    old: Option<&board_snapshot::Snapshot>,
+    new: &board_snapshot::Snapshot,
+    pairings: &BTreeMap<i32, board_snapshot::Snapshot>,
+) -> bool {
+    let advanced = |stage: &board_snapshot::Snapshot, team: i32| {
+        pairings.iter().any(|(&peer, next)| {
+            peer != id
+                && stage.division == next.division
+                && next
+                    .num_teams
+                    .zip(stage.num_teams)
+                    .is_some_and(|(next, current)| next < current)
+                && teams(next).contains(&team)
+        })
+    };
+    let new_winner = winner_loser(new).map(|(winner, _)| winner);
+    if let Some(old) = old
+        && let Some((winner, _)) = winner_loser(old)
+        && (new_winner != Some(winner)
+            || old.division != new.division
+            || old.num_teams != new.num_teams)
+        && advanced(old, winner)
+    {
+        return true;
+    }
+    winner_loser(new).is_some_and(|(_, loser)| advanced(new, loser))
+}
+
+fn invalid_entrants(
+    id: i32,
+    round: &board_snapshot::Snapshot,
+    pairings: &BTreeMap<i32, board_snapshot::Snapshot>,
+) -> bool {
+    let [gov, opp] = teams(round);
+    gov == opp
+        || pairings.iter().any(|(&peer, earlier)| {
+            if peer == id || earlier.division != round.division {
+                return false;
+            }
+            if earlier.num_teams == round.num_teams {
+                return teams(earlier)
+                    .iter()
+                    .any(|team| *team == gov || *team == opp);
+            }
+            earlier
+                .num_teams
+                .zip(round.num_teams)
+                .is_some_and(|(earlier, now)| earlier > now)
+                && winner_loser(earlier).is_some_and(|(_, loser)| loser == gov || loser == opp)
+        })
+}
+
+fn competitive_values(round: &board_snapshot::Snapshot) -> [Option<i32>; 5] {
+    [
+        round.division,
+        round.num_teams,
+        round.victor,
+        round.gov_team.as_ref().map(|team| team.id),
+        round.opp_team.as_ref().map(|team| team.id),
+    ]
 }
 
 pub(super) const LATER_STAGE: &str = "Resolve the later stage before deleting this pairing.";
@@ -263,8 +262,4 @@ async fn prune_published_stage(
         .execute(db)
         .await?;
     Ok(())
-}
-
-fn missing() -> Response {
-    private((StatusCode::NOT_FOUND, "Record not found."))
 }

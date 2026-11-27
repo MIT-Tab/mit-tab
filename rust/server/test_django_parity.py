@@ -5321,12 +5321,12 @@ def test_admin_roster_forms_match_django_and_preserve_related_records(html_asset
             for path in (f"{model}add/", f"{model}{record.id}/change/",
                          f"{model}{record.id}/history/", f"{model}{record.id}/delete/"):
                 with subtests.test(path=path):
-                    compare_admin_page(port, path, client)
+                    compare_admin_page(port, path, client, deletion_scope=name == "room" and path.endswith("/delete/"))
                     assert request(port, path, cookie=board)[1]["Location"] == "/403/"
             with subtests.test(bulk=model):
                 compare_admin_page(port, model, client, post={
                     "action": "delete_selected", "_selected_action": record.id, "index": 0,
-                })
+                }, deletion_scope=name == "room")
         invalid = [
             ("school", {"name": school.name, "apda_id": "invalid"}),
             ("debater", {"name": debater.name, "email": "bad", "tiebreaker": 256,
@@ -5429,7 +5429,9 @@ def test_admin_roster_forms_match_django_and_preserve_related_records(html_asset
         assert audit.changes["public"]["before"]["scores"][0]["debater"] == debater.id
         assert audit.changes["public"]["after"]["scores"] == []
         assert not group.debaters.filter(id=debater.id).exists()
-        assert submit(port, f"{base}room/{room.id}/delete/", {"post": "yes"})[0] == 302
+        room_deletion = f"{base}room/{room.id}/delete/"
+        _, _, preview = request(port, room_deletion, cookie=session)
+        assert submit(port, room_deletion, {"post": "yes", "mittab_delete_scope": admin_delete_proof(preview)})[0] == 302
         assert not RoomCheckIn.objects.filter(id=checkin.id).exists()
         assert not tags.filter(room_id=room.id).exists()
         assert submit(port, f"{base}rankinggroup/{group.id}/delete/", {"post": "yes"})[0] == 302
@@ -5661,10 +5663,229 @@ def test_admin_team_judge_forms_and_deletion_match_django(html_assets, subtests)
         assert not group.teams.filter(id=team.id).exists()
 
 
-def compare_admin_page(port, path, client, post=None, *, deletion_scope=False):
+@pytest.mark.django_db(transaction=True)
+def test_admin_round_and_outround_forms_match_django_and_record_corrections(html_assets, subtests):
+    from mittab.apps.tab.models import ManualJudgeAssignment, PublishedOutroundStage, WrittenRFDEmailLog
+
+    staff = legacy_tab_session("pairing-admin-parity")
+    user = get_user_model().objects.get(username="pairing-admin-parity")
+    board = legacy_tab_session("pairing-admin-parity-board")
+    get_user_model().objects.get(username="pairing-admin-parity-board").groups.add(
+        Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("var_teams_visible", 2)
+    school = School.objects.create(name="Pairing Editor School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0)
+                for name in ("Government <Team>", "Opposition & Team")]
+    chair, wing, spare = [Judge.objects.create(name=name, rank=2)
+                          for name in ("Catherine & Chair", "Winnie Wing", "Spare <Judge>")]
+    room = Room.objects.create(name="Pairing & Room", rank=1)
+    speaker = Debater.objects.create(name="Score fixture", novice_status=0)
+    gov.debaters.add(speaker)
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, room=room, chair=chair,
+                                  rfd="Original <statement> & reason\r\nSecond line")
+    debate.judges.add(chair, wing)
+    ManualJudgeAssignment.objects.filter(round=debate, judge=wing).update(created_by=user)
+    kept_assignment = ManualJudgeAssignment.objects.get(round=debate, judge=wing)
+    kept_link = Round.judges.through.objects.get(round=debate, judge=wing).id
+    score = RoundStats.objects.create(round=debate, debater=speaker, debater_role="pm", speaks=27, ranks=1)
+    email = WrittenRFDEmailLog.objects.create(round=debate, email="written@example.org")
+    active_no_show = NoShow.objects.create(no_show_team=gov, round_number=1)
+    other_no_show = NoShow.objects.create(no_show_team=gov, round_number=2)
+    final = Outround.objects.create(num_teams=2, type_of_round=0, gov_team=gov, opp_team=opp, chair=chair,
+                                    room=room, victor=Outround.GOV)
+    final.judges.add(chair, wing)
+    final_stage = PublishedOutroundStage.objects.create(type_of_round=0, num_teams=2)
+    PublishedTeamPlacement.objects.create(stage=final_stage, team=gov, place=1)
+    PublishedTeamPlacement.objects.create(stage=final_stage, team=opp, place=2)
+
+    client = Client()
+    csrf = "a" * 32
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = csrf
+    round_list, outround_list = "/admin/tab/round/", "/admin/tab/outround/"
+    debate_url, final_url = f"{round_list}{debate.id}/", f"{outround_list}{final.id}/"
+
+    def post(port, path, fields, session=staff, token=csrf):
+        return request(port, path, method="POST", form={**fields, "csrfmiddlewaretoken": token},
+                       extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"})
+
+    def save(port, path, fields):
+        status, _, html = request(port, path, cookie=staff)
+        assert status == 200
+        return post(port, path, {**fields, "mittab_pairing_revision": admin_edit_proof(html)})
+
+    def pair_audit(pairing):
+        return AuditEvent.objects.filter(
+            content_type__model=pairing._meta.model_name,
+            object_id=pairing.id,
+            changes__public__source="admin correction",
+        )
+
+    prelim_fields = {"round_number": 1, "gov_team": gov.id, "opp_team": opp.id, "chair": spare.id,
+                     "judges": [wing.id, spare.id], "pullup": Round.GOV, "room": room.id,
+                     "victor": Round.OPP, "rfd": "Private <reason> & example\nKeep the second line."}
+    final_fields = {"num_teams": 2, "type_of_round": Outround.VARSITY, "gov_team": gov.id, "opp_team": opp.id,
+                    "chair": wing.id, "judges": [wing.id, spare.id], "room": room.id,
+                    "victor": Outround.OPP, "sidelock": "on", "choice": Outround.GOV}
+
+    with rust_server(overrides=html_assets) as port:
+        for root, url, proof in [(round_list, debate_url, False), (outround_list, final_url, True)]:
+            for endpoint in (f"{root}add/", f"{url}change/", f"{url}history/", f"{url}delete/"):
+                with subtests.test(endpoint=endpoint):
+                    compare_admin_page(port, endpoint, client, deletion_scope=proof and endpoint.endswith("/delete/"),
+                                       pairing_revision=endpoint.endswith("/change/"))
+                    assert request(port, endpoint, cookie=board)[1]["Location"] == "/403/"
+        compare_admin_page(port, f"{round_list}add/?chair={spare.id}&judges={chair.id},{spare.id}&gov_team={gov.id}", client)
+        compare_admin_page(port, f"{round_list}add/", client, post={})
+        compare_admin_page(port, f"{outround_list}add/", client, post={**final_fields, "num_teams": "no"})
+        compare_admin_page(port, f"{debate_url}change/", client,
+                           post={**prelim_fields, "judges": [wing.id]}, pairing_revision=True)
+        compare_admin_page(port, f"{final_url}change/", client, post={**final_fields, "chair": spare.id, "judges": [wing.id]}, pairing_revision=True)
+        compare_admin_page(port, round_list, client, post={"action": "delete_selected",
+                                                          "_selected_action": debate.id, "index": 0})
+
+        assert post(port, f"{debate_url}change/", prelim_fields, session=board)[1]["Location"] == "/403/"
+        assert post(port, f"{final_url}change/", final_fields, token="invalid")[0] == 403
+        assert post(port, f"{debate_url}delete/", {"post": "yes"})[0] == 403
+        assert post(port, round_list, {"action": "delete_selected", "_selected_action": debate.id, "post": "yes"})[0] == 403
+        assert RoundStats.objects.filter(id=score.id).exists()
+
+        _, _, html = request(port, f"{debate_url}change/", cookie=staff)
+        previous_spoken = "Fixture ballot entered after the editor opened"
+        Round.objects.filter(id=debate.id).update(victor=Round.GOV, rfd=previous_spoken)
+        status, _, html = post(port, f"{debate_url}change/", {
+            **prelim_fields, "mittab_pairing_revision": admin_edit_proof(html),
+        })
+        assert status == 409 and previous_spoken.encode() in html
+        assert Round.objects.get(id=debate.id).victor == Round.GOV
+        Round.objects.filter(id=debate.id).update(victor=Round.UNKNOWN, rfd=debate.rfd)
+
+        assert save(port, f"{debate_url}change/", {**prelim_fields, "_continue": 1})[1]["Location"] == f"{debate_url}change/"
+        debate.refresh_from_db()
+        assert debate.result_entered_at and debate.victor == Round.OPP and debate.rfd == prelim_fields["rfd"]
+        assert not NoShow.objects.filter(id=active_no_show.id).exists()
+        assert NoShow.objects.filter(id=other_no_show.id).exists()
+        assert set(debate.judges.values_list("id", flat=True)) == {wing.id, spare.id}
+        assert Round.judges.through.objects.get(round=debate, judge=wing).id == kept_link
+        assert ManualJudgeAssignment.objects.get(round=debate, judge=wing).id == kept_assignment.id
+        assert ManualJudgeAssignment.objects.get(round=debate, judge=wing).created_by_id == user.id
+        assert ManualJudgeAssignment.objects.get(round=debate, judge=spare).created_by_id is None
+        assert not ManualJudgeAssignment.objects.filter(round=debate, judge=chair).exists()
+        initial_time = debate.result_entered_at
+        assert save(port, f"{debate_url}change/", {**prelim_fields, "victor": Round.GOV})[0] == 302
+        debate.refresh_from_db()
+        assert debate.result_entered_at == initial_time
+        event = pair_audit(debate).order_by("id").first()
+        assert event.changes["public"]["before"]["chair"] == chair.id
+        assert event.changes["public"]["after"]["chair"] == spare.id
+        assert "Private <reason>" not in json.dumps(event.changes)
+        assert save(port, f"{debate_url}change/", {**prelim_fields, "victor": Round.UNKNOWN})[0] == 302
+        debate.refresh_from_db()
+        assert debate.result_entered_at is None
+
+        assert save(port, f"{final_url}change/", final_fields)[1]["Location"] == outround_list
+        final.refresh_from_db()
+        assert final.sidelock and final.choice == Outround.GOV and final.victor == Outround.OPP
+        assert set(final.judges.values_list("id", flat=True)) == {wing.id, spare.id}
+        assert dict(PublishedTeamPlacement.objects.filter(stage=final_stage).values_list("team_id", "place")) == {
+            gov.id: 2, opp.id: 1,
+        }
+        event = pair_audit(final).get()
+        assert event.changes["public"]["after"]["victor"] == Outround.OPP
+        compare_admin_page(port, f"{debate_url}change/", client, pairing_revision=True)
+        compare_admin_page(port, f"{debate_url}history/", client)
+        compare_admin_page(port, f"{final_url}history/", client)
+
+        assert post(port, f"{round_list}add/", {**prelim_fields, "round_number": 3, "rfd": ""})[0] == 302
+        added = Round.objects.get(round_number=3)
+        assert added.rfd == "" and added.result_entered_at
+        assert pair_audit(added).get().event_type == "create"
+        assert post(port, f"{outround_list}add/", {**final_fields, "type_of_round": Outround.NOVICE})[0] == 302
+        novice = Outround.objects.get(type_of_round=Outround.NOVICE)
+        assert pair_audit(novice).get().event_type == "create"
+
+        eliminated = Team.objects.create(name="Eliminated semifinal team", school=school, seed=0)
+        semifinal = Outround.objects.create(num_teams=4, type_of_round=Outround.VARSITY,
+                                           gov_team=gov, opp_team=eliminated, chair=wing,
+                                           victor=Outround.GOV)
+        semifinal.judges.add(wing)
+        semifinal_path = f"{outround_list}{semifinal.id}/change/"
+        semifinal_fields = {**final_fields, "num_teams": 4, "opp_team": eliminated.id,
+                            "victor": Outround.OPP}
+        status, _, html = save(port, semifinal_path, semifinal_fields)
+        assert status == 409 and b"Re-pair the later stage before changing its qualifying team." in html
+        semifinal.refresh_from_db()
+        assert semifinal.victor == Outround.GOV
+        assert save(port, semifinal_path, {**semifinal_fields, "victor": Outround.GOV})[0] == 302
+        status, _, html = save(port, f"{final_url}change/", {**final_fields, "gov_team": eliminated.id})
+        assert status == 409 and b"Choose distinct teams that are still eligible for this stage." in html
+        final.refresh_from_db()
+        assert final.gov_team_id == gov.id
+        bye = Team.objects.create(name="Bye entrant", school=school, seed=0)
+        assert save(port, f"{final_url}change/", {**final_fields, "opp_team": bye.id})[0] == 302
+        assert save(port, f"{final_url}change/", final_fields)[0] == 302
+
+        ManualJudgeAssignment.objects.filter(round__in=[debate, added]).delete()
+        compare_admin_page(port, f"{debate_url}delete/", client, deletion_scope=True)
+        _, _, single = request(port, f"{debate_url}delete/", cookie=staff)
+        scope = {"action": "delete_selected", "_selected_action": [debate.id, added.id]}
+        compare_admin_page(port, round_list, client, post={**scope, "index": 0}, deletion_scope=True)
+        _, _, body = post(port, round_list, {**scope, "index": 0})
+        token = admin_delete_proof(body)
+        Round.objects.filter(id=debate.id).update(rfd="Fresh private RFD after deletion previews")
+        status, _, refreshed = post(port, f"{debate_url}delete/", {
+            "post": "yes", "mittab_delete_scope": admin_delete_proof(single),
+        })
+        assert status == 409 and b"Fresh private RFD" not in refreshed
+        assert post(port, round_list, {**scope, "post": "yes", "mittab_delete_scope": token})[0] == 409
+        assert Round.objects.filter(id__in=[debate.id, added.id]).count() == 2
+        _, _, body = post(port, round_list, {**scope, "index": 0})
+        assert post(port, round_list, {**scope, "post": "yes", "mittab_delete_scope": admin_delete_proof(body)})[0] == 302
+        assert not RoundStats.objects.filter(id=score.id).exists()
+        assert not WrittenRFDEmailLog.objects.filter(id=email.id).exists()
+        assert AuditEvent.objects.get(content_type__model="round", object_id=debate.id,
+                                      changes__public__source="admin deletion").object_repr == f"Round {debate.id}"
+
+        _, _, body = request(port, f"{final_url}delete/", cookie=staff)
+        assert post(port, f"{final_url}delete/", {"post": "yes", "mittab_delete_scope": admin_delete_proof(body)})[0] == 302
+        assert not PublishedOutroundStage.objects.filter(id=final_stage.id).exists()
+        assert AuditEvent.objects.get(content_type__model="outround", object_id=final.id,
+                                      changes__public__source="admin deletion").object_repr == f"Outround {final.id}"
+        assert Outround.objects.filter(id=novice.id).exists()
+
+        # A room which has only been used for eliminations follows Django's room cascade.
+        elimination_room = Room.objects.create(name="Elimination-only room", rank=7)
+        Outround.objects.filter(id=novice.id).update(room=elimination_room)
+        novice_stage = PublishedOutroundStage.objects.create(type_of_round=Outround.NOVICE, num_teams=2)
+        PublishedTeamPlacement.objects.create(stage=novice_stage, team=opp, place=1)
+        room_deletion = f"/admin/tab/room/{elimination_room.id}/delete/"
+        compare_admin_page(port, room_deletion, client, deletion_scope=True)
+        _, _, html = request(port, room_deletion, cookie=staff)
+        assert post(port, room_deletion, {"post": "yes", "mittab_delete_scope": admin_delete_proof(html)})[0] == 302
+        assert not Room.objects.filter(id=elimination_room.id).exists()
+        assert not Outround.objects.filter(id=novice.id).exists()
+        assert not PublishedOutroundStage.objects.filter(id=novice_stage.id).exists()
+        assert Judge.objects.filter(id=wing.id).exists()
+        assert Team.objects.filter(id=opp.id).exists()
+
+def admin_delete_proof(body):
+    return re.search(rb'name="mittab_delete_scope" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+def admin_edit_proof(body):
+    return re.search(rb'name="mittab_pairing_revision" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
+    if pairing_revision and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["mittab_pairing_revision"] = admin_edit_proof(previous)
     status, headers, body = request(
         port, path, extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
         method="POST" if form is not None else "GET", form=form,
@@ -5679,6 +5900,9 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False):
     else:
         if deletion_scope:
             body, metadata = re.subn(rb'<input type="hidden" name="mittab_delete_scope" value="[a-f0-9]{64}">', b"", body)
+            assert metadata == 1
+        if pairing_revision:
+            body, metadata = re.subn(rb'<input type="hidden" name="mittab_pairing_revision" value="[a-f0-9]{64}">', b"", body)
             assert metadata == 1
         assert_html_bytes(body, reference.content)
 
@@ -5788,10 +6012,16 @@ def test_native_administration_manages_accounts_groups_and_audit_with_board_excl
         assert post(scores, {**selected, "post": "yes"}, board)[1]["Location"] == "/403/"
         assert post(scores, {**selected, "post": "yes"})[1]["Location"] == scores
         assert not RoundStats.objects.filter(id=extra.id).exists()
-        assert post(delete, {})[0] == 422
-        assert post(delete, {"confirm": "on"})[0] == 302
+        def confirm_admin_delete(path):
+            status, _, html = request(port, path, cookie=staff)
+            assert status == 200
+            proof = admin_delete_proof(html)
+            return post(path, {"post": "yes", "mittab_delete_scope": proof})
+
+        assert post(delete, {})[0] == 400
+        assert confirm_admin_delete(delete)[0] == 302
         assert not Round.objects.filter(id=debate.id).exists() and not RoundStats.objects.filter(id=score.id).exists()
-        assert post(delete_final, {"confirm": "on"})[0] == 302
+        assert confirm_admin_delete(delete_final)[0] == 302
         assert not Outround.objects.filter(id=final.id).exists()
         assert AuditEvent.objects.filter(changes__public__source="admin deletion", object_id=final.id,
                                          content_type__model="outround").exists()
@@ -5805,7 +6035,7 @@ def test_native_administration_manages_accounts_groups_and_audit_with_board_excl
         stage = PublishedOutroundStage.objects.create(type_of_round=0, num_teams=4)
         for team, place in zip(teams + extra, (2, 3, 3, 2)):
             PublishedTeamPlacement.objects.create(stage=stage, team=team, place=place)
-        assert post(f"/admin/tab/outround/{semifinal.id}/delete/", {"confirm": "on"})[0] == 302
+        assert confirm_admin_delete(f"/admin/tab/outround/{semifinal.id}/delete/")[0] == 302
         assert dict(PublishedTeamPlacement.objects.filter(stage=stage).values_list("team_id", "place")) == {
             extra[0].id: 3, extra[1].id: 2
         }

@@ -213,7 +213,29 @@ async fn change(
     } else {
         (None, None)
     };
-    let mut form = Form::load(resource, &mut db, initial.as_deref(), post).await?;
+    let pairing_revision = initial
+        .as_ref()
+        .filter(|_| resource.pairing())
+        .and_then(|initial| AdminFormProof::for_session(&page, "admin pairing edit", initial));
+    let stale = post
+        .zip(pairing_revision.as_ref())
+        .is_some_and(|(post, proof)| !proof.verified(app, post.get("mittab_pairing_revision")));
+    let bound = post.filter(|_| !stale);
+    let mut form = Form::load(resource, &mut db, initial.as_deref(), bound, &page.query).await?;
+    form.pairing_revision = pairing_revision.map(|revision| revision.token(app));
+    if stale {
+        form.non_field_error =
+            Some("This pairing changed. Review the current values before saving.");
+        db.commit().await?;
+        return Ok(form_conflict(render_form(
+            page,
+            id,
+            original.as_deref(),
+            form,
+            None,
+            post,
+        )));
+    }
     let attribution = if resource.attributed() {
         Some(attribution(&mut db, resource, id).await?)
     } else {
@@ -236,11 +258,26 @@ async fn change(
             _ => SettingEffects::default(),
         };
         effects.refresh(&mut db).await?;
+        let pairing = admin_repairs::Edit::capture(&mut db, resource.list.model.name, id).await?;
         match resource
             .save(&mut db, id, &values, page.user, initial.as_deref())
             .await
         {
             Ok(saved) => {
+                if let Some(pairing) = pairing
+                    && let Some(message) = pairing.record(&mut db, saved, page.user).await?
+                {
+                    db.rollback().await?;
+                    form.non_field_error = Some(message);
+                    return Ok(form_conflict(render_form(
+                        page,
+                        id,
+                        original.as_deref(),
+                        form,
+                        attribution,
+                        Some(post),
+                    )));
+                }
                 effects.refresh(&mut db).await?;
                 let description = resource
                     .describe(&mut db, saved)
@@ -499,6 +536,13 @@ async fn attribution(
     ])
 }
 
+fn form_conflict(mut response: Response) -> Response {
+    if response.status().is_success() {
+        *response.status_mut() = StatusCode::CONFLICT;
+    }
+    response
+}
+
 fn render_form(
     page: Page<'_>,
     id: Option<i32>,
@@ -539,6 +583,7 @@ fn render_form(
         is_popup => popup, is_popup_var => "_popup", to_field, to_field_var => "_to_field",
         object_url, form_url => &suffix, filter_suffix => &suffix,
         adminform => [context! { classes => "", lines => widgets }],
+        pairing_revision => form.pairing_revision,
         show_delete_link => !popup && !add, show_save => true,
         show_save_and_add_another => !popup, show_save_and_continue => !popup,
         has_view_permission => true, can_change => true,
@@ -624,6 +669,10 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
                 r#"<input type="{input_type}" name="{name}"{value} class="vTextField" maxlength="{max}"{required} id="id_{name}">"#
             )
         }
+        Kind::Textarea => format!(
+            "<textarea name=\"{name}\" cols=\"40\" rows=\"10\" class=\"vLargeTextField\" id=\"id_{name}\">\n{}</textarea>",
+            escape(bound.value.as_deref().unwrap_or_default()),
+        ),
         Kind::BallotCode => format!(
             r#"<input type="text" name="{name}"{value} class="vTextField" maxlength="255"{required} id="id_{name}">"#
         ),
@@ -661,7 +710,7 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
                     blank, multiple, filter_label => field.filter_label, required => (blank || multiple) && field.required,
                 },
             )?;
-            if let Some(relation) = relation {
+            if let Some(relation) = relation.filter(|_| field.related_widget) {
                 admin_html::render_fragment("admin/widgets/related_widget_wrapper.html", context! {
                     name, model => relation.model,
                     rendered_widget => Value::from_safe_string(select.trim_end_matches('\n').into()),
@@ -671,7 +720,7 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
                     url_params => "_to_field=id&_popup=1",
                     view_related_url_params => "_to_field=id",
                     can_change_related => !multiple, can_add_related => true,
-                    can_delete_related => !multiple && !field.required && relation.model == "school",
+                    can_delete_related => field.can_delete_related,
                     can_view_related => !multiple,
                 })?.trim().to_owned()
             } else {
@@ -815,28 +864,30 @@ struct DeletionSummary {
     objects: Vec<String>,
 }
 
-struct DeletionPreview(Vec<u8>);
+struct AdminFormProof(Vec<u8>);
 
-impl DeletionPreview {
-    fn new(
+impl AdminFormProof {
+    fn deletion(
         page: &Page<'_>,
         records: &Removed,
         cascade: &Cascade,
         pairings: &CascadePairings,
     ) -> Option<Self> {
-        if !matches!(page.resource.list.model.name, "team" | "judge") {
+        if !page.resource.cascading_deletion() {
             return None;
         }
-        let session = cookie(page.headers, "sessionid")?;
-        let statement = serde_json::to_vec(&(
+        Self::for_session(
+            page,
             "admin deletion preview",
-            session,
-            page.target,
-            &records.rows,
-            cascade.scope(),
-            pairings.scope(),
-        ))
-        .expect("serializable deletion preview");
+            (&records.rows, cascade.scope(), pairings.scope()),
+        )
+    }
+
+    fn for_session(page: &Page<'_>, purpose: &str, state: impl serde::Serialize) -> Option<Self> {
+        let session = cookie(page.headers, "sessionid")?;
+        let statement =
+            serde_json::to_vec(&(purpose, session, page.target.split('?').next(), state))
+                .expect("serializable admin confirmation");
         Some(Self(statement))
     }
 
@@ -858,19 +909,47 @@ struct CascadePairings {
     removed_outrounds: BTreeSet<i32>,
     inrounds: BTreeMap<i32, round_audit::Snapshot>,
     publications: Vec<PublicationScope>,
+    deleted_round_details: Vec<(i32, i32, Option<NaiveDateTime>, String)>,
 }
 
 impl CascadePairings {
-    async fn capture(db: &mut MySqlConnection, cascade: &Cascade) -> Result<Self, sqlx::Error> {
-        let removed_outrounds = cascade.ids("tab_outround");
+    async fn capture(
+        db: &mut MySqlConnection,
+        cascade: &Cascade,
+        model: &str,
+        rows: &[(i32, String)],
+    ) -> Result<Self, sqlx::Error> {
+        let mut removed_outrounds = cascade.ids("tab_outround");
+        if model == "outround" {
+            removed_outrounds.extend(rows.iter().map(|(id, _)| *id));
+        }
         let outrounds = if !removed_outrounds.is_empty() || cascade.touches("tab_outround_judges") {
             Some(board_snapshot::capture(db, board_snapshot::Pairings::Outround).await?)
         } else {
             None
         };
+        let mut removed_rounds = cascade.ids("tab_round");
+        if model == "round" {
+            removed_rounds.extend(rows.iter().map(|(id, _)| *id));
+        }
+        let mut deleted_round_details = Vec::new();
+        if !removed_rounds.is_empty() {
+            let mut query = QueryBuilder::new(
+                "SELECT id, pullup, result_entered_at, SHA2(rfd, 256) FROM tab_round WHERE id IN (",
+            );
+            let mut ids = query.separated(", ");
+            for id in &removed_rounds {
+                ids.push_bind(*id);
+            }
+            deleted_round_details = query
+                .push(") ORDER BY id")
+                .build_query_as()
+                .fetch_all(&mut *db)
+                .await?;
+        }
         let mut inrounds = BTreeMap::new();
-        if cascade.touches("tab_round") || cascade.touches("tab_round_judges") {
-            let mut affected = cascade.ids("tab_round");
+        if !removed_rounds.is_empty() || cascade.touches("tab_round_judges") {
+            let mut affected = removed_rounds;
             let judge_links = cascade.ids("tab_round_judges");
             if !judge_links.is_empty() {
                 let mut sql = QueryBuilder::new(
@@ -924,6 +1003,7 @@ impl CascadePairings {
             removed_outrounds,
             inrounds,
             publications,
+            deleted_round_details,
         })
     }
 
@@ -934,7 +1014,12 @@ impl CascadePairings {
             .flatten()
             .filter(|(id, _)| self.removed_outrounds.contains(id))
             .collect::<Vec<_>>();
-        (&self.inrounds, removed, &self.publications)
+        (
+            &self.inrounds,
+            removed,
+            &self.publications,
+            &self.deleted_round_details,
+        )
     }
 
     fn blocked(&self) -> bool {
@@ -1012,7 +1097,7 @@ impl Removed {
         page: &Page<'_>,
         cascade: &Cascade,
     ) -> Result<DeletionSummary, sqlx::Error> {
-        if matches!(page.resource.list.model.name, "team" | "judge") {
+        if page.resource.cascading_deletion() {
             let model = &page.resource.list.model;
             let mut counts = vec![(model.plural, self.rows.len())];
             counts.extend(cascade.counts());
@@ -1097,12 +1182,8 @@ impl Removed {
                 ));
             }
         }
-        let related = match model.name {
-            "room" => Some(("roomcheckin", "room_id")),
-            "debater" => Some(("roundstats", "debater_id")),
-            _ => None,
-        };
-        if let Some((name, column)) = related {
+        if model.name == "debater" {
+            let (name, column) = ("roundstats", "debater_id");
             let list = admin_changelist::default_list(name).expect("admin cascade model");
             let mut sql = QueryBuilder::new(format!(
                 "SELECT t.id, t.{column}, {} FROM {} WHERE t.{column} IN (",
@@ -1112,23 +1193,14 @@ impl Removed {
             for (id, _) in &self.rows {
                 ids.push_bind(*id);
             }
-            let order = if model.name == "debater" {
-                ") ORDER BY t.id DESC"
-            } else {
-                ") ORDER BY t.id"
-            };
             let linked = sql
-                .push(order)
+                .push(") ORDER BY t.id DESC")
                 .build_query_as::<(i32, i32, String)>()
                 .fetch_all(&mut *db)
                 .await?;
             if !linked.is_empty() {
                 let count = (list.model.plural, linked.len());
-                if model.name == "debater" {
-                    counts.insert(1, count);
-                } else {
-                    counts.push(count);
-                }
+                counts.insert(1, count);
             }
             let title = admin_html::capitalized(list.model.singular);
             let url = list.model.url();
@@ -1138,11 +1210,7 @@ impl Removed {
                     escape(&label)
                 );
                 let items = children.entry(parent).or_default();
-                if model.name == "debater" {
-                    items.insert(0, item);
-                } else {
-                    items.push(item);
-                }
+                items.insert(0, item);
             }
         }
         let title = admin_html::capitalized(model.singular);
@@ -1184,7 +1252,7 @@ impl Removed {
                 "Remove this debater from their team before deleting the debater.",
             ),
             "room" => (
-                &[("tab_round", "room_id"), ("tab_outround", "room_id")],
+                &[("tab_round", "room_id")],
                 "This room is assigned to a round.",
             ),
             _ => return Ok(None),
@@ -1256,18 +1324,20 @@ impl Removed {
             _ => SettingEffects::default(),
         };
         effects.refresh(db).await?;
-        let mut links: Vec<_> = page
-            .resource
-            .relations()
-            .map(|(_, link)| (link.table, link.owner))
-            .collect();
+        let mut links: Vec<_> = if page.resource.cascading_deletion() {
+            Vec::new()
+        } else {
+            page.resource
+                .relations()
+                .map(|(_, link)| (link.table, link.owner))
+                .collect()
+        };
         match page.resource.list.model.name {
             "roomtag" => links.extend(
                 TAG_RELATIONS
                     .iter()
                     .map(|&(table, _, _, _)| (table, "roomtag_id")),
             ),
-            "room" => links.push(("tab_roomcheckin", "room_id")),
             "team" | "judge" => {
                 let model = page.resource.list.model.name;
                 let kind = if model == "team" { "teams" } else { "judges" };
@@ -1340,10 +1410,16 @@ async fn delete(
     let rejection = records.rejection(&mut db, &page.resource).await?;
     let cascade = records.cascade(&mut db, &page.resource, confirm).await?;
     let permissions = cascade.unavailable_permissions(&mut db).await?;
-    let pairings = CascadePairings::capture(&mut db, &cascade).await?;
+    let pairings = CascadePairings::capture(
+        &mut db,
+        &cascade,
+        page.resource.list.model.name,
+        &records.rows,
+    )
+    .await?;
     let rejection = rejection.or_else(|| pairings.blocked().then_some(LATER_STAGE));
     let headers = page.headers;
-    let preview = DeletionPreview::new(&page, &records, &cascade, &pairings);
+    let preview = AdminFormProof::deletion(&page, &records, &cascade, &pairings);
     let stale = confirm
         && preview.as_ref().is_some_and(|preview| {
             !preview.verified(app, post.map_or("", |post| post.get("mittab_delete_scope")))
@@ -1396,11 +1472,12 @@ async fn delete(
         is_popup => page.query.get("_popup").is_some(), is_popup_var => "_popup",
         to_field => page.query.get("_to_field"), to_field_var => "_to_field",
     };
-    let mut response = page.markup("admin/delete_confirmation.html", ctx);
-    if stale && response.status().is_success() {
-        *response.status_mut() = StatusCode::CONFLICT;
-    }
-    Ok(response)
+    let response = page.markup("admin/delete_confirmation.html", ctx);
+    Ok(if stale {
+        form_conflict(response)
+    } else {
+        response
+    })
 }
 
 async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx::Error> {
@@ -1434,10 +1511,16 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
     let rejection = records.rejection(&mut db, &page.resource).await?;
     let cascade = records.cascade(&mut db, &page.resource, confirm).await?;
     let permissions = cascade.unavailable_permissions(&mut db).await?;
-    let pairings = CascadePairings::capture(&mut db, &cascade).await?;
+    let pairings = CascadePairings::capture(
+        &mut db,
+        &cascade,
+        page.resource.list.model.name,
+        &records.rows,
+    )
+    .await?;
     let rejection = rejection.or_else(|| pairings.blocked().then_some(LATER_STAGE));
     let headers = page.headers;
-    let preview = DeletionPreview::new(&page, &records, &cascade, &pairings);
+    let preview = AdminFormProof::deletion(&page, &records, &cascade, &pairings);
     let stale = confirm
         && preview
             .as_ref()
@@ -1494,11 +1577,12 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
         queryset => records.rows.iter().map(|(id, _)| context! {pk => id}).collect::<Vec<_>>(),
         action_checkbox_name => "_selected_action",
     };
-    let mut response = page.markup("admin/delete_selected_confirmation.html", ctx);
-    if stale && response.status().is_success() {
-        *response.status_mut() = StatusCode::CONFLICT;
-    }
-    Ok(response)
+    let response = page.markup("admin/delete_selected_confirmation.html", ctx);
+    Ok(if stale {
+        form_conflict(response)
+    } else {
+        response
+    })
 }
 
 fn deletion_title(name: &str, rejection: Option<&str>, permissions: Vec<&str>) -> (String, String) {
