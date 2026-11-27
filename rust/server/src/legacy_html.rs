@@ -222,6 +222,14 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/common/403.html"),
         ),
         (
+            "common/404.html",
+            include_str!("../../../mittab/templates/common/404.html"),
+        ),
+        (
+            "common/500.html",
+            include_str!("../../../mittab/templates/common/500.html"),
+        ),
+        (
             "tab/email_management.html",
             include_str!("../../../mittab/templates/tab/email_management.html"),
         ),
@@ -264,6 +272,22 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "public/motions.html",
             include_str!("../../../mittab/templates/public/motions.html"),
+        ),
+        (
+            "public/teams.html",
+            include_str!("../../../mittab/templates/public/teams.html"),
+        ),
+        (
+            "public/judges.html",
+            include_str!("../../../mittab/templates/public/judges.html"),
+        ),
+        (
+            "public/expected_records.html",
+            include_str!("../../../mittab/templates/public/expected_records.html"),
+        ),
+        (
+            "public/_roster_changes.html",
+            include_str!("../../../mittab/templates/public/_roster_changes.html"),
         ),
         (
             "motions/manage_motions.html",
@@ -581,6 +605,7 @@ fn translate(name: &str, source: &str) -> String {
             ),
             ["outround_form", "form"] => output.push_str("{% include 'outrounds/_form.html' %}"),
             ["csrf_token"] => output.push_str("{{ csrf_input|safe }}"),
+            ["widthratio", "num_rounds", "1", "72"] => output.push_str("{{ table_width }}"),
             ["render_field", field, ..] => {
                 let field = field.strip_prefix("form.").unwrap_or(field);
                 output.push_str(&format!(
@@ -663,6 +688,14 @@ fn translate(name: &str, source: &str) -> String {
         "tab/_email_preview.html" => translated.replace(
             "|default:email.to_address", "|django_default(email.to_address)",
         ).replace("{{ email.html_body }}", "{{ email.html_body|isolated_email_preview }}"),
+        "public/teams.html" => translated
+            .replace("team.display", "team.name")
+            .replace("team.school.display", "team.school")
+            .replace("team.hybrid_school.name", "team.hybrid")
+            .replace("team.debaters_display", "team.debaters")
+            .replace("team.novice_status_display", "team.division")
+            .replace("team.get_seed_display", "team.seed"),
+        "public/expected_records.html" => translated.replace("|floatformat:\"-2\"", ""),
         _ => translated,
     };
     ["default", "date", "yesno", "pluralize", "truncatechars"]

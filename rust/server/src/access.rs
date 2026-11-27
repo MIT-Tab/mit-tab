@@ -1,6 +1,6 @@
 use axum::{
     extract::{MatchedPath, Request, State},
-    http::{Method, StatusCode, header},
+    http::{HeaderMap, Method, StatusCode, header},
     middleware::Next,
     response::Response,
 };
@@ -9,8 +9,9 @@ use sqlx::MySqlConnection;
 
 use crate::{
     App,
-    legacy_session::{Actor, actor},
-    private,
+    admin_model_forms::AdminFormProof,
+    legacy_session::{Actor, SessionError, actor, cookie},
+    login, private,
     settings::Settings,
     unavailable,
 };
@@ -26,7 +27,7 @@ pub async fn public_api(State(app): State<App>, request: Request, next: Next) ->
                 return unavailable();
             };
             if open {
-                access_denied()
+                board_denied(&app, request.headers())
             } else {
                 private((
                     StatusCode::FORBIDDEN,
@@ -65,6 +66,9 @@ pub async fn public_tournament(
 ) -> Response {
     let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
         Ok(actor) => actor,
+        Err(SessionError::Reauthenticate) if request.uri().path() == "/public/login/" => {
+            Actor::Anonymous
+        }
         Err(error) => return error.response(),
     };
     if matches!(actor, Actor::User { board: true, .. }) {
@@ -93,10 +97,22 @@ pub async fn public_tournament(
                 | "/public/judges/"
                 | "/public/teams/expected-records/"
                 | "/403/"
+                | "/404/"
+                | "/500/"
         );
         if !read || !allowed {
-            return access_denied();
+            return board_denied(&app, request.headers());
         }
+        request.extensions_mut().insert(actor);
+        let response = next.run(request).await;
+        return if response.status().is_server_error() {
+            private((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unable to complete this request.",
+            ))
+        } else {
+            private(response)
+        };
     }
     request.extensions_mut().insert(actor);
     next.run(request).await
@@ -114,7 +130,7 @@ pub async fn staff_settings(State(app): State<App>, mut request: Request, next: 
             return found(target);
         }
         Actor::User { board: true, .. } => match board_access_open(&app).await {
-            Ok(true) => return access_denied(),
+            Ok(true) => return board_denied(&app, request.headers()),
             Ok(false) => return board_closed(),
             Err(_) => return unavailable(),
         },
@@ -275,7 +291,7 @@ pub async fn admin_actor(
             found(format!("/public/login/?next={path}"))
         }
         Actor::User { board: true, .. } => match board_access_open(app).await {
-            Ok(true) => access_denied(),
+            Ok(true) => board_denied(app, headers),
             Ok(false) => board_closed(),
             Err(_) => unavailable(),
         },
@@ -302,7 +318,7 @@ pub async fn roster_log(State(app): State<App>, mut request: Request, next: Next
         Actor::Anonymous => return found(format!("/public/login/?next={}", request.uri().path())),
         Actor::User { board: true, .. } => {
             return match board_access_open(&app).await {
-                Ok(true) => access_denied(),
+                Ok(true) => board_denied(&app, request.headers()),
                 Ok(false) => board_closed(),
                 Err(_) => unavailable(),
             };
@@ -332,9 +348,9 @@ fn board_closed() -> Response {
     ))
 }
 
-pub async fn board_restricted(app: &App) -> Response {
+pub async fn board_restricted(app: &App, headers: &HeaderMap) -> Response {
     match board_access_open(app).await {
-        Ok(true) => access_denied(),
+        Ok(true) => board_denied(app, headers),
         Ok(false) => board_closed(),
         Err(_) => unavailable(),
     }
@@ -352,6 +368,34 @@ pub async fn wizard_complete(app: &App) -> Result<bool, sqlx::Error> {
 
 pub fn access_denied() -> Response {
     private((StatusCode::FOUND, [(header::LOCATION, "/403/")]))
+}
+
+pub const BOARD_DENIAL_COOKIE: &str = "mittab_board_denial";
+pub const BOARD_DENIAL_TEXT: &str = "APDA Board access is limited to APDA tools and public pages.";
+
+fn board_denial_proof(headers: &HeaderMap) -> Option<AdminFormProof> {
+    AdminFormProof::for_target(headers, "board access denial", "/403/", ())
+}
+
+fn board_denied(app: &App, headers: &HeaderMap) -> Response {
+    let mut response = access_denied();
+    if let Some(proof) = board_denial_proof(headers) {
+        login::set_cookie(
+            &mut response,
+            BOARD_DENIAL_COOKIE,
+            &proof.token(app),
+            60,
+            login::secure_request(headers),
+            true,
+        );
+    }
+    response
+}
+
+pub fn board_denial_notice(app: &App, headers: &HeaderMap) -> bool {
+    cookie(headers, BOARD_DENIAL_COOKIE)
+        .zip(board_denial_proof(headers))
+        .is_some_and(|(token, proof)| proof.verified(app, token))
 }
 
 pub async fn board_access_open(app: &App) -> Result<bool, sqlx::Error> {
@@ -428,7 +472,7 @@ pub async fn board(State(app): State<App>, mut request: Request, next: Next) -> 
         )
     );
     if !allowed {
-        return access_denied();
+        return board_denied(&app, request.headers());
     }
     request.extensions_mut().insert(actor);
     private(next.run(request).await)
@@ -442,7 +486,7 @@ pub async fn checkins(State(app): State<App>, mut request: Request, next: Next) 
     match actor {
         Actor::Anonymous => return found(format!("/public/login/?next={}", request.uri().path())),
         Actor::User { board: true, .. } => match board_access_open(&app).await {
-            Ok(true) => return access_denied(),
+            Ok(true) => return board_denied(&app, request.headers()),
             Ok(false) => return board_closed(),
             Err(_) => return unavailable(),
         },
@@ -482,7 +526,7 @@ pub async fn data_entry(State(app): State<App>, mut request: Request, next: Next
     match actor {
         Actor::Anonymous => return found(format!("/public/login/?next={}", request.uri().path())),
         Actor::User { board: true, .. } => match board_access_open(&app).await {
-            Ok(true) => return access_denied(),
+            Ok(true) => return board_denied(&app, request.headers()),
             Ok(false) => return board_closed(),
             Err(_) => return unavailable(),
         },
@@ -518,8 +562,8 @@ pub async fn staff_or_board(State(app): State<App>, mut request: Request, next: 
         .extensions()
         .get::<MatchedPath>()
         .map(MatchedPath::as_str);
-    if !matches!(request.method(), &Method::GET | &Method::HEAD)
-        || !matches!(
+    let allowed = matches!(request.method(), &Method::GET | &Method::HEAD)
+        && matches!(
             route,
             Some(
                 "/all_tab_cards/"
@@ -528,23 +572,24 @@ pub async fn staff_or_board(State(app): State<App>, mut request: Request, next: 
                     | "/archive/black_rod_bundle/"
                     | "/forum_post"
             )
-        )
-    {
-        return access_denied();
-    }
+        );
     let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
         Ok(actor) => actor,
         Err(error) => return error.response(),
     };
     if matches!(actor, Actor::User { board: true, .. }) {
         match board_access_open(&app).await {
-            Ok(true) => {
+            Ok(true) if allowed => {
                 request.extensions_mut().insert(actor);
                 return private(next.run(request).await);
             }
+            Ok(true) => return board_denied(&app, request.headers()),
             Ok(false) => return board_closed(),
             Err(_) => return unavailable(),
         }
+    }
+    if !allowed {
+        return access_denied();
     }
     staff_settings(State(app), request, next).await
 }

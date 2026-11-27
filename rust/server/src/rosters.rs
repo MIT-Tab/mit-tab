@@ -2,19 +2,18 @@ use std::collections::{HashMap, HashSet};
 
 use axum::{
     Extension,
-    extract::{Query, State},
+    extract::{RawQuery, State},
     http::StatusCode,
     response::Response,
 };
 use chrono::{FixedOffset, NaiveDateTime};
 use minijinja::context;
 use mittab_tabulation::calculator::{award_points, expected_records, tournament_value};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access,
-    html::{self, Navigation},
+    App, access, legacy_html,
     legacy_session::Actor,
     public_cache::{self, Page},
     settings::Settings,
@@ -25,7 +24,6 @@ const SETTINGS: &[&str] = &[
     "teams_public",
     "judges_public",
     "debaters_public",
-    "motions_enabled",
     "tot_rounds",
 ];
 
@@ -60,15 +58,9 @@ struct TeamMembers {
     varsity: bool,
 }
 
-#[derive(Deserialize)]
-pub struct TeamFilter {
-    #[serde(default)]
-    teams: String,
-}
-
 #[derive(Serialize)]
 struct Record {
-    label: String,
+    record: String,
     count: usize,
 }
 
@@ -80,12 +72,13 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
         }
         let teams = team_rows(db, settings.flag("debaters_public", true)).await?;
         let changes = changes(db, "teams", settings.flag("debaters_public", true)).await?;
-        let checked_in = teams.iter().filter(|team| team.checked_in).count();
-        Ok(html::render(
-            "teams.html",
+        let num_checked_in = teams.iter().filter(|team| team.checked_in).count();
+        let shell = legacy_html::shell(db, actor, "/public/teams/").await?;
+        Ok(legacy_html::render(
+            "public/teams.html",
+            shell,
             context! {
-                title => "Team List", nav => navigation(actor, &settings),
-                checked_in, checked_in_points => tournament_value(checked_in),
+                num_checked_in, checked_in_points => tournament_value(num_checked_in),
                 total_points => tournament_value(teams.len()), teams, changes,
             },
             StatusCode::OK,
@@ -103,12 +96,11 @@ pub async fn judges(State(app): State<App>, Extension(actor): Extension<Actor>) 
         let rounds: Vec<_> = (1..=settings.integer("tot_rounds", 5)).collect();
         let judges = judge_rows(db, &rounds).await?;
         let changes = changes(db, "judges", settings.flag("debaters_public", true)).await?;
-        Ok(html::render(
-            "judges.html",
-            context! {
-                title => "Judge List", nav => navigation(actor, &settings),
-                judges, rounds, changes,
-            },
+        let shell = legacy_html::shell(db, actor, "/public/judges/").await?;
+        Ok(legacy_html::render(
+            "public/judges.html",
+            shell,
+            context! { judges, rounds, changes },
             StatusCode::OK,
         ))
     })
@@ -118,69 +110,56 @@ pub async fn judges(State(app): State<App>, Extension(actor): Extension<Actor>) 
 pub async fn records(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
-    Query(filter): Query<TeamFilter>,
+    RawQuery(query): RawQuery,
 ) -> Response {
-    let Ok(mut db) = app.db.begin().await else {
-        return unavailable();
-    };
-    let Ok(settings) = Settings::load(&mut db, SETTINGS).await else {
-        return unavailable();
-    };
-    if !settings.flag("teams_public", false) {
-        return access::found("/public/access-error/");
-    }
-    let checked_in = filter.teams == "checked-in";
-    let count = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM tab_team WHERE ? = FALSE OR checked_in = TRUE",
-    )
-    .bind(checked_in)
-    .fetch_one(&mut *db)
-    .await;
-    let Ok(team_count) = count else {
-        return unavailable();
-    };
-    if db.commit().await.is_err() {
-        return unavailable();
-    }
-    let num_rounds = settings.integer("tot_rounds", 5).max(0) as usize;
-    let team_count = team_count as usize;
-    let brackets = expected_records(team_count, num_rounds);
-    let record_rows: Vec<_> = (0..=num_rounds)
-        .map(|losses| {
-            brackets
-                .iter()
-                .enumerate()
-                .rev()
-                .map(|(index, round)| {
-                    round.get(losses).map(|&count| Record {
-                        label: format!("{}-{losses}", index + 1 - losses),
-                        count,
-                    })
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let settings = Settings::load(&mut db, &["teams_public", "tot_rounds"]).await?;
+        if !settings.flag("teams_public", false) {
+            return Ok(access::found("/public/access-error/"));
+        }
+        let checked_in = url::form_urlencoded::parse(query.as_deref().unwrap_or_default().as_bytes())
+            .filter(|(name, _)| name == "teams").last()
+            .is_some_and(|(_, value)| value == "checked-in");
+        let team_count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM tab_team WHERE ? = FALSE OR checked_in = TRUE",
+        ).bind(checked_in).fetch_one(&mut *db).await? as usize;
+        let shell = legacy_html::shell(&mut db, actor, "/public/teams/expected-records/").await?;
+        db.commit().await?;
+
+        let num_rounds = settings.integer("tot_rounds", 5);
+        let brackets = expected_records(team_count, num_rounds.max(0) as usize);
+        let record_rows: Vec<_> = (0..=num_rounds).map(|losses| {
+            brackets.iter().enumerate().rev().map(|(index, round)| {
+                round.get(losses as usize).map(|&count| Record {
+                    record: format!("{}-{losses}", index + 1 - losses as usize),
+                    count,
                 })
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    let awards = award_points(team_count);
-    html::render(
-        "expected_records.html",
-        context! {
-            title => "Expected Records", nav => navigation(actor, &settings),
-            checked_in, team_count, num_rounds, value => tournament_value(team_count),
-            round_numbers => (1..=num_rounds).rev().collect::<Vec<_>>(),
-            table_width => num_rounds.saturating_mul(72),
-            toty => awards.toty.into_iter().map(|(label, points)| (label, points.to_string())).collect::<Vec<_>>(),
-            soty => awards.soty.into_iter().map(|(place, points)| (place, points.to_string())).collect::<Vec<_>>(),
-            record_rows,
-        },
-        StatusCode::OK,
-    )
+            }).collect::<Vec<_>>()
+        }).collect();
+        let awards = award_points(team_count);
+        Ok::<_, sqlx::Error>(legacy_html::render(
+            "public/expected_records.html", shell,
+            context! {
+                checked_in, team_count, num_rounds, value => tournament_value(team_count),
+                round_numbers => (1..=num_rounds).rev().collect::<Vec<_>>(),
+                table_width => i64::from(num_rounds) * 72,
+                toty => awards.toty.into_iter().map(|(label, points)| (label, format_award(points))).collect::<Vec<_>>(),
+                soty => awards.soty.into_iter().map(|(place, points)| (place, format_award(points))).collect::<Vec<_>>(),
+                record_rows,
+            },
+            StatusCode::OK,
+        ))
+    }.await;
+    result.unwrap_or_else(|_| unavailable())
 }
 
-fn navigation(actor: Actor, settings: &Settings) -> Navigation {
-    let mut nav = Navigation::new(actor, settings.flag("motions_enabled", false));
-    nav.teams_public = settings.flag("teams_public", false);
-    nav.judges_public = settings.flag("judges_public", false);
-    nav
+fn format_award(points: f64) -> String {
+    if points.fract() == 0.0 {
+        format!("{points:.0}")
+    } else {
+        format!("{points:.2}")
+    }
 }
 
 async fn team_rows(

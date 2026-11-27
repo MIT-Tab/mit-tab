@@ -52,19 +52,9 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/diagnostics.html"),
         ),
         ("base.html", include_str!("../templates/base.html")),
-        ("teams.html", include_str!("../templates/teams.html")),
-        ("judges.html", include_str!("../templates/judges.html")),
-        (
-            "expected_records.html",
-            include_str!("../templates/expected_records.html"),
-        ),
         (
             "public_table.html",
             include_str!("../templates/public_table.html"),
-        ),
-        (
-            "roster_changes.html",
-            include_str!("../templates/roster_changes.html"),
         ),
         (
             "public_footer.html",

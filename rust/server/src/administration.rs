@@ -11,7 +11,8 @@ use sqlx::AssertSqlSafe;
 use crate::{
     App, access, admin_accounts, admin_changelist, admin_html, admin_records, diagnostics,
     html::{self, Navigation},
-    legacy_session::Actor,
+    legacy_html,
+    legacy_session::{self, Actor},
     private, unavailable,
 };
 
@@ -357,31 +358,63 @@ pub async fn fallback(State(app): State<App>, request: Request) -> Response {
             Err(response) => *response,
         };
     }
-    not_found().await
-}
-
-pub async fn not_found() -> Response {
+    let actor = if legacy_session::cookie(request.headers(), "sessionid").is_some() {
+        legacy_session::actor(&app.db, request.headers(), app.django_secret.as_deref())
+            .await
+            .unwrap_or(Actor::Anonymous)
+    } else {
+        Actor::Anonymous
+    };
+    if matches!(actor, Actor::User { board: true, .. }) {
+        return access::board_restricted(&app, request.headers()).await;
+    }
     error_page(
+        &app,
+        actor,
+        "common/404.html",
+        request.uri().path(),
         StatusCode::NOT_FOUND,
-        "Page Not Found",
-        "The requested page could not be found.",
     )
+    .await
 }
 
-pub async fn internal_error() -> Response {
+pub async fn not_found(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
     error_page(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        "Server Error",
-        "MIT-Tab could not complete this request.",
+        &app,
+        actor,
+        "common/404.html",
+        "/404/",
+        StatusCode::NOT_FOUND,
     )
+    .await
 }
 
-fn error_page(status: StatusCode, title: &str, detail: &str) -> Response {
-    html::render(
-        "error.html",
-        context! {
-            title, heading => title, detail, nav => Navigation::new(Actor::Anonymous, true),
-        },
-        status,
+pub async fn internal_error(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+) -> Response {
+    error_page(
+        &app,
+        actor,
+        "common/500.html",
+        "/500/",
+        StatusCode::INTERNAL_SERVER_ERROR,
     )
+    .await
+}
+
+async fn error_page(
+    app: &App,
+    actor: Actor,
+    template: &str,
+    path: &str,
+    status: StatusCode,
+) -> Response {
+    let Ok(mut db) = app.db.acquire().await else {
+        return unavailable();
+    };
+    let Ok(shell) = legacy_html::shell(&mut db, actor, path).await else {
+        return unavailable();
+    };
+    legacy_html::render(template, shell, context! {}, status)
 }

@@ -40,6 +40,7 @@
   "outround_pairing_view_default": "/outround_pairing",
   "pair_round": "/pairing/pair_round/",
   "public_home": "/public/",
+  "public_expected_records": "/public/teams/expected-records/",
   "public_homepage": "/settings/public-homepage/",
   "public_rankings_control": "/rankings/public-control/",
   "rank_debaters_ajax": "/debater/ranking/",

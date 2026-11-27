@@ -648,13 +648,37 @@ pub async fn public_error(State(app): State<App>, Extension(actor): Extension<Ac
     .await
 }
 
-pub async fn forbidden(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
+pub async fn forbidden(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+) -> Response {
     let Ok(mut db) = app.db.acquire().await else {
         return unavailable();
     };
-    legacy_html::forbidden(&mut db, actor, "/403/")
-        .await
-        .unwrap_or_else(|_| unavailable())
+    let Ok(shell) = legacy_html::shell(&mut db, actor, "/403/").await else {
+        return unavailable();
+    };
+    let messages = (matches!(actor, Actor::User { board: true, .. })
+        && access::board_denial_notice(&app, &headers))
+    .then(|| [context! { text => access::BOARD_DENIAL_TEXT, level => 20, tags => "info" }]);
+    let mut response = legacy_html::render(
+        "common/403.html",
+        shell,
+        context! { messages },
+        StatusCode::FORBIDDEN,
+    );
+    if cookie(&headers, access::BOARD_DENIAL_COOKIE).is_some() {
+        login::set_cookie(
+            &mut response,
+            access::BOARD_DENIAL_COOKIE,
+            "",
+            0,
+            login::secure_request(&headers),
+            true,
+        );
+    }
+    response
 }
 
 fn not_found(actor: Actor) -> Response {

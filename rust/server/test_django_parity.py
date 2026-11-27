@@ -573,10 +573,20 @@ def test_missing_session_signing_key_does_not_remove_staff_restrictions():
         status, headers, _ = request(port, COUNTS, cookie=cookie)
         assert status == 303 and headers["Location"] == "/public/login/"
         assert headers["Cache-Control"] == "private, no-store"
-        assert request(port, headers["Location"], cookie=cookie)[0] == 200
+        login_status, login_headers, _ = request(port, headers["Location"], cookie=cookie)
+        assert login_status == 200
+        csrf = load_cookies(login_headers)["csrftoken"].value
+        posted, signed_in, _ = request(port, "/public/login/", method="POST",
+            extra_headers={"Cookie": f"sessionid={cookie}; csrftoken={csrf}"},
+            form={"username": user.username, "password": "synthetic", "csrfmiddlewaretoken": csrf})
+        assert posted == 302
+        replacement = load_cookies(signed_in)["sessionid"].value
+        assert replacement != cookie and request(port, COUNTS, cookie=replacement)[0] == 302
         assert request(port, COUNTS)[0] == 200
+    client = Client()
+    client.force_login(user)
     with rust_server(overrides={"MITTAB_DJANGO_SECRET_KEY": "wrong-fixture-key"}) as port:
-        status, headers, _ = request(port, COUNTS, cookie=cookie)
+        status, headers, _ = request(port, COUNTS, cookie=client.cookies["sessionid"].value)
         assert status == 303 and headers["Location"] == "/public/login/"
 
 
@@ -1144,7 +1154,7 @@ def test_native_public_rosters_board_projection_and_expected_records():
         assert b"Debater Hidden By Settings" not in rendered[teams]
         assert b"Sensitive roster entry" not in rendered[teams]
         assert b"Public Judge" in rendered[judges]
-        assert b'R2">' in rendered[judges] and "✔".encode() in rendered[judges]
+        assert b'R2">' in rendered[judges] and "✔" in unescape(rendered[judges].decode())
         assert b"2 total teams" in rendered[records]
         assert b"1 checked in teams" in request(port, records + "?teams=checked-in", cookie=cookie)[2]
         assert b"Round 5" in rendered[records]
@@ -1161,6 +1171,153 @@ def test_native_public_rosters_board_projection_and_expected_records():
         assert b"Sensitive roster entry" in visible
         TabSettings.set("teams_public", 0)
         assert request(port, records, cookie=cookie)[1]["Location"] == "/public/access-error/"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_public_rosters_and_calculator_match_django_html(html_assets, subtests):
+    team_url = "/public/teams/"
+    judge_url = "/public/judges/"
+    records_url = "/public/teams/expected-records/"
+    paths = [team_url, judge_url, records_url, records_url + "?teams=checked-in"]
+    TabSettings.set("teams_public", 1)
+    TabSettings.set("judges_public", 1)
+    TabSettings.set("tot_rounds", 5)
+    TabSettings.set("var_teams_visible", 8)
+    TabSettings.set("tournament_name", "Public <Roster> & Records")
+    staff = legacy_tab_session("roster-parity-staff")
+    board = legacy_tab_session("roster-parity-board")
+    get_user_model().objects.get(username="roster-parity-board").groups.add(Group.objects.create(name="APDA Board"))
+    def client_for(session):
+        client = Client()
+        if session:
+            client.cookies["sessionid"] = session
+        return client
+    clients = {session: client_for(session) for session in (None, staff, board)}
+
+    def compare(port, path, session=None):
+        caches["public"].clear()
+        actual, headers, body = request(port, path, cookie=session)
+        expected = clients[session].get(path)
+        assert actual == expected.status_code
+        if actual == 302:
+            assert headers["Location"] == expected["Location"]
+        else:
+            assert_html_bytes(body, expected.content)
+        if session == board or path.startswith(records_url):
+            assert headers["Cache-Control"] == "private, no-store"
+        return body
+
+    with rust_server(overrides=html_assets) as port:
+        for path in paths:
+            with subtests.test(state="empty", path=path):
+                compare(port, path)
+        school = School.objects.create(name="Example & School")
+        hybrid = School.objects.create(name="Other <University>")
+        empty_affiliation = School.objects.create(name="")
+        first = Team.objects.create(name="A-team <Exhibition>", seed=Team.FREE_SEED, school=school,
+                                    checked_in=True, hybrid_school=hybrid)
+        second = Team.objects.create(name="B-team & Friends", seed=Team.HALF_SEED, school=hybrid, checked_in=False)
+        first.debaters.add(*[Debater.objects.create(name=name, novice_status=status)
+                            for name, status in (("Z Novice", 1), ("A Varsity <Speaker>", 0))])
+        Team.objects.bulk_create([Team(name=f"Fixture Team {index:02}", school=school, seed=0, checked_in=False)
+                                  for index in range(26)])
+        judge = Judge.objects.create(name="Z <Judge> & Company", rank=3)
+        judge.schools.add(hybrid, school, empty_affiliation)
+        Judge.objects.create(name="Another Judge", rank=4)
+        for number in (0, 2, 5):
+            JudgeExpectedCheckIn.objects.create(judge=judge, round_number=number)
+        PublicRosterChange.objects.create(list_kind="teams", message="Debater is private <fixture>", involves_debaters=True)
+        event = PublicRosterChange.objects.create(list_kind="teams", message="Non-sensitive team rename & check-in")
+        PublicRosterChange.objects.filter(pk=event.pk).update(created_at=datetime.fromisoformat("2026-07-15T15:30:00+00:00"))
+        PublicRosterChange.objects.create(list_kind="judges", message="Judge affiliation added and published")
+        PublicRosterChange.objects.create(list_kind="judges", message="Debater appears in a manually edited judge entry",
+                                          involves_debaters=True)
+        assert b"Released Pairings" not in compare(port, team_url)
+        assert b"Varsity Outrounds" not in compare(port, judge_url)
+        prelim = Round.objects.create(round_number=5, gov_team=first, opp_team=second, victor=Round.GOV)
+        final = Outround.objects.create(num_teams=8, type_of_round=0, gov_team=first, opp_team=second)
+        assert b"Released Pairings" in compare(port, team_url)
+        assert b"Varsity Outrounds" in compare(port, judge_url)
+        Outround.objects.filter(pk=final.pk).update(num_teams=4)
+        assert b"Varsity Outrounds" not in compare(port, judge_url)
+        assert b"July 15, 2026, 10:30 AM EST" in compare(port, team_url)
+        assert b"3.75" in compare(port, records_url)
+        for path in paths + [records_url + "?teams=total&teams=checked-in", records_url + "?case=best"]:
+            for session in clients:
+                with subtests.test(state="populated", path=path, actor=(session is None, session == board)):
+                    compare(port, path, session)
+
+        TabSettings.set("debaters_public", 0)
+        for session in (None, board):
+            hidden = compare(port, team_url, session)
+            assert b"A Varsity" not in hidden and b"Debater is private" not in hidden
+            assert b"Varsity / Novice" in hidden
+            assert b"manually edited judge entry" not in compare(port, judge_url, session)
+        TabSettings.set("tot_rounds", 6)
+        assert b"Round 6" in compare(port, records_url)
+        prelim.delete()
+        assert b"Released Pairings" not in compare(port, team_url)
+        TabSettings.set("teams_public", 0)
+        TabSettings.set("judges_public", 0)
+        for path in paths:
+            with subtests.test(state="revoked", path=path):
+                compare(port, path)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_board_denial_flash_matches_django_and_is_session_bound(html_assets, subtests):
+    board_group = Group.objects.create(name="APDA Board")
+    board, other_board = [legacy_tab_session(name) for name in ("denied-board", "other-denied-board")]
+    for user in get_user_model().objects.filter(username__in=("denied-board", "other-denied-board")):
+        user.groups.add(board_group)
+    staff = legacy_tab_session("denied-non-board-staff")
+    client = Client()
+    client.cookies["sessionid"] = board
+    TabSettings.set("tot_rounds", 1)
+    forbidden = "/403/"
+    notice_name = "mittab_board_denial"
+    notice_text = b"APDA Board access is limited to APDA tools and public pages."
+    denied_paths = ["/admin/", "/email_management/", "/public/e-ballots/", "/api/debater-counts",
+                    "/unknown-board-path/", "/public/login/"]
+
+    def page(port, session, token=None):
+        headers = f"sessionid={session}"
+        if token:
+            headers += f"; {notice_name}={token}"
+        return request(port, forbidden, extra_headers={"Cookie": headers})
+
+    with rust_server(overrides=html_assets) as port:
+        for path in (denied_paths[0], "/public/login/", "/404/", "/500/"):
+            closed, closed_headers, body = request(port, path, cookie=board)
+            assert closed == 403 and notice_name not in load_cookies(closed_headers)
+            assert body == client.get(path).content
+        school = School.objects.create(name="Board denial fixture")
+        gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Gov", "Opp")]
+        Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+        for path in ("/404/", "/500/"):
+            for session in (None, board):
+                reference = (client if session else Client()).get(path)
+                status, _, body = request(port, path, cookie=session)
+                assert status == reference.status_code
+                assert_html_bytes(body, reference.content)
+        for path in ("/favicon.ico", "/tournament-logo/"):
+            assert request(port, path, cookie=board)[1]["Cache-Control"] == "private, no-store"
+        for path in denied_paths:
+            with subtests.test(path=path):
+                status, headers, _ = request(port, path, cookie=board)
+                assert status == 302 and headers["Location"] == forbidden
+                token = load_cookies(headers)[notice_name].value
+                assert headers["Cache-Control"] == "private, no-store"
+                status, response_headers, body = page(port, board, token)
+                reference = client.get(path, follow=True)
+                assert status == reference.status_code == 403 and notice_text in body
+                assert_html_bytes(body, reference.content)
+                assert response_headers["Cache-Control"] == "private, no-store"
+                assert load_cookies(response_headers)[notice_name]["max-age"] == "0"
+                for unrelated in (other_board, staff):
+                    assert notice_text not in page(port, unrelated, token)[2]
+                assert notice_text not in page(port, board, "a" * 64)[2]
+                assert_html_bytes(page(port, board)[2], client.get(forbidden).content)
 
 
 class HomeLinks(HTMLParser):

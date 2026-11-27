@@ -101,9 +101,12 @@ impl Page {
                 ("mittab_public_logo", "id, updated_at"),
             ],
             Self::AccessError => &[SETTINGS, DISPLAY, ROUNDS, OUTROUNDS],
-            Self::Teams => &[SETTINGS, TEAMS, MEMBERS, DEBATERS, SCHOOLS, ROSTER_LOG],
+            Self::Teams => &[
+                SETTINGS, DISPLAY, TEAMS, MEMBERS, DEBATERS, SCHOOLS, ROSTER_LOG,
+            ],
             Self::Judges => &[
                 SETTINGS,
+                DISPLAY,
                 JUDGES,
                 SCHOOLS,
                 ROSTER_LOG,
@@ -229,6 +232,8 @@ impl Page {
             Self::Home
                 | Self::AccessError
                 | Self::Motions
+                | Self::Teams
+                | Self::Judges
                 | Self::TeamRankings
                 | Self::SpeakerRankings
                 | Self::Ballots
@@ -280,6 +285,16 @@ impl Page {
                     (new_registrations_open_at IS NULL OR new_registrations_open_at <= UTC_TIMESTAMP(6)) AND
                     (new_registrations_close_at IS NULL OR new_registrations_close_at > UTC_TIMESTAMP(6))
                   FROM registration_registrationconfig WHERE id = 1), 1)",
+            );
+        }
+        if matches!(self, Self::Teams | Self::Judges) {
+            // The roster navigation depends on whether pairings exist and on the
+            // largest outround in each division, independent of pairing details.
+            inputs.push("EXISTS(SELECT 1 FROM tab_round)");
+            inputs.push(
+                "(SELECT JSON_ARRAY(MAX(CASE WHEN type_of_round = 0 THEN num_teams END),
+                                             MAX(CASE WHEN type_of_round = 1 THEN num_teams END))
+                          FROM tab_outround)",
             );
         }
         if matches!(self, Self::LiveResults) {

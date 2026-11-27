@@ -265,6 +265,9 @@ fn router(app: App) -> Router {
                 .route("/public/teams/expected-records/", get(rosters::records))
                 .route("/public/access-error/", get(motions::public_error))
                 .route("/403/", get(motions::forbidden))
+                .route("/404/", get(administration::not_found))
+                .route("/500/", get(administration::internal_error))
+                .route("/public/login/", get(login::page).post(login::sign_in))
                 .route_layer(axum::middleware::from_fn_with_state(
                     app.clone(),
                     access::public_tournament,
@@ -596,10 +599,7 @@ fn router(app: App) -> Router {
                     access::administration,
                 )),
         )
-        .route("/404/", get(administration::not_found))
-        .route("/500/", get(administration::internal_error))
         .route("/theme.css", get(homepage_admin::theme))
-        .route("/public/login/", get(login::page).post(login::sign_in))
         .route(
             "/accounts/logout/",
             get(login::sign_out).post(login::sign_out),

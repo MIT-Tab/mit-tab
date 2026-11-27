@@ -90,7 +90,9 @@ pub async fn middleware(State(app): State<App>, mut request: Request, next: Next
         Actor::Anonymous => {
             return access::found(format!("/public/login/?next={}", request.uri().path()));
         }
-        Actor::User { board: true, .. } => return access::board_restricted(&app).await,
+        Actor::User { board: true, .. } => {
+            return access::board_restricted(&app, request.headers()).await;
+        }
         Actor::User {
             superuser: true, ..
         } => match access::wizard_complete(&app).await {
