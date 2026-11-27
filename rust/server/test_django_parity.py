@@ -4014,5 +4014,5 @@ def test_native_diagnostics_gate_and_javascript_catalog():
             status, _, body = request(port, "/silk/", cookie=staff)
             assert status == code
             if code == 200:
-                assert b"/dynamic-media/jsi18n/" in body
+                assert "/dynamic-media/jsi18n/" in unescape(body.decode())
                 assert b"private-fixture-query" not in body
