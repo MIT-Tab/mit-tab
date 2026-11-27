@@ -1,5 +1,6 @@
 mod access;
 mod admin_accounts;
+mod admin_cascade;
 mod admin_changelist;
 mod admin_html;
 mod admin_model_data;

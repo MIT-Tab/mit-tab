@@ -118,26 +118,31 @@ pub async fn debater_edited(
         record(db, "teams", &message, true).await?;
     }
     if old_school != new_school {
-        let (old, new): (Option<String>, Option<String>) = sqlx::query_as(
-            "SELECT (SELECT name FROM tab_school WHERE id = ?),
-                    (SELECT name FROM tab_school WHERE id = ?)",
-        )
-        .bind(old_school)
-        .bind(new_school)
-        .fetch_one(&mut *db)
-        .await?;
-        let old = old
-            .as_deref()
-            .filter(|name| !name.is_empty())
-            .unwrap_or("None");
-        let new = new
-            .as_deref()
-            .filter(|name| !name.is_empty())
-            .unwrap_or("None");
+        let (old, new) = affiliation_names(db, old_school, new_school).await?;
         let message = format!("Changed debater affiliation for “{name}”: {old} → {new}.");
         record(db, "teams", &message, true).await?;
     }
     Ok(())
+}
+
+pub async fn affiliation_names(
+    db: &mut MySqlConnection,
+    old_school: Option<&str>,
+    new_school: Option<&str>,
+) -> Result<(String, String), sqlx::Error> {
+    let (old, new): (Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT (SELECT name FROM tab_school WHERE id = ?),
+                (SELECT name FROM tab_school WHERE id = ?)",
+    )
+    .bind(old_school)
+    .bind(new_school)
+    .fetch_one(db)
+    .await?;
+    let name = |name: Option<String>| {
+        name.filter(|name| !name.is_empty())
+            .unwrap_or_else(|| "None".into())
+    };
+    Ok((name(old), name(new)))
 }
 
 pub async fn school_removed(

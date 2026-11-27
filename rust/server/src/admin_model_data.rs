@@ -4,6 +4,7 @@ use sqlx::{AssertSqlSafe, MySql, MySqlConnection, QueryBuilder};
 
 use crate::{
     admin_changelist::{self, DefaultList},
+    codes::{self, Credential},
     registration_form::Fields,
 };
 
@@ -20,6 +21,8 @@ pub const MANAGED: &[&str] = &[
     "room",
     "rankinggroup",
     "scratch",
+    "team",
+    "judge",
     "tabsettings",
 ];
 
@@ -36,6 +39,8 @@ pub struct Field {
     pub kind: Kind,
     pub required: bool,
     pub initial: Option<&'static str>,
+    pub filter_label: Option<&'static str>,
+    pub help_text: Option<&'static str>,
 }
 
 #[derive(Clone, Copy)]
@@ -43,6 +48,8 @@ pub enum Kind {
     Text(usize),
     Email(usize),
     Integer,
+    Experience,
+    BallotCode,
     Decimal,
     Checkbox,
     Relation(Relation),
@@ -170,18 +177,61 @@ const DEBATER: Relation = Relation {
     admin_url: "/admin/tab/debater/",
     sql: "SELECT id, name FROM tab_debater ORDER BY name",
 };
+const REGISTRATION: Relation = Relation {
+    model: "registration",
+    admin_url: "/admin/registration/registration/",
+    sql: "SELECT r.id, CONCAT(s.name, ' — ', r.email) FROM registration_registration r
+          JOIN tab_school s ON s.id = r.school_id ORDER BY r.id",
+};
+const ROOM_TAG: Relation = Relation {
+    model: "room tag",
+    admin_url: "/admin/tab/roomtag/",
+    sql: "SELECT id, tag FROM tab_roomtag ORDER BY id",
+};
 const ROOM_TAGS: Multiple = Multiple {
-    relation: Relation {
-        model: "room tag",
-        admin_url: "/admin/tab/roomtag/",
-        sql: "SELECT id, tag FROM tab_roomtag ORDER BY id",
-    },
+    relation: ROOM_TAG,
     table: "tab_room_tags",
     owner: "room_id",
     column: "roomtag_id",
     through: "Room_tags",
     singular: "Room-roomtag relationship",
     plural: "room-roomtag relationships",
+};
+const TEAM_DEBATERS: Multiple = Multiple {
+    relation: DEBATER,
+    table: "tab_team_debaters",
+    owner: "team_id",
+    column: "debater_id",
+    through: "Team_debaters",
+    singular: "Team-debater relationship",
+    plural: "team-debater relationships",
+};
+const TEAM_TAGS: Multiple = Multiple {
+    relation: ROOM_TAG,
+    table: "tab_team_required_room_tags",
+    owner: "team_id",
+    column: "roomtag_id",
+    through: "Team_required_room_tags",
+    singular: "Team-roomtag relationship",
+    plural: "team-roomtag relationships",
+};
+const JUDGE_SCHOOLS: Multiple = Multiple {
+    relation: SCHOOL,
+    table: "tab_judge_schools",
+    owner: "judge_id",
+    column: "school_id",
+    through: "Judge_schools",
+    singular: "Judge-school relationship",
+    plural: "judge-school relationships",
+};
+const JUDGE_TAGS: Multiple = Multiple {
+    relation: ROOM_TAG,
+    table: "tab_judge_required_room_tags",
+    owner: "judge_id",
+    column: "roomtag_id",
+    through: "Judge_required_room_tags",
+    singular: "Judge-roomtag relationship",
+    plural: "judge-roomtag relationships",
 };
 const GROUP_TEAMS: Multiple = Multiple {
     relation: TEAM,
@@ -211,6 +261,8 @@ impl Field {
             kind,
             required: true,
             initial: None,
+            filter_label: None,
+            help_text: None,
         }
     }
 
@@ -233,6 +285,20 @@ impl Field {
         }
     }
 
+    const fn filtered(self, label: &'static str) -> Self {
+        Self {
+            filter_label: Some(label),
+            ..self
+        }
+    }
+
+    const fn help(self, text: &'static str) -> Self {
+        Self {
+            help_text: Some(text),
+            ..self
+        }
+    }
+
     const fn initial(self, initial: &'static str) -> Self {
         Self {
             initial: Some(initial),
@@ -244,6 +310,24 @@ impl Field {
 const APDA_ID: Field = Field::new("apda_id", "Apda id", Kind::Integer)
     .optional()
     .initial("-1");
+
+const REGISTRATION_FIELD: Field = Field::relation(
+    "registration",
+    "registration_id",
+    "Registration",
+    REGISTRATION,
+)
+.optional();
+const TIEBREAKER: Field = Field::new("tiebreaker", "Tiebreaker", Kind::Integer).optional();
+const HOUSING: Field =
+    Field::new("needs_crash_housing", "Needs crash housing", Kind::Checkbox).optional();
+const WGM_HOUSING: Field = Field::new(
+    "requests_wgm_housing",
+    "Requests wgm housing",
+    Kind::Checkbox,
+)
+.optional();
+const EMAIL: Field = Field::new("email", "Email", Kind::Email(254)).optional();
 
 const ROUND: Field = Field::new("round_number", "Round number", Kind::Integer);
 const SEED: Field = Field::new("seed", "Seed", Kind::Integer).initial("-1");
@@ -357,7 +441,7 @@ impl Resource {
                 const {
                     &[
                         Field::new("name", "Name", Kind::Text(30)),
-                        Field::new("email", "Email", Kind::Email(254)).optional(),
+                        EMAIL,
                         Field::new(
                             "novice_status",
                             "Novice status",
@@ -372,7 +456,7 @@ impl Resource {
                         )
                         .optional(),
                         Field::new("qualified", "Qualified", Kind::Checkbox).optional(),
-                        Field::new("tiebreaker", "Tiebreaker", Kind::Integer).optional(),
+                        TIEBREAKER,
                         APDA_ID,
                         Field::relation("school", "school_id", "School", SCHOOL).optional(),
                     ]
@@ -419,6 +503,101 @@ impl Resource {
                     message: "Ranking group with this Name already exists.",
                 }],
             ),
+            "team" => (
+                const {
+                    &[
+                        Field::new("name", "Name", Kind::Text(35)),
+                        Field::relation("school", "school_id", "School", SCHOOL),
+                        Field::relation(
+                            "hybrid_school",
+                            "hybrid_school_id",
+                            "Hybrid school",
+                            SCHOOL,
+                        )
+                        .optional(),
+                        Field::new("debaters", "Debaters", Kind::Multiple(TEAM_DEBATERS))
+                            .filtered("debaters"),
+                        REGISTRATION_FIELD,
+                        Field::new(
+                            "seed",
+                            "Seed",
+                            Kind::Choice(&[
+                                (0, "Unseeded"),
+                                (1, "Free Seed"),
+                                (2, "Half Seed"),
+                                (3, "Full Seed"),
+                            ]),
+                        ),
+                        Field::new("checked_in", "Checked in", Kind::Checkbox)
+                            .optional()
+                            .initial("1"),
+                        Field::new(
+                            "required_room_tags",
+                            "Required room tags",
+                            Kind::Multiple(TEAM_TAGS),
+                        )
+                        .optional(),
+                        Field::new(
+                            "break_preference",
+                            "Break preference",
+                            Kind::Choice(&[(0, "Varsity"), (1, "Novice")]),
+                        )
+                        .initial("0"),
+                        TIEBREAKER,
+                        Field::new("ranking_public", "Ranking public", Kind::Checkbox)
+                            .optional()
+                            .initial("1"),
+                    ]
+                },
+                &[
+                    Unique {
+                        fields: &[0],
+                        error_field: Some(0),
+                        message: "Team with this Name already exists.",
+                    },
+                    Unique {
+                        fields: &[9],
+                        error_field: Some(9),
+                        message: "Team with this Tiebreaker already exists.",
+                    },
+                ],
+            ),
+            "judge" => {
+                (
+                    const {
+                        &[
+                        Field::new("name", "Name", Kind::Text(30)),
+                        Field::new("rank", "Rank", Kind::Decimal),
+                        Field::new("reported_experience", "Reported experience", Kind::Experience).optional(),
+                        HOUSING, WGM_HOUSING,
+                        Field::new("schools", "Schools", Kind::Multiple(JUDGE_SCHOOLS)).filtered("schools"),
+                        EMAIL,
+                        REGISTRATION_FIELD,
+                        Field::new("ballot_code", "Ballot code", Kind::BallotCode).optional(),
+                        Field::new("is_dino", "Is dino", Kind::Checkbox).optional(),
+                        Field::new("wing_only", "Wing only", Kind::Checkbox).optional(),
+                        Field::new("request_wing", "Request wing", Kind::Checkbox).optional()
+                            .help("Prioritize giving this judge a wing when they chair an inround."),
+                        Field::new("no_wings", "No wings", Kind::Checkbox).optional()
+                            .help("Deprioritize giving this judge a wing when they chair an inround."),
+                        Field::new("required_room_tags", "Required room tags", Kind::Multiple(JUDGE_TAGS))
+                            .optional().filtered("required room tags"),
+                    ]
+                    },
+                    &[
+                        Unique {
+                            fields: &[0],
+                            error_field: Some(0),
+                            message: "Judge with this Name already exists.",
+                        },
+                        Unique {
+                            fields: &[8],
+                            error_field: Some(8),
+                            message: "Judge with this Ballot code already exists.",
+                        },
+                    ],
+                )
+            }
             "scratch" => (
                 const {
                     &[
@@ -444,6 +623,18 @@ impl Resource {
             fields,
             unique,
         })
+    }
+
+    pub fn value<'a>(&self, name: &str, values: &'a [Option<String>]) -> Option<&'a str> {
+        self.fields
+            .iter()
+            .zip(values)
+            .find(|(field, _)| field.name == name)
+            .and_then(|(_, value)| value.as_deref())
+    }
+
+    pub fn attributed(&self) -> bool {
+        matches!(self.list.model.name, "scratch" | "team" | "judge")
     }
 
     pub fn relations(&self) -> impl Iterator<Item = (&Field, Multiple)> {
@@ -531,6 +722,7 @@ impl Resource {
         id: Option<i32>,
         values: &[Option<String>],
         user: i32,
+        initial: Option<&[Option<String>]>,
     ) -> Result<i32, sqlx::Error> {
         let mut sql = if id.is_some() {
             QueryBuilder::<MySql>::new(format!("UPDATE {} SET ", self.list.table()))
@@ -538,43 +730,64 @@ impl Resource {
             QueryBuilder::<MySql>::new(format!("INSERT INTO {} SET ", self.list.table()))
         };
         let mut columns = sql.separated(", ");
-        let coin = if self.list.model.name == "debater" {
-            let submitted = values[6].as_deref();
-            let blank = submitted.is_none_or(|value| value == "0");
-            let unchanged = !blank
-                && id.is_some()
-                && sqlx::query_scalar::<_, bool>(
-                    "SELECT EXISTS(SELECT 1 FROM tab_debater WHERE id = ? AND tiebreaker = ?)",
-                )
-                .bind(id)
-                .bind(submitted)
-                .fetch_one(&mut *db)
-                .await?;
-            if blank || unchanged {
-                Some(crate::codes::coin(db, false).await?.to_string())
+        let model = self.list.model.name;
+        let coin = if matches!(model, "team" | "debater") {
+            let submitted = self.value("tiebreaker", values);
+            let unchanged = id.is_some()
+                && submitted.is_some_and(|submitted| {
+                    initial.and_then(|old| self.value("tiebreaker", old)) == Some(submitted)
+                });
+            if unchanged || submitted.is_none_or(|value| value == "0") {
+                Some(codes::coin(db, model == "team").await?.to_string())
             } else {
                 None
             }
         } else {
             None
         };
+        let team_code = if model == "team" {
+            let existing: Option<String> = if let Some(id) = id {
+                sqlx::query_scalar("SELECT team_code FROM tab_team WHERE id = ?")
+                    .bind(id)
+                    .fetch_one(&mut *db)
+                    .await?
+            } else {
+                None
+            };
+            if existing.as_deref().is_none_or(str::is_empty) {
+                Some(codes::unique(db, Credential::Team).await?)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let ballot_code = if model == "judge" && self.value("ballot_code", values).is_none() {
+            Some(codes::unique(db, Credential::Judge).await?)
+        } else {
+            None
+        };
         for (field, value) in self.fields.iter().zip(values) {
             if !matches!(field.kind, Kind::Multiple(_)) {
-                let value = if field.name == "tiebreaker" {
-                    coin.as_ref().or(value.as_ref())
-                } else {
-                    value.as_ref()
+                let value = match field.name {
+                    "tiebreaker" => coin.as_ref().or(value.as_ref()),
+                    "ballot_code" => ballot_code.as_ref().or(value.as_ref()),
+                    _ => value.as_ref(),
                 };
                 columns
                     .push(format!("`{}` = ", field.column))
                     .push_bind_unseparated(value);
             }
         }
-        if let Some(id) = id {
-            sql.push(" WHERE id = ").push_bind(id);
-        } else if self.list.model.name == "scratch" {
+        if let Some(code) = team_code.as_ref() {
+            columns.push("team_code = ").push_bind_unseparated(code);
+        }
+        if id.is_none() && self.attributed() {
             columns.push("created_by_id = ").push_bind_unseparated(user);
             columns.push("created_at = UTC_TIMESTAMP(6)");
+        }
+        if let Some(id) = id {
+            sql.push(" WHERE id = ").push_bind(id);
         }
         let result = sql.build().execute(&mut *db).await?;
         let saved = match id {
@@ -704,6 +917,9 @@ impl BoundField {
             None
         };
         if matches!(self.field.kind, Kind::Multiple(_)) {
+            if self.field.required && self.selected.is_empty() {
+                return invalid(&mut self.error, "This field is required.");
+            }
             let mut ids = BTreeSet::new();
             for value in &self.selected {
                 let Ok(id) = value.parse::<i32>() else {
@@ -745,7 +961,23 @@ impl BoundField {
                 }
                 Some(raw.into())
             }
-            Kind::Integer => {
+            Kind::BallotCode => {
+                let len = raw.chars().count();
+                if len > 30 {
+                    return invalid(
+                        &mut self.error,
+                        &format!("Ensure this value has at most 30 characters (it has {len})."),
+                    );
+                }
+                if !crate::judge_portal::valid_code(raw) {
+                    return invalid(
+                        &mut self.error,
+                        "Ballot code must be legacy alphanumeric text or a hyphenated word-word code with an optional alphanumeric token.",
+                    );
+                }
+                Some(raw.into())
+            }
+            Kind::Integer | Kind::Experience => {
                 let integer = if let Some((number, fraction)) = raw.split_once('.')
                     && fraction.bytes().all(|digit| digit == b'0')
                 {
@@ -754,6 +986,18 @@ impl BoundField {
                     raw
                 };
                 match integer.parse::<i128>() {
+                    Ok(value) if matches!(self.field.kind, Kind::Experience) && value < 0 => {
+                        invalid(
+                            &mut self.error,
+                            "Ensure this value is greater than or equal to 0.",
+                        )
+                    }
+                    Ok(value) if matches!(self.field.kind, Kind::Experience) && value > 10 => {
+                        invalid(
+                            &mut self.error,
+                            "Ensure this value is less than or equal to 10.",
+                        )
+                    }
                     Ok(value) if value < i128::from(i32::MIN) => invalid(
                         &mut self.error,
                         "Ensure this value is greater than or equal to -2147483648.",
@@ -774,7 +1018,11 @@ impl BoundField {
             Kind::Multiple(_) => unreachable!("Multiple choices are cleaned above"),
             Kind::Relation(_) | Kind::Choice(_) => {
                 let id = raw.parse::<i32>().ok();
-                if self.options.iter().any(|&(option, _)| Some(option) == id) {
+                if self.options.iter().any(|&(option, _)| {
+                    Some(option) == id
+                        && (!matches!(self.field.kind, Kind::Choice(_))
+                            || option.to_string() == raw)
+                }) {
                     id.map(|id| id.to_string())
                 } else if matches!(self.field.kind, Kind::Choice(_)) {
                     invalid(

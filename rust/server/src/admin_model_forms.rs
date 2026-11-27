@@ -10,18 +10,21 @@ use axum::{
 };
 use chrono::NaiveDateTime;
 use minijinja::{Value, context};
+use ring::hmac;
 use sqlx::{AssertSqlSafe, MySqlConnection, QueryBuilder};
 
 use crate::{
     App, access,
+    admin_cascade::Cascade,
     admin_changelist::{self, Query, filter_ids},
     admin_html::{self, Shell},
     admin_model_data::{BoundField, Form, Kind, MANAGED, Resource},
     admin_records::readonly,
+    admin_repairs::{self, LATER_STAGE},
     admin_scores::score_audit,
-    entity_store,
+    board_snapshot, entity_store,
     legacy_html::escape,
-    legacy_session::Actor,
+    legacy_session::{Actor, cookie},
     login, private, publication,
     registration_form::Fields,
     roster_log, round_audit,
@@ -211,8 +214,8 @@ async fn change(
         (None, None)
     };
     let mut form = Form::load(resource, &mut db, initial.as_deref(), post).await?;
-    let attribution = if resource.list.model.name == "scratch" {
-        Some(attribution(&mut db, id).await?)
+    let attribution = if resource.attributed() {
+        Some(attribution(&mut db, resource, id).await?)
     } else {
         None
     };
@@ -233,27 +236,30 @@ async fn change(
             _ => SettingEffects::default(),
         };
         effects.refresh(&mut db).await?;
-        match resource.save(&mut db, id, &values, page.user).await {
+        match resource
+            .save(&mut db, id, &values, page.user, initial.as_deref())
+            .await
+        {
             Ok(saved) => {
                 effects.refresh(&mut db).await?;
                 let description = resource
                     .describe(&mut db, saved)
                     .await?
                     .ok_or(sqlx::Error::RowNotFound)?;
-                record_roster_edit(&mut db, resource, saved, initial.as_deref(), &values).await?;
+                record_roster_edit(&mut db, resource, saved, initial.as_deref(), &values, &form)
+                    .await?;
                 let changed = changed_fields(resource, initial.as_deref(), &values);
-                if resource.list.model.name == "scratch" {
-                    let changes = if id.is_some() {
-                        serde_json::json!({"fields": changed.iter().map(|field| field.name).collect::<Vec<_>>()})
-                    } else {
-                        serde_json::json!({})
-                    };
-                    sqlx::query(
-                        "INSERT INTO tab_auditevent (object_id, event_type, created_at, object_repr, changes, note, content_type_id, user_id)
-                         VALUES (?, ?, UTC_TIMESTAMP(6), ?, ?, '',
-                             (SELECT id FROM django_content_type WHERE app_label = 'tab' AND model = 'scratch'), ?)",
-                    ).bind(saved).bind(if id.is_some() { "edit" } else { "create" }).bind(&description)
-                        .bind(changes.to_string()).bind(page.user).execute(&mut *db).await?;
+                if resource.attributed() {
+                    record_attribution(
+                        &mut db,
+                        &page,
+                        saved,
+                        &description,
+                        &changed,
+                        initial.as_deref(),
+                        &values,
+                    )
+                    .await?;
                 }
                 let (flag, message) = change_log(id.is_none(), &changed);
                 let log_id = admin_html::log_action(
@@ -323,47 +329,150 @@ async fn change(
     ))
 }
 
+async fn record_attribution(
+    db: &mut MySqlConnection,
+    page: &Page<'_>,
+    id: i32,
+    description: &str,
+    changed: &[&crate::admin_model_data::Field],
+    previous: Option<&[Option<String>]>,
+    values: &[Option<String>],
+) -> Result<(), sqlx::Error> {
+    let model = page.resource.list.model.name;
+    let mut changes = serde_json::json!({});
+    if let Some(previous) = previous {
+        changes["fields"] =
+            serde_json::json!(changed.iter().map(|field| field.name).collect::<Vec<_>>());
+        if model == "judge" {
+            let before = page.resource.value("is_dino", previous) == Some("1");
+            let after = page.resource.value("is_dino", values) == Some("1");
+            if before != after {
+                changes["is_dino"] = serde_json::json!({"before": before, "after": after});
+            }
+        }
+    }
+    sqlx::query(
+        "INSERT INTO tab_auditevent (object_id, event_type, created_at, object_repr, changes, note, content_type_id, user_id)
+         VALUES (?, ?, UTC_TIMESTAMP(6), ?, ?, '',
+             (SELECT id FROM django_content_type WHERE app_label = 'tab' AND model = ?), ?)",
+    ).bind(id).bind(if previous.is_some() { "edit" } else { "create" }).bind(description)
+        .bind(changes.to_string()).bind(model).bind(page.user).execute(db).await?;
+    Ok(())
+}
+
 async fn record_roster_edit(
     db: &mut MySqlConnection,
     resource: &Resource,
     id: i32,
     before: Option<&[Option<String>]>,
     after: &[Option<String>],
+    form: &Form,
 ) -> Result<(), sqlx::Error> {
     let model = resource.list.model.name;
-    if !matches!(model, "school" | "debater") || !roster_log::enabled(db).await? {
+    if !matches!(model, "school" | "debater" | "team" | "judge") || !roster_log::enabled(db).await?
+    {
         return Ok(());
     }
-    let Some(before) = before else {
-        return Ok(());
-    };
-    let name = after[0].as_deref().unwrap_or_default();
-    let old_name = before[0].as_deref().unwrap_or_default();
-    if model == "school" {
-        if old_name != name {
+    let old = |name| before.and_then(|row| resource.value(name, row));
+    let new = |name| resource.value(name, after);
+    let name = new("name").unwrap_or_default();
+    let old_name = old("name").unwrap_or_default();
+    match model {
+        "school" if before.is_some() && old_name != name => {
             roster_log::school_renamed(db, id, old_name, name).await?;
         }
-    } else {
-        roster_log::debater_edited(
-            db,
-            id,
-            old_name,
-            name,
-            before[8].as_deref(),
-            after[8].as_deref(),
-        )
-        .await?;
+        "debater" if before.is_some() => {
+            roster_log::debater_edited(db, id, old_name, name, old("school"), new("school"))
+                .await?;
+        }
+        "team" | "judge" => {
+            let is_team = model == "team";
+            let kind = if is_team { "teams" } else { "judges" };
+            if before.is_none() {
+                roster_log::record(db, kind, &format!("Added {model} “{name}”."), false).await?;
+            } else if is_team {
+                for field in ["school", "hybrid_school"] {
+                    if old(field) != new(field) {
+                        let (old, new) =
+                            roster_log::affiliation_names(db, old(field), new(field)).await?;
+                        roster_log::record(
+                            db,
+                            kind,
+                            &format!("Changed affiliation for “{name}”: {old} → {new}."),
+                            false,
+                        )
+                        .await?;
+                    }
+                }
+            } else if old_name != name {
+                roster_log::record(
+                    db,
+                    kind,
+                    &format!("Changed name for “{name}”: {old_name} → {name}."),
+                    false,
+                )
+                .await?;
+            }
+            let field = if is_team { "debaters" } else { "schools" };
+            if old(field) != new(field) {
+                let options = &form
+                    .fields
+                    .iter()
+                    .find(|bound| bound.field.name == field)
+                    .expect("roster relationship")
+                    .options;
+                let before = membership_ids(old(field));
+                let after = membership_ids(new(field));
+                let labels: BTreeMap<_, _> = options.iter().map(|(id, name)| (*id, name)).collect();
+                for (added, affected) in [
+                    (false, before.difference(&after)),
+                    (true, after.difference(&before)),
+                ] {
+                    for id in affected {
+                        let Some(related) = labels.get(id) else {
+                            return Err(sqlx::Error::RowNotFound);
+                        };
+                        let verb = if added { "Added" } else { "Removed" };
+                        let preposition = if !added {
+                            "from"
+                        } else if is_team {
+                            "on"
+                        } else {
+                            "for"
+                        };
+                        let noun = if is_team { "debater" } else { "affiliation" };
+                        let message =
+                            format!("{verb} {noun} “{related}” {preposition} {model} “{name}”.");
+                        roster_log::record(db, kind, &message, is_team).await?;
+                    }
+                }
+            }
+        }
+        _ => {}
     }
     Ok(())
 }
 
-async fn attribution(db: &mut MySqlConnection, id: Option<i32>) -> Result<[Value; 2], sqlx::Error> {
+fn membership_ids(value: Option<&str>) -> BTreeSet<i32> {
+    value
+        .into_iter()
+        .flat_map(|ids| ids.split(','))
+        .map(|id| id.parse().expect("validated relationship id"))
+        .collect()
+}
+
+async fn attribution(
+    db: &mut MySqlConnection,
+    resource: &Resource,
+    id: Option<i32>,
+) -> Result<[Value; 2], sqlx::Error> {
     let (user, date) = if let Some(id) = id {
         let (user_id, username, date): (Option<i32>, Option<String>, Option<NaiveDateTime>) =
-            sqlx::query_as(
-                "SELECT u.id, u.username, t.created_at FROM tab_scratch t LEFT JOIN auth_user u
+            sqlx::query_as(AssertSqlSafe(format!(
+                "SELECT u.id, u.username, t.created_at FROM {} t LEFT JOIN auth_user u
                  ON u.id = t.created_by_id WHERE t.id = ?",
-            )
+                resource.list.table(),
+            )))
             .bind(id)
             .fetch_one(db)
             .await?;
@@ -435,7 +544,10 @@ fn render_form(
         has_view_permission => true, can_change => true,
         errors => (0..errors).collect::<Vec<_>>(),
         non_field_errors => form.non_field_error.map(|message| error_list(message, true)).unwrap_or_default(),
-        media => admin_html::scripts(), prepopulated_fields_json => "[]",
+        media => if resource.fields.iter().any(|field| field.filter_label.is_some()) {
+            admin_html::filtered_select_scripts()
+        } else { admin_html::scripts() },
+        prepopulated_fields_json => "[]",
     };
     page.markup("admin/change_form.html", ctx)
 }
@@ -512,9 +624,19 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
                 r#"<input type="{input_type}" name="{name}"{value} class="vTextField" maxlength="{max}"{required} id="id_{name}">"#
             )
         }
-        Kind::Integer => format!(
-            r#"<input type="number" name="{name}"{value} class="vIntegerField"{required} id="id_{name}">"#
+        Kind::BallotCode => format!(
+            r#"<input type="text" name="{name}"{value} class="vTextField" maxlength="255"{required} id="id_{name}">"#
         ),
+        Kind::Integer | Kind::Experience => {
+            let min = if matches!(field.kind, Kind::Experience) {
+                r#" min="0""#
+            } else {
+                ""
+            };
+            format!(
+                r#"<input type="number" name="{name}"{value} class="vIntegerField"{min}{required} id="id_{name}">"#
+            )
+        }
         Kind::Decimal => format!(
             r#"<input type="number" name="{name}"{value} step="0.01"{required} id="id_{name}">"#
         ),
@@ -536,7 +658,7 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
                 context! {
                     name, options => &bound.options, selected => &bound.selected,
                     has_selection => bound.value.as_deref().is_some_and(|value| !value.is_empty()),
-                    blank, multiple, required => blank && field.required,
+                    blank, multiple, filter_label => field.filter_label, required => (blank || multiple) && field.required,
                 },
             )?;
             if let Some(relation) = relation {
@@ -549,7 +671,7 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
                     url_params => "_to_field=id&_popup=1",
                     view_related_url_params => "_to_field=id",
                     can_change_related => !multiple, can_add_related => true,
-                    can_delete_related => !multiple && relation.model == "school",
+                    can_delete_related => !multiple && !field.required && relation.model == "school",
                     can_view_related => !multiple,
                 })?.trim().to_owned()
             } else {
@@ -574,8 +696,10 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
         .map(|message| error_list(message, false))
         .unwrap_or_default();
     let suffix = if checkbox { "" } else { ":" };
-    let help_text = matches!(field.kind, Kind::Multiple(_))
-        .then_some("Hold down “Control”, or “Command” on a Mac, to select more than one.");
+    let help_text = field.help_text.or_else(|| {
+        matches!(field.kind, Kind::Multiple(_))
+            .then_some("Hold down “Control”, or “Command” on a Mac, to select more than one.")
+    });
     Ok(context! {
         has_visible_field => true, errors,
         fields => [context! {
@@ -691,6 +815,150 @@ struct DeletionSummary {
     objects: Vec<String>,
 }
 
+struct DeletionPreview(Vec<u8>);
+
+impl DeletionPreview {
+    fn new(
+        page: &Page<'_>,
+        records: &Removed,
+        cascade: &Cascade,
+        pairings: &CascadePairings,
+    ) -> Option<Self> {
+        if !matches!(page.resource.list.model.name, "team" | "judge") {
+            return None;
+        }
+        let session = cookie(page.headers, "sessionid")?;
+        let statement = serde_json::to_vec(&(
+            "admin deletion preview",
+            session,
+            page.target,
+            &records.rows,
+            cascade.scope(),
+            pairings.scope(),
+        ))
+        .expect("serializable deletion preview");
+        Some(Self(statement))
+    }
+
+    fn verified(&self, app: &App, posted: &str) -> bool {
+        hex::decode(posted)
+            .is_ok_and(|tag| hmac::verify(&app.admin_notice_key, &self.0, &tag).is_ok())
+    }
+
+    fn token(&self, app: &App) -> String {
+        hex::encode(hmac::sign(&app.admin_notice_key, &self.0).as_ref())
+    }
+}
+
+type Placement = (i32, Option<i32>, Option<i32>, Option<u32>);
+type PublicationScope = (i32, i32, i32, Vec<Placement>);
+
+struct CascadePairings {
+    outrounds: Option<BTreeMap<i32, board_snapshot::Snapshot>>,
+    removed_outrounds: BTreeSet<i32>,
+    inrounds: BTreeMap<i32, round_audit::Snapshot>,
+    publications: Vec<PublicationScope>,
+}
+
+impl CascadePairings {
+    async fn capture(db: &mut MySqlConnection, cascade: &Cascade) -> Result<Self, sqlx::Error> {
+        let removed_outrounds = cascade.ids("tab_outround");
+        let outrounds = if !removed_outrounds.is_empty() || cascade.touches("tab_outround_judges") {
+            Some(board_snapshot::capture(db, board_snapshot::Pairings::Outround).await?)
+        } else {
+            None
+        };
+        let mut inrounds = BTreeMap::new();
+        if cascade.touches("tab_round") || cascade.touches("tab_round_judges") {
+            let mut affected = cascade.ids("tab_round");
+            let judge_links = cascade.ids("tab_round_judges");
+            if !judge_links.is_empty() {
+                let mut sql = QueryBuilder::new(
+                    "SELECT DISTINCT round_id FROM tab_round_judges WHERE id IN (",
+                );
+                let mut selected = sql.separated(", ");
+                for id in judge_links {
+                    selected.push_bind(id);
+                }
+                let ids = sql
+                    .push(")")
+                    .build_query_scalar::<i32>()
+                    .fetch_all(&mut *db)
+                    .await?;
+                affected.extend(ids);
+            }
+            for id in affected {
+                inrounds.extend(score_audit(db, id).await?);
+            }
+        }
+        let mut publications = Vec::new();
+        if !removed_outrounds.is_empty() {
+            let settings = Settings::load(db, publication::VISIBILITY_KEYS).await?;
+            let affected = outrounds
+                .iter()
+                .flatten()
+                .filter(|(id, _)| removed_outrounds.contains(id))
+                .filter_map(|(_, round)| round.division.zip(round.num_teams))
+                .collect::<BTreeSet<_>>();
+            for (division, size) in affected {
+                let key = if division == 0 {
+                    publication::VISIBILITY_KEYS[0]
+                } else {
+                    publication::VISIBILITY_KEYS[1]
+                };
+                let visibility = settings.integer(key, 256);
+                let placements: Vec<Placement> = sqlx::query_as(
+                    "SELECT s.id, p.id, p.team_id, p.place FROM tab_publishedoutroundstage s
+                     LEFT JOIN tab_publishedteamplacement p ON p.stage_id = s.id
+                     WHERE s.type_of_round = ? AND s.num_teams = ? ORDER BY p.id",
+                )
+                .bind(division)
+                .bind(size)
+                .fetch_all(&mut *db)
+                .await?;
+                publications.push((division, size, visibility, placements));
+            }
+        }
+        Ok(Self {
+            outrounds,
+            removed_outrounds,
+            inrounds,
+            publications,
+        })
+    }
+
+    fn scope(&self) -> impl serde::Serialize + '_ {
+        let removed = self
+            .outrounds
+            .iter()
+            .flatten()
+            .filter(|(id, _)| self.removed_outrounds.contains(id))
+            .collect::<Vec<_>>();
+        (&self.inrounds, removed, &self.publications)
+    }
+
+    fn blocked(&self) -> bool {
+        self.outrounds.as_ref().is_some_and(|before| {
+            admin_repairs::later_stage_depends_on(before, &self.removed_outrounds)
+        })
+    }
+
+    async fn record(self, db: &mut MySqlConnection, user: i32) -> Result<(), sqlx::Error> {
+        if !self.inrounds.is_empty() {
+            let mut after = BTreeMap::new();
+            for id in self.inrounds.keys() {
+                after.extend(score_audit(db, *id).await?);
+            }
+            round_audit::record(db, &self.inrounds, &after, user, "admin deletion").await?;
+        }
+        if let Some(outrounds) = self.outrounds {
+            admin_repairs::finish_outround_changes(db, user, &outrounds, &self.removed_outrounds)
+                .await?;
+        }
+        Ok(())
+    }
+}
+
 struct Removed {
     rows: Vec<(i32, String)>,
 }
@@ -728,11 +996,42 @@ impl Removed {
         Ok(Self { rows })
     }
 
+    async fn cascade(
+        &self,
+        db: &mut MySqlConnection,
+        resource: &Resource,
+        locked: bool,
+    ) -> Result<Cascade, sqlx::Error> {
+        let ids: Vec<_> = self.rows.iter().map(|(id, _)| *id).collect();
+        Cascade::read(db, resource.list.table(), &ids, locked).await
+    }
+
     async fn summary(
         &self,
         db: &mut MySqlConnection,
         page: &Page<'_>,
+        cascade: &Cascade,
     ) -> Result<DeletionSummary, sqlx::Error> {
+        if matches!(page.resource.list.model.name, "team" | "judge") {
+            let model = &page.resource.list.model;
+            let mut counts = vec![(model.plural, self.rows.len())];
+            counts.extend(cascade.counts());
+            let title = admin_html::capitalized(model.singular);
+            let mut seen = BTreeSet::new();
+            let objects = self
+                .rows
+                .iter()
+                .map(|(id, label)| {
+                    let label = format!(
+                        "{title}: <a href=\"{}{id}/change/\">{}</a>",
+                        page.model_url,
+                        escape(label)
+                    );
+                    cascade.rendered(page.resource.list.table(), *id, &label, &mut seen)
+                })
+                .collect();
+            return Ok(DeletionSummary { counts, objects });
+        }
         let mut children: BTreeMap<i32, Vec<String>> = BTreeMap::new();
         let model = &page.resource.list.model;
         let mut counts = vec![(model.plural, self.rows.len())];
@@ -775,8 +1074,16 @@ impl Removed {
             for (id, _) in &self.rows {
                 ids.push_bind(*id);
             }
+            sql.push(") ORDER BY ").push(owner);
+            if let Some((_, relation)) = page
+                .resource
+                .relations()
+                .find(|(_, link)| link.table == table && link.owner == owner)
+            {
+                sql.push(", ").push(relation.column);
+            }
             let links = sql
-                .push(") ORDER BY id")
+                .push(", id")
                 .build_query_as::<(i32, i32)>()
                 .fetch_all(&mut *db)
                 .await?;
@@ -902,7 +1209,12 @@ impl Removed {
         Ok(None)
     }
 
-    async fn execute(&self, db: &mut MySqlConnection, page: &Page<'_>) -> Result<u64, sqlx::Error> {
+    async fn execute(
+        &self,
+        db: &mut MySqlConnection,
+        page: &Page<'_>,
+        cascade: Cascade,
+    ) -> Result<u64, sqlx::Error> {
         let mut last_log = 0;
         for (id, name) in &self.rows {
             last_log = admin_html::log_action(
@@ -956,6 +1268,16 @@ impl Removed {
                     .map(|&(table, _, _, _)| (table, "roomtag_id")),
             ),
             "room" => links.push(("tab_roomcheckin", "room_id")),
+            "team" | "judge" => {
+                let model = page.resource.list.model.name;
+                let kind = if model == "team" { "teams" } else { "judges" };
+                if roster_log::enabled(db).await? {
+                    for (_, name) in &self.rows {
+                        roster_log::record(db, kind, &format!("Removed {model} “{name}”."), false)
+                            .await?;
+                    }
+                }
+            }
             "debater" => links.extend([
                 ("tab_roundstats", "debater_id"),
                 ("tab_rankinggroup_debaters", "debater_id"),
@@ -982,6 +1304,7 @@ impl Removed {
             }
             _ => {}
         }
+        cascade.delete(db).await?;
         entity_store::delete_links(db, &ids, &links).await?;
         entity_store::delete_links(db, &ids, &[(page.resource.list.table(), "id")]).await?;
         for (round, before) in scores {
@@ -1015,25 +1338,40 @@ async fn delete(
         return Ok(access::found("/admin/"));
     };
     let rejection = records.rejection(&mut db, &page.resource).await?;
+    let cascade = records.cascade(&mut db, &page.resource, confirm).await?;
+    let permissions = cascade.unavailable_permissions(&mut db).await?;
+    let pairings = CascadePairings::capture(&mut db, &cascade).await?;
+    let rejection = rejection.or_else(|| pairings.blocked().then_some(LATER_STAGE));
+    let headers = page.headers;
+    let preview = DeletionPreview::new(&page, &records, &cascade, &pairings);
+    let stale = confirm
+        && preview.as_ref().is_some_and(|preview| {
+            !preview.verified(app, post.map_or("", |post| post.get("mittab_delete_scope")))
+        });
     if confirm {
+        if !permissions.is_empty() {
+            return Ok(private((
+                StatusCode::FORBIDDEN,
+                "You do not have permission to delete related records.",
+            )));
+        }
         if let Some(message) = rejection {
             return Ok(private((StatusCode::CONFLICT, message)));
         }
-        let log = records.execute(&mut db, &page).await?;
-        db.commit().await?;
-        if post.is_some_and(|post| !post.all("_popup").is_empty()) {
-            return Ok(popup_response(Some("delete"), id, None));
-        }
-        return Ok(admin_html::redirect_with_notice(
-            app,
-            page.headers,
-            page.list_url(),
-            log,
-            "delete",
-        ));
     }
-    let summary = if rejection.is_none() {
-        records.summary(&mut db, &page).await?
+    if confirm && !stale {
+        let log = records.execute(&mut db, &page, cascade).await?;
+        pairings.record(&mut db, page.user).await?;
+        db.commit().await?;
+        let response = if post.is_some_and(|post| !post.all("_popup").is_empty()) {
+            popup_response(Some("delete"), id, None)
+        } else {
+            admin_html::redirect_with_notice(app, headers, page.list_url(), log, "delete")
+        };
+        return Ok(response);
+    }
+    let summary = if rejection.is_none() && permissions.is_empty() {
+        records.summary(&mut db, &page, &cascade).await?
     } else {
         DeletionSummary {
             counts: Vec::new(),
@@ -1043,16 +1381,26 @@ async fn delete(
     let protected = rejection.map(|message| format!("\t<li>{}</li>", escape(message)));
     db.commit().await?;
     let model = &page.resource.list.model;
+    let can_delete = rejection.is_none() && permissions.is_empty();
+    let (title, perms_lacking) = deletion_title(model.singular, rejection, permissions);
+    let delete_scope = preview
+        .filter(|_| can_delete)
+        .map(|preview| preview.token(app));
     let ctx = context! {
-        title => if rejection.is_some() { "Cannot delete" } else { "Are you sure?" }, media => admin_html::scripts(),
-        protected,
+        delete_scope,
+        title => if stale { "Review updated deletion" } else { &title }, media => admin_html::scripts(),
+        protected, perms_lacking,
         object_url => format!("{}{id}/", page.model_url), object => description,
         deleted_objects => summary.objects.join("\n"),
         object_name => model.singular, model_count => summary.counts,
         is_popup => page.query.get("_popup").is_some(), is_popup_var => "_popup",
         to_field => page.query.get("_to_field"), to_field_var => "_to_field",
     };
-    Ok(page.markup("admin/delete_confirmation.html", ctx))
+    let mut response = page.markup("admin/delete_confirmation.html", ctx);
+    if stale && response.status().is_success() {
+        *response.status_mut() = StatusCode::CONFLICT;
+    }
+    Ok(response)
 }
 
 async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx::Error> {
@@ -1084,23 +1432,38 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
         return Ok(access::found(page.target));
     }
     let rejection = records.rejection(&mut db, &page.resource).await?;
+    let cascade = records.cascade(&mut db, &page.resource, confirm).await?;
+    let permissions = cascade.unavailable_permissions(&mut db).await?;
+    let pairings = CascadePairings::capture(&mut db, &cascade).await?;
+    let rejection = rejection.or_else(|| pairings.blocked().then_some(LATER_STAGE));
+    let headers = page.headers;
+    let preview = DeletionPreview::new(&page, &records, &cascade, &pairings);
+    let stale = confirm
+        && preview
+            .as_ref()
+            .is_some_and(|preview| !preview.verified(app, post.get("mittab_delete_scope")));
     if confirm {
+        if !permissions.is_empty() {
+            return Ok(private((
+                StatusCode::FORBIDDEN,
+                "You do not have permission to delete related records.",
+            )));
+        }
         if let Some(message) = rejection {
             return Ok(private((StatusCode::CONFLICT, message)));
         }
-        let log = records.execute(&mut db, &page).await?;
+    }
+    if confirm && !stale {
+        let log = records.execute(&mut db, &page, cascade).await?;
+        pairings.record(&mut db, page.user).await?;
         db.commit().await?;
         let notice = format!("bulk-{}", records.rows.len());
-        return Ok(admin_html::redirect_with_notice(
-            app,
-            page.headers,
-            page.target.to_owned(),
-            log,
-            &notice,
-        ));
+        let response =
+            admin_html::redirect_with_notice(app, headers, page.target.to_owned(), log, &notice);
+        return Ok(response);
     }
-    let summary = if rejection.is_none() {
-        records.summary(&mut db, &page).await?
+    let summary = if rejection.is_none() && permissions.is_empty() {
+        records.summary(&mut db, &page, &cascade).await?
     } else {
         DeletionSummary {
             counts: Vec::new(),
@@ -1110,17 +1473,46 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
     let protected = rejection.map(|message| format!("\t<li>{}</li>", escape(message)));
     db.commit().await?;
     let count = records.rows.len();
-    let plural = page.resource.list.model.plural;
+    let model = &page.resource.list.model;
+    let name = if count == 1 {
+        model.singular
+    } else {
+        model.plural
+    };
+    let can_delete = rejection.is_none() && permissions.is_empty();
+    let (title, perms_lacking) = deletion_title(name, rejection, permissions);
+    let delete_scope = preview
+        .filter(|_| can_delete)
+        .map(|preview| preview.token(app));
     let ctx = context! {
-        title => if rejection.is_some() { "Cannot delete" } else { "Are you sure?" }, media => admin_html::scripts(),
-        protected,
-        objects_name => if count == 1 { page.resource.list.model.singular } else { plural },
+        delete_scope,
+        title => if stale { "Review updated deletion" } else { &title }, media => admin_html::scripts(),
+        protected, perms_lacking,
+        objects_name => name,
         model_count => summary.counts,
         deletable_objects => [summary.objects.join("\n")],
         queryset => records.rows.iter().map(|(id, _)| context! {pk => id}).collect::<Vec<_>>(),
         action_checkbox_name => "_selected_action",
     };
-    Ok(page.markup("admin/delete_selected_confirmation.html", ctx))
+    let mut response = page.markup("admin/delete_selected_confirmation.html", ctx);
+    if stale && response.status().is_success() {
+        *response.status_mut() = StatusCode::CONFLICT;
+    }
+    Ok(response)
+}
+
+fn deletion_title(name: &str, rejection: Option<&str>, permissions: Vec<&str>) -> (String, String) {
+    let title = if rejection.is_some() || !permissions.is_empty() {
+        format!("Cannot delete {name}")
+    } else {
+        "Are you sure?".into()
+    };
+    let permissions = permissions
+        .into_iter()
+        .map(|item| format!("\t<li>{}</li>", escape(item)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    (title, permissions)
 }
 
 async fn history(app: &App, page: Page<'_>, id: i32) -> Result<Response, sqlx::Error> {

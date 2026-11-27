@@ -1,4 +1,4 @@
-<select name="{{ name }}"{% if required %} required{% endif %} id="id_{{ name }}"{% if multiple %} multiple{% endif %}>
+<select name="{{ name }}"{% if required %} required{% endif %} id="id_{{ name }}"{% if multiple %} multiple{% endif %}{% if filter_label %} class="selectfilter" data-field-name="{{ filter_label }}" data-is-stacked="0"{% endif %}>
 {% if blank %}  <option value=""{% if not has_selection %} selected{% endif %}>---------</option>
 
 {% endif %}{% for id, label in options %}  <option value="{{ id }}"{% if id|string in selected %} selected{% endif %}>{{ label }}</option>

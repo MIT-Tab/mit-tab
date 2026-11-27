@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use axum::{
     Extension, Form, Router,
     extract::{Path, State},
@@ -148,37 +150,17 @@ async fn delete(
                 "/pairings/view_rounds/"
             }
             Record::Outround => {
-                let mut snapshots =
+                let before =
                     board_snapshot::capture(&mut db, board_snapshot::Pairings::Outround).await?;
-                let Some(before) = snapshots.remove(&id) else {
+                if !before.contains_key(&id) {
                     return Ok(missing());
-                };
-                let (Some(division), Some(size)) = (before.division, before.num_teams) else {
-                    return Ok(missing());
-                };
-                if snapshots.values().any(|round| {
-                    round.division == Some(division)
-                        && round.num_teams.is_some_and(|teams| teams < size)
-                }) {
-                    return Ok(private((
-                        StatusCode::CONFLICT,
-                        "Resolve the later stage before deleting this pairing.",
-                    )));
+                }
+                let removed = BTreeSet::from([id]);
+                if later_stage_depends_on(&before, &removed) {
+                    return Ok(private((StatusCode::CONFLICT, LATER_STAGE)));
                 }
                 crate::entity_store::delete_outrounds(&mut db, &[id]).await?;
-                prune_published_stage(&mut db, division, size, &before, &snapshots).await?;
-                board_snapshot::audit_pairings(
-                    &mut db,
-                    &std::collections::BTreeMap::from([(id, before)]),
-                    &Default::default(),
-                    user,
-                    "admin deletion",
-                )
-                .await?;
-                crate::board_outrounds::recompute_staff_seeds(&mut db, user, &snapshots, division)
-                    .await?;
-                let settings = Settings::load(&mut db, publication::VISIBILITY_KEYS).await?;
-                publication::refresh_placements(&mut db, &settings).await?;
+                finish_outround_changes(&mut db, user, &before, &removed).await?;
                 "/outround_pairing"
             }
         };
@@ -187,6 +169,49 @@ async fn delete(
     }
     .await;
     result.unwrap_or_else(|_| unavailable())
+}
+
+pub(super) const LATER_STAGE: &str = "Resolve the later stage before deleting this pairing.";
+
+pub(super) fn later_stage_depends_on(
+    before: &BTreeMap<i32, board_snapshot::Snapshot>,
+    removed: &BTreeSet<i32>,
+) -> bool {
+    removed.iter().filter_map(|id| before.get(id)).any(|round| {
+        before.iter().any(|(id, later)| {
+            !removed.contains(id)
+                && round.division == later.division
+                && later
+                    .num_teams
+                    .zip(round.num_teams)
+                    .is_some_and(|(next, current)| next < current)
+        })
+    })
+}
+
+pub(super) async fn finish_outround_changes(
+    db: &mut MySqlConnection,
+    user: i32,
+    before: &BTreeMap<i32, board_snapshot::Snapshot>,
+    removed: &BTreeSet<i32>,
+) -> Result<(), sqlx::Error> {
+    let after = board_snapshot::capture(db, board_snapshot::Pairings::Outround).await?;
+    let mut divisions = BTreeSet::new();
+    for round in removed.iter().filter_map(|id| before.get(id)) {
+        if let (Some(division), Some(size)) = (round.division, round.num_teams) {
+            prune_published_stage(db, division, size, round, &after).await?;
+            divisions.insert(division);
+        }
+    }
+    board_snapshot::audit_pairings(db, before, &after, user, "admin deletion").await?;
+    for division in divisions {
+        crate::board_outrounds::recompute_staff_seeds(db, user, &after, division).await?;
+    }
+    if !removed.is_empty() {
+        let settings = Settings::load(db, publication::VISIBILITY_KEYS).await?;
+        publication::refresh_placements(db, &settings).await?;
+    }
+    Ok(())
 }
 
 async fn prune_published_stage(

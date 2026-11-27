@@ -270,6 +270,10 @@ fn templates(env: &mut Environment<'static>) {
 fn translate(source: &str) -> String {
     let source = source
         .replace("{{ block.super }}", "{{ super() }}")
+        .replace(
+            r#"<input type="hidden" name="post" value="yes">"#,
+            r#"<input type="hidden" name="post" value="yes">{% if delete_scope %}<input type="hidden" name="mittab_delete_scope" value="{{ delete_scope }}">{% endif %}"#,
+        )
         .replace("{% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}", " By {{ title }} ")
         .replace("{% blocktranslate count counter=cl.result_count %}{{ counter }} result{% plural %}{{ counter }} results{% endblocktranslate %}", "{{ cl.result_count }} result{% if cl.result_count != 1 %}s{% endif %}")
         .replace("{% blocktranslate with full_result_count=cl.full_result_count %}{{ full_result_count }} total{% endblocktranslate %}", "{{ cl.full_result_count }} total")
@@ -482,6 +486,20 @@ const ADMIN_MEDIA: &[&str] = &[
 pub fn scripts() -> String {
     ADMIN_MEDIA
         .iter()
+        .map(|script| format!("<script src=\"/static/admin/js/{script}\"></script>"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub fn filtered_select_scripts() -> String {
+    ADMIN_MEDIA
+        .iter()
+        .flat_map(|&script| match script {
+            "admin/RelatedObjectLookups.js" => [Some(script), Some("SelectBox.js")],
+            "actions.js" => [Some(script), Some("SelectFilter2.js")],
+            _ => [Some(script), None],
+        })
+        .flatten()
         .map(|script| format!("<script src=\"/static/admin/js/{script}\"></script>"))
         .collect::<Vec<_>>()
         .join("\n")
