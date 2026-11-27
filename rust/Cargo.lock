@@ -1218,6 +1218,8 @@ checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.2",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -1429,6 +1431,7 @@ dependencies = [
  "flate2",
  "hex",
  "image",
+ "indexmap",
  "minijinja",
  "mittab-tabulation",
  "quick-xml",

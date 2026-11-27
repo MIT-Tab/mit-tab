@@ -18,14 +18,14 @@ use crate::{
     admin_cascade::Cascade,
     admin_changelist::{self, Query, filter_ids},
     admin_html::{self, Shell},
-    admin_model_data::{BoundField, Form, Kind, MANAGED, Resource},
+    admin_model_data::{BoundField, Form, Kind, MANAGED, Resource, email_log_revision},
     admin_model_list::{self, ListKind},
     admin_records::readonly,
     admin_registration_inlines::Inlines,
     admin_repairs::{self, LATER_STAGE},
     admin_scores::score_audit,
     board_snapshot, entity_store,
-    legacy_html::escape,
+    legacy_html::{DjangoJson, escape},
     legacy_session::{Actor, cookie},
     login, private, publication,
     registration_form::Fields,
@@ -253,6 +253,8 @@ async fn change(
         Some(("mittab_content_revision", "admin public information edit"))
     } else if resource.motion() {
         Some(("mittab_motion_revision", "admin motion edit"))
+    } else if resource.email_log() {
+        Some(("mittab_email_log_revision", "admin email log edit"))
     } else {
         None
     };
@@ -320,6 +322,8 @@ async fn change(
             "This registration configuration changed. Review the current values before saving."
         } else if stale_resource && resource.motion() {
             "This motion changed. Review the current values before saving."
+        } else if stale_resource && resource.email_log() {
+            "This email log changed. Review the current values before saving."
         } else if stale_resource {
             "This content changed. Review the current values before saving."
         } else {
@@ -823,6 +827,30 @@ pub(super) fn error_list(message: &str, non_field: bool) -> String {
     format!("<ul class=\"{class}\"><li>{}</li></ul>", escape(message))
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
+enum AdminJson {
+    Object(indexmap::IndexMap<String, Self>),
+    Array(Vec<Self>),
+    Scalar(serde_json::Value),
+}
+
+fn json_form_value(raw: &str) -> String {
+    use serde::Serialize;
+
+    let Ok(parsed) = serde_json::from_str::<AdminJson>(raw) else {
+        return raw.to_owned();
+    };
+    let mut output = Vec::new();
+    parsed
+        .serialize(&mut serde_json::Serializer::with_formatter(
+            &mut output,
+            DjangoJson { ascii_only: false },
+        ))
+        .expect("serializable admin JSON value");
+    String::from_utf8(output).expect("JSON is UTF-8")
+}
+
 pub(super) fn render_widget(
     bound: &BoundField,
     name: &str,
@@ -858,14 +886,16 @@ pub(super) fn render_widget(
             escape(bound.value.as_deref().unwrap_or_default()),
         ),
         Kind::Json => {
-            let payload = escape(bound.value.as_deref().unwrap_or_default());
-            let initial = bound
-                .initial_json
-                .as_deref()
-                .filter(|raw| !raw.is_empty())
-                .map_or_else(String::new, |raw| format!(r#" value="{}""#, escape(raw)));
+            let payload = json_form_value(bound.value.as_deref().unwrap_or("null"));
+            let initial = bound.initial_json.as_deref().unwrap_or(&payload);
+            let initial = if initial.is_empty() {
+                String::new()
+            } else {
+                format!(r#" value="{}""#, escape(initial))
+            };
             format!(
-                "<textarea name=\"{name}\" cols=\"40\" rows=\"10\" id=\"id_{name}\">\n{payload}</textarea><input type=\"hidden\" name=\"initial-{name}\"{initial} id=\"initial-id_{name}\">"
+                "<textarea name=\"{name}\" cols=\"40\" rows=\"10\" id=\"id_{name}\">\n{}</textarea><input type=\"hidden\" name=\"initial-{name}\"{initial} id=\"initial-id_{name}\">",
+                escape(&payload),
             )
         }
         Kind::EasternDateTime => {
@@ -899,7 +929,7 @@ pub(super) fn render_widget(
             let state = if checked { " checked" } else { "" };
             format!(r#"<input type="checkbox" name="{name}" id="id_{name}"{state}>"#)
         }
-        Kind::Choice(_) | Kind::Relation(_) | Kind::Multiple(_) => {
+        Kind::Choice(_) | Kind::StringChoice(_) | Kind::Relation(_) | Kind::Multiple(_) => {
             let relation = match field.kind {
                 Kind::Relation(relation) => Some(relation),
                 Kind::Multiple(link) => Some(link.relation),
@@ -907,11 +937,16 @@ pub(super) fn render_widget(
             };
             let multiple = matches!(field.kind, Kind::Multiple(_));
             let blank = matches!(field.kind, Kind::Relation(_))
-                || matches!(field.kind, Kind::Choice(_)) && field.initial.is_none();
+                || matches!(field.kind, Kind::Choice(_) | Kind::StringChoice(_))
+                    && field.initial.is_none();
+            let options = match field.kind {
+                Kind::StringChoice(choices) => Value::from_serialize(choices),
+                _ => Value::from_serialize(&bound.options),
+            };
             let select = admin_html::render_fragment(
                 "admin/model_select.html",
                 context! {
-                    name, options => &bound.options, selected => &bound.selected,
+                    name, options, selected => &bound.selected,
                     has_selection => bound.value.as_deref().is_some_and(|value| !value.is_empty()),
                     blank, multiple, filter_label => field.filter_label, required => use_required_attribute && (blank || multiple) && field.required,
                 },
@@ -1096,6 +1131,7 @@ impl AdminFormProof {
         if !page.resource.cascading_deletion()
             && !page.resource.registration_config()
             && !page.resource.motion()
+            && !page.resource.email_log()
         {
             return None;
         }
@@ -1305,7 +1341,7 @@ impl Removed {
         } else if resource.motion() {
             "CAST(JSON_ARRAY(t.updated_at, t.round_number, t.outround_type, t.num_teams, t.info_slide, t.motion_text, t.is_published) AS CHAR)"
         } else {
-            "NULL"
+            email_log_revision(list.model.name).unwrap_or("NULL")
         };
         let mut sql = QueryBuilder::new(format!(
             "SELECT t.id, {}, {revision} FROM {} WHERE TRUE",

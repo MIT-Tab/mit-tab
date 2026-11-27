@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Write, sync::LazyLock};
+use std::{collections::BTreeMap, fmt::Write, io, sync::LazyLock};
 
 use axum::{
     http::StatusCode,
@@ -7,6 +7,7 @@ use axum::{
 use chrono::{NaiveDateTime, Timelike};
 use minijinja::{Environment, UndefinedBehavior, Value, context};
 use serde::Serialize;
+use serde_json::ser::Formatter;
 use sqlx::MySqlConnection;
 
 use crate::{
@@ -17,6 +18,66 @@ use crate::{
     staff_roles::{self, Preset},
     unavailable,
 };
+
+pub(crate) struct DjangoJson {
+    pub ascii_only: bool,
+}
+
+impl Formatter for DjangoJson {
+    fn begin_array_value<W: ?Sized + io::Write>(
+        &mut self,
+        writer: &mut W,
+        first: bool,
+    ) -> io::Result<()> {
+        if first {
+            Ok(())
+        } else {
+            writer.write_all(b", ")
+        }
+    }
+
+    fn begin_object_key<W: ?Sized + io::Write>(
+        &mut self,
+        writer: &mut W,
+        first: bool,
+    ) -> io::Result<()> {
+        self.begin_array_value(writer, first)
+    }
+
+    fn begin_object_value<W: ?Sized + io::Write>(&mut self, writer: &mut W) -> io::Result<()> {
+        writer.write_all(b": ")
+    }
+
+    fn write_f64<W: ?Sized + io::Write>(&mut self, writer: &mut W, value: f64) -> io::Result<()> {
+        let decimal = format!("{value:?}");
+        if let Some((mantissa, exponent)) = decimal.split_once('e') {
+            let exponent: i32 = exponent.parse().expect("f64 exponent");
+            write!(writer, "{mantissa}e{exponent:+03}")
+        } else {
+            writer.write_all(decimal.as_bytes())
+        }
+    }
+
+    fn write_string_fragment<W: ?Sized + io::Write>(
+        &mut self,
+        writer: &mut W,
+        fragment: &str,
+    ) -> io::Result<()> {
+        if !self.ascii_only {
+            return writer.write_all(fragment.as_bytes());
+        }
+        for character in fragment.chars() {
+            if character < '\u{007f}' {
+                writer.write_all(&[character as u8])?;
+            } else {
+                for unit in character.encode_utf16(&mut [0; 2]) {
+                    write!(writer, "\\u{unit:04x}")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
 
 static URLS: LazyLock<BTreeMap<String, String>> = LazyLock::new(|| {
     serde_json::from_str(include_str!("../templates/legacy_navigation_urls.json"))

@@ -17,6 +17,7 @@ excelerate = "0.14.0"
 flate2 = "1.1.5"
 hex = "0.4.3"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+indexmap = { version = "2", features = ["serde"] }
 minijinja = { version = "2.12", features = ["loader"] }
 quick-xml = { version = "0.42", features = ["serialize"] }
 ring = "0.17.14"

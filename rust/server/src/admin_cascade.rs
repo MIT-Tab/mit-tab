@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use sqlx::{MySqlConnection, QueryBuilder};
 
-use crate::{admin_changelist, admin_html, entity_store::delete_links, legacy_html::escape};
+use crate::{
+    admin_changelist, admin_html, admin_model_data::email_log_revision, entity_store::delete_links,
+    legacy_html::escape,
+};
 
 #[derive(Clone, Copy)]
 enum Model {
@@ -307,6 +310,7 @@ pub struct Cascade {
     objects: BTreeMap<Key, String>,
     edges: BTreeMap<Key, Vec<Key>>,
     registration_log_links: Vec<(i32, i32)>,
+    email_log_revisions: BTreeMap<Key, String>,
 }
 
 impl Cascade {
@@ -358,8 +362,13 @@ impl Cascade {
         }
         for &(child, column) in children(parent) {
             let model = child.description();
+            let revision = match child {
+                Registered(name) => email_log_revision(name),
+                _ => None,
+            }
+            .unwrap_or("NULL");
             let mut sql = QueryBuilder::new(format!(
-                "SELECT t.id, t.{column}, {} FROM {} WHERE t.{column} IN (",
+                "SELECT t.id, t.{column}, {}, {revision} FROM {} WHERE t.{column} IN (",
                 model.label, model.source
             ));
             let mut selected = sql.separated(", ");
@@ -393,7 +402,7 @@ impl Cascade {
                 sql.push(" FOR UPDATE");
             }
             let rows = sql
-                .build_query_as::<(i32, i32, String)>()
+                .build_query_as::<(i32, i32, String, Option<String>)>()
                 .fetch_all(&mut *db)
                 .await?;
             if rows.is_empty() {
@@ -416,8 +425,11 @@ impl Cascade {
             recorded.depth = recorded.depth.max(depth);
             let title = admin_html::capitalized(model.singular);
             let mut newly_found = Vec::new();
-            for (id, owner, label) in rows {
+            for (id, owner, label, revision) in rows {
                 let key = (model.table, id);
+                if let Some(revision) = revision {
+                    self.email_log_revisions.insert(key, revision);
+                }
                 self.edges.entry((parent, owner)).or_default().push(key);
                 if recorded.ids.insert(id) {
                     let label = if matches!(child, Model::LogEntry) {
@@ -490,6 +502,7 @@ impl Cascade {
             self.objects.iter().collect::<Vec<_>>(),
             self.edges.iter().collect::<Vec<_>>(),
             &self.registration_log_links,
+            self.email_log_revisions.iter().collect::<Vec<_>>(),
         )
     }
 

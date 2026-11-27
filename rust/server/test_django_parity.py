@@ -34,8 +34,9 @@ from webpack_loader import utils as webpack_utils
 from mittab.apps.registration.models import InfoLink, InfoText, RegistrationConfig
 
 from mittab.apps.tab.models import (
-    AuditEvent, BreakingTeam, Bye, CheckIn, Debater, Judge, JudgeExpectedCheckIn, Motion, Outround, PublishedTeamPlacement, Round, RoundStats,
+    AuditEvent, BreakingTeam, Bye, CheckIn, Debater, Judge, JudgeCodeEmailLog, JudgeExpectedCheckIn, Motion, Outround, PublishedTeamPlacement, Round, RoundStats,
     NoShow, PublicDisplaySetting, PublicRosterChange, Room, RoomCheckIn, RoomTag, School, Scratch, TabSettings, Team,
+    WrittenRFDEmailLog,
 )
 
 from mittab.libs import assign_judges, tab_logic
@@ -6053,7 +6054,8 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
 
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
                        registration_revision=False, configuration_revision=False, list_revision=False,
-                       content_revision=False, motion_revision=False, staff_motion_revision=False):
+                       content_revision=False, motion_revision=False, staff_motion_revision=False,
+                       email_log_revision=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
@@ -6065,6 +6067,10 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
         status, _, previous = request(port, path, cookie=session)
         assert status == 200
         form["mittab_motion_revision"] = motion_edit_proof(previous)
+    if email_log_revision and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["mittab_email_log_revision"] = email_log_edit_proof(previous)
     if list_revision and form is not None:
         status, _, previous = request(port, path, cookie=session)
         assert status == 200
@@ -6123,6 +6129,11 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
                 rb'<input type="hidden" name="mittab_motion_revision" value="[a-f0-9]{64}">', b"", body,
             )
             assert metadata == 1
+        if email_log_revision:
+            body, metadata = re.subn(
+                rb'<input type="hidden" name="mittab_email_log_revision" value="[a-f0-9]{64}">', b"", body,
+            )
+            assert metadata == 1
         if content_revision:
             body, metadata = re.subn(
                 rb'<input type="hidden" name="mittab_content_revision" value="[a-f0-9]{64}">', b"", body,
@@ -6149,6 +6160,10 @@ def motion_delete_proof(body):
 
 def motion_edit_proof(body):
     return re.search(rb'name="mittab_motion_revision" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+def email_log_edit_proof(body):
+    return re.search(rb'name="mittab_email_log_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
 
 def content_edit_proof(body):
@@ -7013,3 +7028,122 @@ def test_native_diagnostics_gate_and_javascript_catalog():
             if code == 200:
                 assert "/dynamic-media/jsi18n/" in unescape(body.decode())
                 assert b"private-fixture-query" not in body
+
+
+@pytest.mark.django_db(transaction=True)
+def test_tab_email_log_admin_matches_django(html_assets, subtests):
+    staff = legacy_tab_session("tab-email-log-admin")
+    board = legacy_tab_session("tab-email-log-board")
+    get_user_model().objects.get(username="tab-email-log-board").groups.add(
+        Group.objects.create(name="APDA Board")
+    )
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Mail Fixture School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Mail Gov", "Mail & Opp")]
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+    judge = Judge.objects.create(name="Mail Judge", rank=2)
+    Judge.objects.create(name="Another Judge", rank=2)
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = csrf
+
+    def submit(port, path, form, *, session=staff, token=csrf):
+        return request(port, path, method="POST", form={**form, "csrfmiddlewaretoken": token},
+                       extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"})
+
+    common = {"email_payload": r'{"subject":"A judge\u2019s note <&>", "preview":["Draft",{"z":1,"a":0}]}',
+              "initial-email_payload": "{}", "email": "received@example.org"}
+    with rust_server(overrides=html_assets) as port:
+        for model, relation, related, extra in (
+            (JudgeCodeEmailLog, "judge", judge, {"ballot_code": "fixture-only!", "source": "registration"}),
+            (WrittenRFDEmailLog, "round", debate, {}),
+        ):
+            slug = model._meta.model_name
+            root = f"/admin/tab/{slug}/"
+            add = root + "add/"
+            existing = model.objects.create(**{relation: related}, email="first@example.org",
+                                            email_payload={"old": [True, "Café"], "second": "<&>"}, **extra)
+            edit = f"{root}{existing.id}/change/"
+            delete = f"{root}{existing.id}/delete/"
+            history = f"{root}{existing.id}/history/"
+            form = {**common, **extra, relation: related.pk}
+            bulk = {"action": "delete_selected", "index": 0, "select_across": 0,
+                    "_selected_action": [str(existing.pk)]}
+            for path in (root, root + "?o=1", root + f"?id__exact={existing.id}", add, edit, history, delete,
+                         add + "?_popup=1&_to_field=id", edit + "?_popup=1&_to_field=id",
+                         add + "?email_payload=%7B%22prefill%22%3A1%7D"):
+                with subtests.test(path=path):
+                    compare_admin_page(port, path, client, email_log_revision=path.startswith(edit),
+                                       deletion_scope=path == delete)
+            compare_admin_page(port, root, client, post=bulk, deletion_scope=True)
+            for invalid in ({"email_payload": '{"broken":'}, {relation: 2147483647}, {"email": "invalid"}):
+                with subtests.test(model=slug, invalid=invalid):
+                    compare_admin_page(port, add, client, post={**form, **invalid})
+            for fields in (
+                {key: value for key, value in form.items() if key not in ("initial-email_payload", "email_payload")},
+                {key: value for key, value in form.items() if key != "initial-email_payload"},
+                {**form, "email_payload": '{"small":1e-5,"large":1e16,"decimal":1.0}', "initial-email_payload": ""},
+            ):
+                compare_admin_page(port, add, client, post={**fields, "email": "invalid"})
+            if extra:
+                for invalid in ({"ballot_code": "x" * 31}, {"source": "other"}, {"source": " "}):
+                    with subtests.test(model=slug, invalid=invalid):
+                        compare_admin_page(port, add, client, post={**form, **invalid})
+
+            for path in (root, add, edit, history, delete):
+                response = request(port, path, cookie=board)
+                assert response[1]["Location"] == "/403/"
+                assert b"first@example.org" not in response[2] and b"Caf" not in response[2]
+            for path, fields in ((root, {**bulk, "post": "yes"}), (add, form), (edit, form), (delete, {"post": "yes"})):
+                assert submit(port, path, fields, session=board)[1]["Location"] == "/403/"
+                assert submit(port, path, fields, token="b" * 32)[0] == 403
+            rejected = submit(port, add, {**form, "email_payload": "null"})
+            assert rejected[0] == 200 and b"Enter a JSON value other than null." in rejected[2]
+            assert not model.objects.filter(email="received@example.org").exists()
+
+            assert submit(port, add, {**form, "sent_at": "1999-01-01 00:00:00", "_continue": "Save"})[0] == 302
+            added = model.objects.get(email="received@example.org")
+            assert added.sent_at.year != 1999 and getattr(added, f"{relation}_id") == related.pk
+            assert added.email_payload == json.loads(common["email_payload"])
+            for field, expected in extra.items():
+                assert getattr(added, field) == expected
+            compare_admin_page(port, f"{root}{added.id}/history/", client)
+
+            initial_sent = existing.sent_at
+            old_edit = email_log_edit_proof(request(port, edit, cookie=staff)[2])
+            old_delete = motion_delete_proof(request(port, delete, cookie=staff)[2])
+            old_bulk = motion_delete_proof(submit(port, root, bulk)[2])
+            parent = f"/admin/tab/{relation}/{related.pk}/delete/"
+            parent_preview = request(port, parent, cookie=staff)[2]
+            old_parent = motion_delete_proof(parent_preview)
+            assert b"first@example.org" not in parent_preview and b"fixture-only!" not in parent_preview
+            model.objects.filter(pk=existing.id).update(email="changed-by-other-admin@example.org")
+            assert submit(port, edit, {**form, "mittab_email_log_revision": old_edit})[0] == 409
+            assert submit(port, delete, {"post": "yes", "mittab_delete_scope": old_delete})[0] == 409
+            assert submit(port, root, {**bulk, "post": "yes", "mittab_delete_scope": old_bulk})[0] == 409
+            stale_parent = submit(port, parent, {"post": "yes", "mittab_delete_scope": old_parent})
+            assert stale_parent[0] == 409 and b"Review updated deletion" in stale_parent[2]
+            existing.refresh_from_db()
+            assert existing.email == "changed-by-other-admin@example.org"
+
+            new_edit = email_log_edit_proof(request(port, edit, cookie=staff)[2])
+            assert submit(port, edit, {**form, "email": "updated@example.org", "sent_at": "1999-01-01 00:00:00",
+                                       "mittab_email_log_revision": new_edit})[0] == 302
+            existing.refresh_from_db()
+            assert existing.sent_at == initial_sent and existing.email == "updated@example.org"
+            assert existing.email_payload == added.email_payload
+            compare_admin_page(port, history, client)
+            compare_admin_page(port, edit, client, email_log_revision=True)
+
+            omitted = {key: value for key, value in form.items() if key != "email_payload"}
+            assert submit(port, add, {**omitted, "email": "default@example.org"})[0] == 302
+            assert model.objects.get(email="default@example.org").email_payload == {}
+            direct_scope = motion_delete_proof(request(port, delete, cookie=staff)[2])
+            assert submit(port, delete, {"post": "yes", "mittab_delete_scope": direct_scope})[0] == 302
+            bulk = {**bulk, "_selected_action": [str(added.id)]}
+            bulk_scope = motion_delete_proof(submit(port, root, bulk)[2])
+            assert submit(port, root, {**bulk, "post": "yes", "mittab_delete_scope": bulk_scope})[0] == 302
+            assert not model.objects.filter(pk__in=[added.id, existing.id]).exists()
+            assert type(related).objects.filter(pk=related.pk).exists()

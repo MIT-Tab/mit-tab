@@ -32,6 +32,8 @@ pub const MANAGED: &[&str] = &[
     "registrationconfig",
     "registrationchangelog",
     "registrationconfirmationemaillog",
+    "judgecodeemaillog",
+    "writtenrfdemaillog",
     "infolink",
     "infotext",
     "registrationlink",
@@ -42,6 +44,18 @@ pub struct Resource {
     pub list: DefaultList,
     pub fields: &'static [Field],
     pub unique: &'static [Unique],
+}
+
+pub fn email_log_revision(model: &str) -> Option<&'static str> {
+    match model {
+        "judgecodeemaillog" => Some(
+            "SHA2(JSON_ARRAY(t.sent_at, t.email_payload, t.judge_id, t.email, t.ballot_code, t.source), 256)",
+        ),
+        "writtenrfdemaillog" => {
+            Some("SHA2(JSON_ARRAY(t.sent_at, t.email_payload, t.round_id, t.email), 256)")
+        }
+        _ => None,
+    }
 }
 
 pub struct Field {
@@ -76,6 +90,7 @@ pub enum Kind {
     Relation(Relation),
     Multiple(Multiple),
     Choice(&'static [(i32, &'static str)]),
+    StringChoice(&'static [(&'static str, &'static str)]),
 }
 
 #[derive(Clone, Copy)]
@@ -193,6 +208,13 @@ const JUDGE: Relation = Relation {
     model: "judge",
     admin_url: "/admin/tab/judge/",
     sql: "SELECT id, name FROM tab_judge ORDER BY name",
+};
+const ROUND_RELATION: Relation = Relation {
+    model: "round",
+    admin_url: "/admin/tab/round/",
+    sql: "SELECT r.id, CONCAT('Round ', r.round_number, ' between ', gov.name, ' and ', opp.name)
+          FROM tab_round r JOIN tab_team gov ON gov.id = r.gov_team_id
+          JOIN tab_team opp ON opp.id = r.opp_team_id ORDER BY r.id",
 };
 const ROOM: Relation = Relation {
     model: "room",
@@ -401,6 +423,9 @@ const fn checkbox(name: &'static str, label: &'static str, initial: &'static str
 }
 
 const INFO_TITLE: Field = Field::new("title", "Title", Kind::Text(80));
+const EMAIL_PAYLOAD: Field = Field::new("email_payload", "Email payload", Kind::Json)
+    .optional()
+    .initial("{}");
 pub(super) const INFO_ACTIVE: Field = checkbox("is_active", "Is active", "1");
 pub(super) const INFO_ORDER: Field =
     Field::new("display_order", "Display order", Kind::PositiveInteger).initial("0");
@@ -510,6 +535,36 @@ impl Resource {
             "registrationchangelog" => (&[], &[]),
             "registrationconfirmationemaillog" => (
                 const { &[Field::new("email_payload", "Email payload", Kind::Json).optional()] },
+                &[],
+            ),
+            "judgecodeemaillog" => (
+                const {
+                    &[
+                        EMAIL_PAYLOAD,
+                        Field::relation("judge", "judge_id", "Judge", JUDGE),
+                        Field::new("email", "Email", Kind::Email(254)),
+                        Field::new("ballot_code", "Ballot code", Kind::Text(30)),
+                        Field::new(
+                            "source",
+                            "Source",
+                            Kind::StringChoice(&[
+                                ("manual", "Manual"),
+                                ("registration", "Registration"),
+                            ]),
+                        )
+                        .initial("manual"),
+                    ]
+                },
+                &[],
+            ),
+            "writtenrfdemaillog" => (
+                const {
+                    &[
+                        EMAIL_PAYLOAD,
+                        Field::relation("round", "round_id", "Round", ROUND_RELATION),
+                        Field::new("email", "Email", Kind::Email(254)),
+                    ]
+                },
                 &[],
             ),
             "motion" => (
@@ -919,6 +974,10 @@ impl Resource {
         self.list.model.name == "motion"
     }
 
+    pub fn email_log(&self) -> bool {
+        email_log_revision(self.list.model.name).is_some()
+    }
+
     pub fn public_information(&self) -> bool {
         matches!(
             self.list.model.name,
@@ -978,6 +1037,7 @@ impl Resource {
                 (self.registration_config() || self.public_information() || self.motion())
                     .then(|| "CAST(updated_at AS CHAR)".into()),
             )
+            .chain(self.email_log().then(|| "CAST(sent_at AS CHAR)".into()))
             .collect::<Vec<_>>()
             .join(", ");
         let suffix = if lock { " FOR UPDATE" } else { "" };
@@ -1115,6 +1175,9 @@ impl Resource {
             columns.push("created_by_id = ").push_bind_unseparated(user);
             columns.push("created_at = UTC_TIMESTAMP(6)");
         }
+        if id.is_none() && self.email_log() {
+            columns.push("sent_at = UTC_TIMESTAMP(6)");
+        }
         if model == "round" {
             if self.value("victor", values) == Some("0") {
                 columns.push("result_entered_at = NULL");
@@ -1198,7 +1261,12 @@ impl Form {
                     _ => stored.map(str::to_owned),
                 }
             } else {
-                query.get(field.name).or(field.initial).map(str::to_owned)
+                match (field.kind, query.get(field.name)) {
+                    (Kind::Json, Some(value)) => Some(
+                        serde_json::to_string(value).expect("serializable initial JSON string"),
+                    ),
+                    (_, value) => value.or(field.initial).map(str::to_owned),
+                }
             };
             let options = match field.kind {
                 Kind::Relation(relation) => relation.options(db).await?,
@@ -1217,15 +1285,9 @@ impl Form {
                     .collect(),
                 _ => value.iter().cloned().collect(),
             };
-            let initial_json = matches!(field.kind, Kind::Json)
-                .then(|| {
-                    if let Some(post) = post {
-                        post.all(&format!("initial-{}", field.name)).last().cloned()
-                    } else {
-                        stored.map(str::to_owned)
-                    }
-                })
-                .flatten();
+            let initial_json = post
+                .filter(|_| matches!(field.kind, Kind::Json))
+                .and_then(|post| post.all(&format!("initial-{}", field.name)).last().cloned());
             fields.push(BoundField {
                 field,
                 value,
@@ -1263,7 +1325,9 @@ impl Form {
                     Kind::EasternDateTime if eastern_date_input(stored) == field.value => {
                         stored.map(str::to_owned)
                     }
-                    Kind::Json if field.value.is_none() => stored.map(str::to_owned),
+                    Kind::Json if field.value.is_none() => {
+                        stored.or(field.field.initial).map(str::to_owned)
+                    }
                     _ => field.clean(),
                 }
             })
@@ -1335,7 +1399,12 @@ impl Form {
 
 impl BoundField {
     pub(super) fn clean(&mut self) -> Option<String> {
-        let raw = self.value.as_deref().unwrap_or_default().trim();
+        let raw = self.value.as_deref().unwrap_or_default();
+        let raw = if matches!(self.field.kind, Kind::StringChoice(_)) {
+            raw
+        } else {
+            raw.trim()
+        };
         let invalid = |error: &mut Option<String>, message: &str| {
             *error = Some(message.into());
             None
@@ -1371,10 +1440,12 @@ impl BoundField {
             };
         }
         if matches!(self.field.kind, Kind::Json) {
-            return if serde_json::from_str::<serde_json::Value>(raw).is_ok() {
-                Some(raw.into())
-            } else {
-                invalid(&mut self.error, "Enter a valid JSON.")
+            return match serde_json::from_str::<serde_json::Value>(raw) {
+                Ok(serde_json::Value::Null) => {
+                    invalid(&mut self.error, "Enter a JSON value other than null.")
+                }
+                Ok(_) => Some(raw.into()),
+                Err(_) => invalid(&mut self.error, "Enter a valid JSON."),
             };
         }
         if raw.is_empty() {
@@ -1490,6 +1561,18 @@ impl BoundField {
                 Err(reason) => invalid(&mut self.error, reason),
             },
             Kind::Checkbox => Some(raw.into()),
+            Kind::StringChoice(choices) => {
+                if choices.iter().any(|&(option, _)| option == raw) {
+                    Some(raw.into())
+                } else {
+                    invalid(
+                        &mut self.error,
+                        &format!(
+                            "Select a valid choice. {raw} is not one of the available choices."
+                        ),
+                    )
+                }
+            }
             Kind::Multiple(_) | Kind::Textarea | Kind::Json => {
                 unreachable!("Field was cleaned above")
             }

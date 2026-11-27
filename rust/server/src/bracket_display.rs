@@ -1,13 +1,11 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    io::{self, Write},
-};
+use std::collections::{BTreeMap, HashMap};
 
 use mittab_tabulation::bracket::opening_matchups;
 use serde::Serialize;
-use serde_json::{Serializer, ser::Formatter};
+use serde_json::Serializer;
 
 use crate::{
+    legacy_html::DjangoJson,
     public_outrounds::{Judge, Match},
     public_pairings::Team,
 };
@@ -101,51 +99,6 @@ struct Appearance {
     seed: Option<usize>,
     name: String,
     debaters_plain: String,
-}
-
-struct DjangoJson;
-
-impl Formatter for DjangoJson {
-    fn begin_array_value<W: ?Sized + Write>(
-        &mut self,
-        writer: &mut W,
-        first: bool,
-    ) -> io::Result<()> {
-        if first {
-            Ok(())
-        } else {
-            writer.write_all(b", ")
-        }
-    }
-
-    fn begin_object_key<W: ?Sized + Write>(
-        &mut self,
-        writer: &mut W,
-        first: bool,
-    ) -> io::Result<()> {
-        self.begin_array_value(writer, first)
-    }
-
-    fn begin_object_value<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
-        writer.write_all(b": ")
-    }
-
-    fn write_string_fragment<W: ?Sized + Write>(
-        &mut self,
-        writer: &mut W,
-        fragment: &str,
-    ) -> io::Result<()> {
-        for character in fragment.chars() {
-            if character < '\u{007f}' {
-                writer.write_all(&[character as u8])?;
-            } else {
-                for unit in character.encode_utf16(&mut [0; 2]) {
-                    write!(writer, "\\u{unit:04x}")?;
-                }
-            }
-        }
-        Ok(())
-    }
 }
 
 struct Slot {
@@ -420,7 +373,10 @@ pub fn data(matches: &[Match<'_>], seeded: &BTreeMap<i32, &Team>) -> Option<Stri
     };
     let mut payload = Vec::new();
     bracket
-        .serialize(&mut Serializer::with_formatter(&mut payload, DjangoJson))
+        .serialize(&mut Serializer::with_formatter(
+            &mut payload,
+            DjangoJson { ascii_only: true },
+        ))
         .ok()?;
     String::from_utf8(payload).ok()
 }
