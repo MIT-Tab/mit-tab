@@ -17,12 +17,14 @@ use crate::{
     admin_changelist::{self, Query, filter_ids},
     admin_html::{self, Shell},
     admin_model_data::{BoundField, Form, Kind, MANAGED, Resource},
+    admin_records::readonly,
+    admin_scores::score_audit,
     entity_store,
     legacy_html::escape,
     legacy_session::Actor,
     login, private, publication,
     registration_form::Fields,
-    roster_log,
+    roster_log, round_audit,
     settings::Settings,
     staff_pairing::lock_round_if_configured,
     unavailable,
@@ -209,6 +211,11 @@ async fn change(
         (None, None)
     };
     let mut form = Form::load(resource, &mut db, initial.as_deref(), post).await?;
+    let attribution = if resource.list.model.name == "scratch" {
+        Some(attribution(&mut db, id).await?)
+    } else {
+        None
+    };
     if let Some(post) = post
         && let Some(values) = form.clean(resource, &mut db, id).await?
     {
@@ -226,14 +233,29 @@ async fn change(
             _ => SettingEffects::default(),
         };
         effects.refresh(&mut db).await?;
-        match resource.save(&mut db, id, &values).await {
+        match resource.save(&mut db, id, &values, page.user).await {
             Ok(saved) => {
                 effects.refresh(&mut db).await?;
                 let description = resource
                     .describe(&mut db, saved)
                     .await?
                     .ok_or(sqlx::Error::RowNotFound)?;
-                let (flag, message) = change_log(resource, initial.as_deref(), &values);
+                record_roster_edit(&mut db, resource, saved, initial.as_deref(), &values).await?;
+                let changed = changed_fields(resource, initial.as_deref(), &values);
+                if resource.list.model.name == "scratch" {
+                    let changes = if id.is_some() {
+                        serde_json::json!({"fields": changed.iter().map(|field| field.name).collect::<Vec<_>>()})
+                    } else {
+                        serde_json::json!({})
+                    };
+                    sqlx::query(
+                        "INSERT INTO tab_auditevent (object_id, event_type, created_at, object_repr, changes, note, content_type_id, user_id)
+                         VALUES (?, ?, UTC_TIMESTAMP(6), ?, ?, '',
+                             (SELECT id FROM django_content_type WHERE app_label = 'tab' AND model = 'scratch'), ?)",
+                    ).bind(saved).bind(if id.is_some() { "edit" } else { "create" }).bind(&description)
+                        .bind(changes.to_string()).bind(page.user).execute(&mut *db).await?;
+                }
+                let (flag, message) = change_log(id.is_none(), &changed);
                 let log_id = admin_html::log_action(
                     &mut db,
                     resource.list.model.name,
@@ -268,17 +290,104 @@ async fn change(
                 ));
             }
             Err(sqlx::Error::Database(error))
-                if error.is_unique_violation() && resource.unique.is_some() =>
+                if error.is_unique_violation() && !resource.unique.is_empty() =>
             {
-                form.mark_duplicate(resource);
                 db.rollback().await?;
-                return Ok(render_form(page, id, original.as_deref(), form, Some(post)));
+                let mut db = app.db.acquire().await?;
+                if form
+                    .check_duplicates(resource, &mut db, id, &values)
+                    .await?
+                {
+                    return Ok(render_form(
+                        page,
+                        id,
+                        original.as_deref(),
+                        form,
+                        attribution,
+                        Some(post),
+                    ));
+                }
+                return Err(sqlx::Error::Database(error));
             }
             Err(error) => return Err(error),
         }
     }
     db.commit().await?;
-    Ok(render_form(page, id, original.as_deref(), form, post))
+    Ok(render_form(
+        page,
+        id,
+        original.as_deref(),
+        form,
+        attribution,
+        post,
+    ))
+}
+
+async fn record_roster_edit(
+    db: &mut MySqlConnection,
+    resource: &Resource,
+    id: i32,
+    before: Option<&[Option<String>]>,
+    after: &[Option<String>],
+) -> Result<(), sqlx::Error> {
+    let model = resource.list.model.name;
+    if !matches!(model, "school" | "debater") || !roster_log::enabled(db).await? {
+        return Ok(());
+    }
+    let Some(before) = before else {
+        return Ok(());
+    };
+    let name = after[0].as_deref().unwrap_or_default();
+    let old_name = before[0].as_deref().unwrap_or_default();
+    if model == "school" {
+        if old_name != name {
+            roster_log::school_renamed(db, id, old_name, name).await?;
+        }
+    } else {
+        roster_log::debater_edited(
+            db,
+            id,
+            old_name,
+            name,
+            before[8].as_deref(),
+            after[8].as_deref(),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn attribution(db: &mut MySqlConnection, id: Option<i32>) -> Result<[Value; 2], sqlx::Error> {
+    let (user, date) = if let Some(id) = id {
+        let (user_id, username, date): (Option<i32>, Option<String>, Option<NaiveDateTime>) =
+            sqlx::query_as(
+                "SELECT u.id, u.username, t.created_at FROM tab_scratch t LEFT JOIN auth_user u
+                 ON u.id = t.created_by_id WHERE t.id = ?",
+            )
+            .bind(id)
+            .fetch_one(db)
+            .await?;
+        (user_id.zip(username), date)
+    } else {
+        (None, None)
+    };
+    let linked_user = user.map_or_else(
+        || "-".into(),
+        |(id, name)| {
+            format!(
+                "<a href=\"/admin/auth/user/{id}/change/\">{}</a>",
+                escape(&name)
+            )
+        },
+    );
+    Ok([
+        readonly("created_by", "Created by", linked_user),
+        readonly(
+            "created_at",
+            "Created at",
+            date.map_or_else(|| "-".into(), admin_html::django_datetime),
+        ),
+    ])
 }
 
 fn render_form(
@@ -286,6 +395,7 @@ fn render_form(
     id: Option<i32>,
     subtitle: Option<&str>,
     form: Form,
+    attribution: Option<[Value; 2]>,
     post: Option<&Fields>,
 ) -> Response {
     let resource = &page.resource;
@@ -294,9 +404,10 @@ fn render_form(
         .iter()
         .map(field_line)
         .collect::<Result<Vec<_>, _>>();
-    let Ok(widgets) = widgets else {
+    let Ok(mut widgets) = widgets else {
         return unavailable();
     };
+    widgets.extend(attribution.into_iter().flatten());
     let errors = form
         .fields
         .iter()
@@ -334,15 +445,15 @@ fn decimal_equal(old: Option<&str>, new: Option<&str>) -> bool {
     number(old) == number(new)
 }
 
-fn change_log(
+fn changed_fields(
     resource: &Resource,
     initial: Option<&[Option<String>]>,
     values: &[Option<String>],
-) -> (u8, String) {
+) -> Vec<&'static crate::admin_model_data::Field> {
     let Some(old) = initial else {
-        return (1, r#"[{"added": {}}]"#.into());
+        return Vec::new();
     };
-    let names: Vec<_> = resource
+    resource
         .fields
         .iter()
         .zip(old.iter().zip(values))
@@ -351,12 +462,19 @@ fn change_log(
                 Kind::Decimal => decimal_equal(old.as_deref(), new.as_deref()),
                 _ => old == new,
             };
-            (!equal).then_some(field.label)
+            (!equal).then_some(field)
         })
-        .collect();
-    let message = if names.is_empty() {
+        .collect()
+}
+
+fn change_log(add: bool, changed: &[&crate::admin_model_data::Field]) -> (u8, String) {
+    if add {
+        return (1, r#"[{"added": {}}]"#.into());
+    }
+    let message = if changed.is_empty() {
         "[]".into()
     } else {
+        let names: Vec<_> = changed.iter().map(|field| field.label).collect();
         serde_json::json!([{"changed": {"fields": names}}]).to_string()
     };
     (2, message)
@@ -384,9 +502,16 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
             format!(r#" value="{}""#, escape(value))
         });
     let widget = match field.kind {
-        Kind::Text(max) => format!(
-            r#"<input type="text" name="{name}"{value} class="vTextField" maxlength="{max}"{required} id="id_{name}">"#
-        ),
+        Kind::Text(max) | Kind::Email(max) => {
+            let input_type = if matches!(field.kind, Kind::Email(_)) {
+                "email"
+            } else {
+                "text"
+            };
+            format!(
+                r#"<input type="{input_type}" name="{name}"{value} class="vTextField" maxlength="{max}"{required} id="id_{name}">"#
+            )
+        }
         Kind::Integer => format!(
             r#"<input type="number" name="{name}"{value} class="vIntegerField"{required} id="id_{name}">"#
         ),
@@ -397,24 +522,35 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
             let state = if checked { " checked" } else { "" };
             format!(r#"<input type="checkbox" name="{name}" id="id_{name}"{state}>"#)
         }
-        Kind::Choice(_) | Kind::Relation(_) => {
+        Kind::Choice(_) | Kind::Relation(_) | Kind::Multiple(_) => {
+            let relation = match field.kind {
+                Kind::Relation(relation) => Some(relation),
+                Kind::Multiple(link) => Some(link.relation),
+                _ => None,
+            };
+            let multiple = matches!(field.kind, Kind::Multiple(_));
+            let blank = matches!(field.kind, Kind::Relation(_))
+                || matches!(field.kind, Kind::Choice(_)) && field.initial.is_none();
             let select = admin_html::render_fragment(
                 "admin/model_select.html",
                 context! {
-                    name, options => &bound.options, selected => bound.value.as_deref(),
-                    blank => matches!(field.kind, Kind::Relation(_)),
-                    required => matches!(field.kind, Kind::Relation(_)),
+                    name, options => &bound.options, selected => &bound.selected,
+                    has_selection => bound.value.as_deref().is_some_and(|value| !value.is_empty()),
+                    blank, multiple, required => blank && field.required,
                 },
             )?;
-            if let Kind::Relation(relation) = field.kind {
+            if let Some(relation) = relation {
                 admin_html::render_fragment("admin/widgets/related_widget_wrapper.html", context! {
                     name, model => relation.model,
                     rendered_widget => Value::from_safe_string(select.trim_end_matches('\n').into()),
                     change_related_template_url => format!("{}__fk__/change/", relation.admin_url),
+                    delete_related_template_url => format!("{}__fk__/delete/", relation.admin_url),
                     add_related_url => format!("{}add/", relation.admin_url),
                     url_params => "_to_field=id&_popup=1",
                     view_related_url_params => "_to_field=id",
-                    can_change_related => true, can_add_related => true, can_view_related => true,
+                    can_change_related => !multiple, can_add_related => true,
+                    can_delete_related => !multiple && relation.model == "school",
+                    can_view_related => !multiple,
                 })?.trim().to_owned()
             } else {
                 select.trim_end_matches('\n').to_owned()
@@ -438,10 +574,12 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
         .map(|message| error_list(message, false))
         .unwrap_or_default();
     let suffix = if checkbox { "" } else { ":" };
+    let help_text = matches!(field.kind, Kind::Multiple(_))
+        .then_some("Hold down “Control”, or “Command” on a Mac, to select more than one.");
     Ok(context! {
         has_visible_field => true, errors,
         fields => [context! {
-            field => context! {name}, widget, is_checkbox => checkbox,
+            field => context! {name, help_text, id_for_label => format!("id_{name}")}, widget, is_checkbox => checkbox,
             label_tag => format!("<label{label_class} for=\"id_{name}\">{}{suffix}</label>", field.label),
         }],
     })
@@ -598,28 +736,105 @@ impl Removed {
         let mut children: BTreeMap<i32, Vec<String>> = BTreeMap::new();
         let model = &page.resource.list.model;
         let mut counts = vec![(model.plural, self.rows.len())];
+        let mut relations: Vec<_> = page
+            .resource
+            .relations()
+            .map(|(_, link)| {
+                (
+                    link.table,
+                    link.owner,
+                    link.through,
+                    link.singular,
+                    link.plural,
+                )
+            })
+            .collect();
         if model.name == "roomtag" {
-            for &(table, object_name, singular, plural) in TAG_RELATIONS {
-                let mut sql = QueryBuilder::new(format!(
-                    "SELECT id, roomtag_id FROM {table} WHERE roomtag_id IN ("
+            relations.extend(
+                TAG_RELATIONS
+                    .iter()
+                    .map(|&(table, through, singular, plural)| {
+                        (table, "roomtag_id", through, singular, plural)
+                    }),
+            );
+        }
+        if model.name == "debater" {
+            relations.push((
+                "tab_rankinggroup_debaters",
+                "debater_id",
+                "RankingGroup_debaters",
+                "Rankinggroup-debater relationship",
+                "rankinggroup-debater relationships",
+            ));
+        }
+        for (table, owner, object_name, singular, plural) in relations {
+            let mut sql = QueryBuilder::new(format!(
+                "SELECT id, {owner} FROM {table} WHERE {owner} IN ("
+            ));
+            let mut ids = sql.separated(", ");
+            for (id, _) in &self.rows {
+                ids.push_bind(*id);
+            }
+            let links = sql
+                .push(") ORDER BY id")
+                .build_query_as::<(i32, i32)>()
+                .fetch_all(&mut *db)
+                .await?;
+            if links.is_empty() {
+                continue;
+            }
+            counts.push((plural, links.len()));
+            for (id, parent) in links {
+                children.entry(parent).or_default().push(format!(
+                    "		<li>{singular}: {object_name} object ({id})</li>"
                 ));
-                let mut ids = sql.separated(", ");
-                for (id, _) in &self.rows {
-                    ids.push_bind(*id);
+            }
+        }
+        let related = match model.name {
+            "room" => Some(("roomcheckin", "room_id")),
+            "debater" => Some(("roundstats", "debater_id")),
+            _ => None,
+        };
+        if let Some((name, column)) = related {
+            let list = admin_changelist::default_list(name).expect("admin cascade model");
+            let mut sql = QueryBuilder::new(format!(
+                "SELECT t.id, t.{column}, {} FROM {} WHERE t.{column} IN (",
+                list.label, list.source,
+            ));
+            let mut ids = sql.separated(", ");
+            for (id, _) in &self.rows {
+                ids.push_bind(*id);
+            }
+            let order = if model.name == "debater" {
+                ") ORDER BY t.id DESC"
+            } else {
+                ") ORDER BY t.id"
+            };
+            let linked = sql
+                .push(order)
+                .build_query_as::<(i32, i32, String)>()
+                .fetch_all(&mut *db)
+                .await?;
+            if !linked.is_empty() {
+                let count = (list.model.plural, linked.len());
+                if model.name == "debater" {
+                    counts.insert(1, count);
+                } else {
+                    counts.push(count);
                 }
-                let links = sql
-                    .push(") ORDER BY id")
-                    .build_query_as::<(i32, i32)>()
-                    .fetch_all(&mut *db)
-                    .await?;
-                if links.is_empty() {
-                    continue;
-                }
-                counts.push((plural, links.len()));
-                for (id, tag) in links {
-                    children.entry(tag).or_default().push(format!(
-                        "		<li>{singular}: {object_name} object ({id})</li>"
-                    ));
+            }
+            let title = admin_html::capitalized(list.model.singular);
+            let url = list.model.url();
+            for (id, parent, label) in linked {
+                let item = format!(
+                    "		<li>{title}: <a href=\"{url}{id}/change/\">{}</a></li>",
+                    escape(&label)
+                );
+                let items = children.entry(parent).or_default();
+                if model.name == "debater" {
+                    items.insert(0, item);
+                } else {
+                    items.push(item);
                 }
             }
         }
@@ -643,6 +858,50 @@ impl Removed {
         Ok(DeletionSummary { counts, objects })
     }
 
+    async fn rejection(
+        &self,
+        db: &mut MySqlConnection,
+        resource: &Resource,
+    ) -> Result<Option<&'static str>, sqlx::Error> {
+        let (references, message): (&[(&str, &str)], _) = match resource.list.model.name {
+            "school" => (
+                &[
+                    ("tab_team", "school_id"),
+                    ("tab_judge_schools", "school_id"),
+                    ("registration_registration", "school_id"),
+                ],
+                "This school has teams, affiliated judges, or registrations.",
+            ),
+            "debater" => (
+                &[("tab_team_debaters", "debater_id")],
+                "Remove this debater from their team before deleting the debater.",
+            ),
+            "room" => (
+                &[("tab_round", "room_id"), ("tab_outround", "room_id")],
+                "This room is assigned to a round.",
+            ),
+            _ => return Ok(None),
+        };
+        for &(table, column) in references {
+            let mut sql = QueryBuilder::new(format!(
+                "SELECT EXISTS(SELECT 1 FROM {table} WHERE {column} IN ("
+            ));
+            let mut ids = sql.separated(", ");
+            for (id, _) in &self.rows {
+                ids.push_bind(*id);
+            }
+            if sql
+                .push("))")
+                .build_query_scalar::<bool>()
+                .fetch_one(&mut *db)
+                .await?
+            {
+                return Ok(Some(message));
+            }
+        }
+        Ok(None)
+    }
+
     async fn execute(&self, db: &mut MySqlConnection, page: &Page<'_>) -> Result<u64, sqlx::Error> {
         let mut last_log = 0;
         for (id, name) in &self.rows {
@@ -658,6 +917,24 @@ impl Removed {
             .await?;
         }
         let ids: Vec<_> = self.rows.iter().map(|(id, _)| *id).collect();
+        let mut scores = Vec::new();
+        if page.resource.list.model.name == "debater" {
+            let mut sql = QueryBuilder::new(
+                "SELECT DISTINCT round_id FROM tab_roundstats WHERE debater_id IN (",
+            );
+            let mut selected = sql.separated(", ");
+            for id in &ids {
+                selected.push_bind(*id);
+            }
+            let rounds = sql
+                .push(") ORDER BY round_id")
+                .build_query_scalar::<i32>()
+                .fetch_all(&mut *db)
+                .await?;
+            for round in rounds {
+                scores.push((round, score_audit(db, round).await?));
+            }
+        }
         let effects = match page.resource.list.model.name {
             "tabsettings" => SettingEffects::for_deleted_keys(db, &ids).await?,
             "breakingteam" => SettingEffects {
@@ -667,14 +944,50 @@ impl Removed {
             _ => SettingEffects::default(),
         };
         effects.refresh(db).await?;
-        if page.resource.list.model.name == "roomtag" {
-            let links: Vec<_> = TAG_RELATIONS
-                .iter()
-                .map(|&(table, _, _, _)| (table, "roomtag_id"))
-                .collect();
-            entity_store::delete_links(db, &ids, &links).await?;
+        let mut links: Vec<_> = page
+            .resource
+            .relations()
+            .map(|(_, link)| (link.table, link.owner))
+            .collect();
+        match page.resource.list.model.name {
+            "roomtag" => links.extend(
+                TAG_RELATIONS
+                    .iter()
+                    .map(|&(table, _, _, _)| (table, "roomtag_id")),
+            ),
+            "room" => links.push(("tab_roomcheckin", "room_id")),
+            "debater" => links.extend([
+                ("tab_roundstats", "debater_id"),
+                ("tab_rankinggroup_debaters", "debater_id"),
+            ]),
+            "school" => {
+                if roster_log::enabled(db).await? {
+                    for (id, name) in &self.rows {
+                        roster_log::school_removed(db, *id, name).await?;
+                    }
+                }
+                for (table, column) in [
+                    ("tab_team", "hybrid_school_id"),
+                    ("tab_debater", "school_id"),
+                ] {
+                    let mut sql = QueryBuilder::new(format!(
+                        "UPDATE {table} SET {column} = NULL WHERE {column} IN ("
+                    ));
+                    let mut selected = sql.separated(", ");
+                    for id in &ids {
+                        selected.push_bind(*id);
+                    }
+                    sql.push(")").build().execute(&mut *db).await?;
+                }
+            }
+            _ => {}
         }
+        entity_store::delete_links(db, &ids, &links).await?;
         entity_store::delete_links(db, &ids, &[(page.resource.list.table(), "id")]).await?;
+        for (round, before) in scores {
+            let after = score_audit(db, round).await?;
+            round_audit::record(db, &before, &after, page.user, "admin scores").await?;
+        }
         effects.refresh(db).await?;
         Ok(last_log)
     }
@@ -701,7 +1014,11 @@ async fn delete(
     let Some((_, description)) = records.rows.first() else {
         return Ok(access::found("/admin/"));
     };
+    let rejection = records.rejection(&mut db, &page.resource).await?;
     if confirm {
+        if let Some(message) = rejection {
+            return Ok(private((StatusCode::CONFLICT, message)));
+        }
         let log = records.execute(&mut db, &page).await?;
         db.commit().await?;
         if post.is_some_and(|post| !post.all("_popup").is_empty()) {
@@ -715,11 +1032,20 @@ async fn delete(
             "delete",
         ));
     }
-    let summary = records.summary(&mut db, &page).await?;
+    let summary = if rejection.is_none() {
+        records.summary(&mut db, &page).await?
+    } else {
+        DeletionSummary {
+            counts: Vec::new(),
+            objects: Vec::new(),
+        }
+    };
+    let protected = rejection.map(|message| format!("\t<li>{}</li>", escape(message)));
     db.commit().await?;
     let model = &page.resource.list.model;
     let ctx = context! {
-        title => "Are you sure?", media => admin_html::scripts(),
+        title => if rejection.is_some() { "Cannot delete" } else { "Are you sure?" }, media => admin_html::scripts(),
+        protected,
         object_url => format!("{}{id}/", page.model_url), object => description,
         deleted_objects => summary.objects.join("\n"),
         object_name => model.singular, model_count => summary.counts,
@@ -757,7 +1083,11 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
     if records.rows.is_empty() {
         return Ok(access::found(page.target));
     }
+    let rejection = records.rejection(&mut db, &page.resource).await?;
     if confirm {
+        if let Some(message) = rejection {
+            return Ok(private((StatusCode::CONFLICT, message)));
+        }
         let log = records.execute(&mut db, &page).await?;
         db.commit().await?;
         let notice = format!("bulk-{}", records.rows.len());
@@ -769,12 +1099,21 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
             &notice,
         ));
     }
-    let summary = records.summary(&mut db, &page).await?;
+    let summary = if rejection.is_none() {
+        records.summary(&mut db, &page).await?
+    } else {
+        DeletionSummary {
+            counts: Vec::new(),
+            objects: Vec::new(),
+        }
+    };
+    let protected = rejection.map(|message| format!("\t<li>{}</li>", escape(message)));
     db.commit().await?;
     let count = records.rows.len();
     let plural = page.resource.list.model.plural;
     let ctx = context! {
-        title => "Are you sure?", media => admin_html::scripts(),
+        title => if rejection.is_some() { "Cannot delete" } else { "Are you sure?" }, media => admin_html::scripts(),
+        protected,
         objects_name => if count == 1 { page.resource.list.model.singular } else { plural },
         model_count => summary.counts,
         deletable_objects => [summary.objects.join("\n")],

@@ -67,3 +67,105 @@ pub async fn record(
     .await?;
     Ok(())
 }
+
+pub async fn school_renamed(
+    db: &mut MySqlConnection,
+    id: i32,
+    old: &str,
+    new: &str,
+) -> Result<(), sqlx::Error> {
+    let (teams, debaters, judges): (bool, bool, bool) = sqlx::query_as(
+        "SELECT EXISTS(SELECT 1 FROM tab_team WHERE school_id = ? OR hybrid_school_id = ?),
+                EXISTS(SELECT 1 FROM tab_debater d JOIN tab_team_debaters t ON t.debater_id = d.id WHERE d.school_id = ?),
+                EXISTS(SELECT 1 FROM tab_judge_schools WHERE school_id = ?)",
+    )
+    .bind(id).bind(id).bind(id).bind(id).fetch_one(&mut *db).await?;
+    let affiliation = format!("Changed affiliation name: {old} → {new}.");
+    if teams {
+        record(db, "teams", &affiliation, false).await?;
+    }
+    if debaters {
+        let message = format!("Changed debater affiliation name: {old} → {new}.");
+        record(db, "teams", &message, true).await?;
+    }
+    if judges {
+        record(db, "judges", &affiliation, false).await?;
+    }
+    Ok(())
+}
+
+pub async fn debater_edited(
+    db: &mut MySqlConnection,
+    id: i32,
+    old_name: &str,
+    name: &str,
+    old_school: Option<&str>,
+    new_school: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    if (old_name, old_school) == (name, new_school) {
+        return Ok(());
+    }
+    let member: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM tab_team_debaters WHERE debater_id = ?)")
+            .bind(id)
+            .fetch_one(&mut *db)
+            .await?;
+    if !member {
+        return Ok(());
+    }
+    if old_name != name {
+        let message = format!("Changed debater name for “{name}”: {old_name} → {name}.");
+        record(db, "teams", &message, true).await?;
+    }
+    if old_school != new_school {
+        let (old, new): (Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT (SELECT name FROM tab_school WHERE id = ?),
+                    (SELECT name FROM tab_school WHERE id = ?)",
+        )
+        .bind(old_school)
+        .bind(new_school)
+        .fetch_one(&mut *db)
+        .await?;
+        let old = old
+            .as_deref()
+            .filter(|name| !name.is_empty())
+            .unwrap_or("None");
+        let new = new
+            .as_deref()
+            .filter(|name| !name.is_empty())
+            .unwrap_or("None");
+        let message = format!("Changed debater affiliation for “{name}”: {old} → {new}.");
+        record(db, "teams", &message, true).await?;
+    }
+    Ok(())
+}
+
+pub async fn school_removed(
+    db: &mut MySqlConnection,
+    id: i32,
+    name: &str,
+) -> Result<(), sqlx::Error> {
+    let teams: Vec<String> = sqlx::query_scalar(
+        "SELECT name FROM tab_team WHERE hybrid_school_id = ? AND school_id <> ? ORDER BY id",
+    )
+    .bind(id)
+    .bind(id)
+    .fetch_all(&mut *db)
+    .await?;
+    for team in teams {
+        let message = format!("Removed hybrid affiliation “{name}” from team “{team}”.");
+        record(db, "teams", &message, false).await?;
+    }
+    let debaters: Vec<String> = sqlx::query_scalar(
+        "SELECT d.name FROM tab_debater d WHERE d.school_id = ?
+         AND EXISTS(SELECT 1 FROM tab_team_debaters t WHERE t.debater_id = d.id) ORDER BY d.name",
+    )
+    .bind(id)
+    .fetch_all(&mut *db)
+    .await?;
+    for debater in debaters {
+        let message = format!("Removed affiliation “{name}” from debater “{debater}”.");
+        record(db, "teams", &message, true).await?;
+    }
+    Ok(())
+}

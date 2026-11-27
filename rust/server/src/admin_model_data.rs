@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use sqlx::{AssertSqlSafe, MySql, MySqlConnection, QueryBuilder};
 
 use crate::{
@@ -13,13 +15,18 @@ pub const MANAGED: &[&str] = &[
     "breakingteam",
     "usertournamentsetuppreference",
     "roomtag",
+    "school",
+    "debater",
+    "room",
+    "rankinggroup",
+    "scratch",
     "tabsettings",
 ];
 
 pub struct Resource {
     pub list: DefaultList,
     pub fields: &'static [Field],
-    pub unique: Option<Unique>,
+    pub unique: &'static [Unique],
 }
 
 pub struct Field {
@@ -34,10 +41,12 @@ pub struct Field {
 #[derive(Clone, Copy)]
 pub enum Kind {
     Text(usize),
+    Email(usize),
     Integer,
     Decimal,
     Checkbox,
     Relation(Relation),
+    Multiple(Multiple),
     Choice(&'static [(i32, &'static str)]),
 }
 
@@ -54,6 +63,73 @@ impl Relation {
         db: &mut MySqlConnection,
     ) -> Result<Vec<(i32, String)>, sqlx::Error> {
         sqlx::query_as(self.sql).fetch_all(db).await
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct Multiple {
+    pub relation: Relation,
+    pub table: &'static str,
+    pub owner: &'static str,
+    pub column: &'static str,
+    pub through: &'static str,
+    pub singular: &'static str,
+    pub plural: &'static str,
+}
+
+impl Multiple {
+    async fn ids(self, db: &mut MySqlConnection, owner: i32) -> Result<BTreeSet<i32>, sqlx::Error> {
+        sqlx::query_scalar(AssertSqlSafe(format!(
+            "SELECT {} FROM {} WHERE {} = ?",
+            self.column, self.table, self.owner,
+        )))
+        .bind(owner)
+        .fetch_all(db)
+        .await
+        .map(|ids| ids.into_iter().collect())
+    }
+
+    async fn save(
+        self,
+        db: &mut MySqlConnection,
+        owner: i32,
+        value: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        let before = self.ids(db, owner).await?;
+        let after: BTreeSet<_> = value
+            .into_iter()
+            .flat_map(|value| value.split(','))
+            .map(str::parse::<i32>)
+            .collect::<Result<_, _>>()
+            .map_err(|error| sqlx::Error::Decode(error.into()))?;
+        let mut removed = before.difference(&after).peekable();
+        if removed.peek().is_some() {
+            let mut sql = QueryBuilder::new(format!(
+                "DELETE FROM {} WHERE {} = ",
+                self.table, self.owner
+            ));
+            sql.push_bind(owner)
+                .push(format!(" AND {} IN (", self.column));
+            let mut ids = sql.separated(", ");
+            for id in removed {
+                ids.push_bind(*id);
+            }
+            sql.push(")").build().execute(&mut *db).await?;
+        }
+        let mut added = after.difference(&before).peekable();
+        if added.peek().is_some() {
+            let mut sql = QueryBuilder::new(format!(
+                "INSERT INTO {} ({}, {}) ",
+                self.table, self.owner, self.column
+            ));
+            sql.push_values(added, |mut row, id| {
+                row.push_bind(owner).push_bind(*id);
+            })
+            .build()
+            .execute(&mut *db)
+            .await?;
+        }
+        Ok(())
     }
 }
 
@@ -82,6 +158,48 @@ const USER: Relation = Relation {
     model: "user",
     admin_url: "/admin/auth/user/",
     sql: "SELECT id, username FROM auth_user ORDER BY username",
+};
+
+const SCHOOL: Relation = Relation {
+    model: "school",
+    admin_url: "/admin/tab/school/",
+    sql: "SELECT id, name FROM tab_school ORDER BY name",
+};
+const DEBATER: Relation = Relation {
+    model: "debater",
+    admin_url: "/admin/tab/debater/",
+    sql: "SELECT id, name FROM tab_debater ORDER BY name",
+};
+const ROOM_TAGS: Multiple = Multiple {
+    relation: Relation {
+        model: "room tag",
+        admin_url: "/admin/tab/roomtag/",
+        sql: "SELECT id, tag FROM tab_roomtag ORDER BY id",
+    },
+    table: "tab_room_tags",
+    owner: "room_id",
+    column: "roomtag_id",
+    through: "Room_tags",
+    singular: "Room-roomtag relationship",
+    plural: "room-roomtag relationships",
+};
+const GROUP_TEAMS: Multiple = Multiple {
+    relation: TEAM,
+    table: "tab_rankinggroup_teams",
+    owner: "rankinggroup_id",
+    column: "team_id",
+    through: "RankingGroup_teams",
+    singular: "Rankinggroup-team relationship",
+    plural: "rankinggroup-team relationships",
+};
+const GROUP_DEBATERS: Multiple = Multiple {
+    relation: DEBATER,
+    table: "tab_rankinggroup_debaters",
+    owner: "rankinggroup_id",
+    column: "debater_id",
+    through: "RankingGroup_debaters",
+    singular: "Rankinggroup-debater relationship",
+    plural: "rankinggroup-debater relationships",
 };
 
 impl Field {
@@ -123,6 +241,10 @@ impl Field {
     }
 }
 
+const APDA_ID: Field = Field::new("apda_id", "Apda id", Kind::Integer)
+    .optional()
+    .initial("-1");
+
 const ROUND: Field = Field::new("round_number", "Round number", Kind::Integer);
 const SEED: Field = Field::new("seed", "Seed", Kind::Integer).initial("-1");
 const EFFECTIVE_SEED: Field =
@@ -136,7 +258,7 @@ const TYPE: Field = Field::new(
 
 impl Resource {
     pub fn find(name: &str) -> Option<Self> {
-        let (fields, unique): (&'static [Field], _) = match name {
+        let (fields, unique): (&'static [Field], &'static [Unique]) = match name {
             "bye" => (
                 const {
                     &[
@@ -144,7 +266,7 @@ impl Resource {
                         ROUND,
                     ]
                 },
-                None,
+                &[],
             ),
             "noshow" => (
                 const {
@@ -153,23 +275,23 @@ impl Resource {
                         ROUND,
                     ]
                 },
-                None,
+                &[],
             ),
             "checkin" => (
                 const { &[Field::relation("judge", "judge_id", "Judge", JUDGE), ROUND] },
-                Some(Unique {
+                &[Unique {
                     fields: &[0, 1],
                     error_field: None,
                     message: "Check in with this Judge and Round number already exists.",
-                }),
+                }],
             ),
             "roomcheckin" => (
                 const { &[Field::relation("room", "room_id", "Room", ROOM), ROUND] },
-                Some(Unique {
+                &[Unique {
                     fields: &[0, 1],
                     error_field: None,
                     message: "Room check in with this Room and Round number already exists.",
-                }),
+                }],
             ),
             "breakingteam" => (
                 const {
@@ -180,11 +302,11 @@ impl Resource {
                         TYPE,
                     ]
                 },
-                Some(Unique {
+                &[Unique {
                     fields: &[0],
                     error_field: Some(0),
                     message: "Breaking team with this Team already exists.",
-                }),
+                }],
             ),
             "usertournamentsetuppreference" => (
                 const {
@@ -198,11 +320,11 @@ impl Resource {
                         .optional(),
                     ]
                 },
-                Some(Unique {
+                &[Unique {
                     fields: &[0],
                     error_field: Some(0),
                     message: "Tournament setup preference with this User already exists.",
-                }),
+                }],
             ),
             "roomtag" => (
                 const {
@@ -211,7 +333,7 @@ impl Resource {
                         Field::new("priority", "Priority", Kind::Decimal),
                     ]
                 },
-                None,
+                &[],
             ),
             "tabsettings" => (
                 const {
@@ -221,7 +343,99 @@ impl Resource {
                         Field::new("value_string", "Value string", Kind::Text(200)).optional(),
                     ]
                 },
-                None,
+                &[],
+            ),
+            "school" => (
+                const { &[Field::new("name", "Name", Kind::Text(50)), APDA_ID] },
+                &[Unique {
+                    fields: &[0],
+                    error_field: Some(0),
+                    message: "School with this Name already exists.",
+                }],
+            ),
+            "debater" => (
+                const {
+                    &[
+                        Field::new("name", "Name", Kind::Text(30)),
+                        Field::new("email", "Email", Kind::Email(254)).optional(),
+                        Field::new(
+                            "novice_status",
+                            "Novice status",
+                            Kind::Choice(&[(0, "Varsity"), (1, "Novice")]),
+                        ),
+                        Field::new("needs_crash_housing", "Needs crash housing", Kind::Checkbox)
+                            .optional(),
+                        Field::new(
+                            "requests_wgm_housing",
+                            "Requests wgm housing",
+                            Kind::Checkbox,
+                        )
+                        .optional(),
+                        Field::new("qualified", "Qualified", Kind::Checkbox).optional(),
+                        Field::new("tiebreaker", "Tiebreaker", Kind::Integer).optional(),
+                        APDA_ID,
+                        Field::relation("school", "school_id", "School", SCHOOL).optional(),
+                    ]
+                },
+                &[
+                    Unique {
+                        fields: &[0],
+                        error_field: Some(0),
+                        message: "Debater with this Name already exists.",
+                    },
+                    Unique {
+                        fields: &[6],
+                        error_field: Some(6),
+                        message: "Debater with this Tiebreaker already exists.",
+                    },
+                ],
+            ),
+            "room" => (
+                const {
+                    &[
+                        Field::new("name", "Name", Kind::Text(30)),
+                        Field::new("rank", "Rank", Kind::Decimal),
+                        Field::new("tags", "Tags", Kind::Multiple(ROOM_TAGS)).optional(),
+                    ]
+                },
+                &[Unique {
+                    fields: &[0],
+                    error_field: Some(0),
+                    message: "Room with this Name already exists.",
+                }],
+            ),
+            "rankinggroup" => (
+                const {
+                    &[
+                        Field::new("name", "Name", Kind::Text(255)),
+                        Field::new("teams", "Teams", Kind::Multiple(GROUP_TEAMS)).optional(),
+                        Field::new("debaters", "Debaters", Kind::Multiple(GROUP_DEBATERS))
+                            .optional(),
+                    ]
+                },
+                &[Unique {
+                    fields: &[0],
+                    error_field: Some(0),
+                    message: "Ranking group with this Name already exists.",
+                }],
+            ),
+            "scratch" => (
+                const {
+                    &[
+                        Field::relation("judge", "judge_id", "Judge", JUDGE),
+                        Field::relation("team", "team_id", "Team", TEAM),
+                        Field::new(
+                            "scratch_type",
+                            "Scratch type",
+                            Kind::Choice(&[(0, "Discretionary Scratch"), (1, "Tab Scratch")]),
+                        ),
+                    ]
+                },
+                &[Unique {
+                    fields: &[0, 1],
+                    error_field: None,
+                    message: "Scratch with this Judge and Team already exists.",
+                }],
             ),
             _ => return None,
         };
@@ -229,6 +443,13 @@ impl Resource {
             list: admin_changelist::default_list(name)?,
             fields,
             unique,
+        })
+    }
+
+    pub fn relations(&self) -> impl Iterator<Item = (&Field, Multiple)> {
+        self.fields.iter().filter_map(|field| match field.kind {
+            Kind::Multiple(link) => Some((field, link)),
+            _ => None,
         })
     }
 
@@ -255,7 +476,10 @@ impl Resource {
         let values = self
             .fields
             .iter()
-            .map(|field| format!("CAST(`{}` AS CHAR)", field.column))
+            .map(|field| match field.kind {
+                Kind::Multiple(_) => "NULL".into(),
+                _ => format!("CAST(`{}` AS CHAR)", field.column),
+            })
             .collect::<Vec<_>>()
             .join(", ");
         let suffix = if lock { " FOR UPDATE" } else { "" };
@@ -264,21 +488,28 @@ impl Resource {
             self.list.table(),
         )))
         .bind(id)
-        .fetch_optional(db)
+        .fetch_optional(&mut *db)
         .await?;
-        raw.map(|raw| serde_json::from_str(&raw).map_err(|error| sqlx::Error::Decode(error.into())))
-            .transpose()
+        let Some(raw) = raw else {
+            return Ok(None);
+        };
+        let mut values: Vec<Option<String>> =
+            serde_json::from_str(&raw).map_err(|error| sqlx::Error::Decode(error.into()))?;
+        for (index, field) in self.fields.iter().enumerate() {
+            if let Kind::Multiple(link) = field.kind {
+                values[index] = join_ids(link.ids(db, id).await?);
+            }
+        }
+        Ok(Some(values))
     }
 
-    pub async fn duplicate(
+    async fn duplicate(
         &self,
         db: &mut MySqlConnection,
         id: Option<i32>,
         values: &[Option<String>],
+        unique: &Unique,
     ) -> Result<bool, sqlx::Error> {
-        let Some(unique) = &self.unique else {
-            return Ok(false);
-        };
         let mut sql = QueryBuilder::new(format!(
             "SELECT EXISTS(SELECT 1 FROM {} WHERE TRUE",
             self.list.table()
@@ -299,39 +530,69 @@ impl Resource {
         db: &mut MySqlConnection,
         id: Option<i32>,
         values: &[Option<String>],
+        user: i32,
     ) -> Result<i32, sqlx::Error> {
-        if let Some(id) = id {
-            let mut sql = QueryBuilder::<MySql>::new(format!("UPDATE {} SET ", self.list.table()));
-            let mut columns = sql.separated(", ");
-            for (field, value) in self.fields.iter().zip(values) {
+        let mut sql = if id.is_some() {
+            QueryBuilder::<MySql>::new(format!("UPDATE {} SET ", self.list.table()))
+        } else {
+            QueryBuilder::<MySql>::new(format!("INSERT INTO {} SET ", self.list.table()))
+        };
+        let mut columns = sql.separated(", ");
+        let coin = if self.list.model.name == "debater" {
+            let submitted = values[6].as_deref();
+            let blank = submitted.is_none_or(|value| value == "0");
+            let unchanged = !blank
+                && id.is_some()
+                && sqlx::query_scalar::<_, bool>(
+                    "SELECT EXISTS(SELECT 1 FROM tab_debater WHERE id = ? AND tiebreaker = ?)",
+                )
+                .bind(id)
+                .bind(submitted)
+                .fetch_one(&mut *db)
+                .await?;
+            if blank || unchanged {
+                Some(crate::codes::coin(db, false).await?.to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        for (field, value) in self.fields.iter().zip(values) {
+            if !matches!(field.kind, Kind::Multiple(_)) {
+                let value = if field.name == "tiebreaker" {
+                    coin.as_ref().or(value.as_ref())
+                } else {
+                    value.as_ref()
+                };
                 columns
                     .push(format!("`{}` = ", field.column))
                     .push_bind_unseparated(value);
             }
-            sql.push(" WHERE id = ")
-                .push_bind(id)
-                .build()
-                .execute(db)
-                .await?;
-            return Ok(id);
         }
-        let columns = self
-            .fields
-            .iter()
-            .map(|field| format!("`{}`", field.column))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let mut sql = QueryBuilder::<MySql>::new(format!(
-            "INSERT INTO {} ({columns}) VALUES (",
-            self.list.table()
-        ));
-        let mut columns = sql.separated(", ");
-        for value in values {
-            columns.push_bind(value);
+        if let Some(id) = id {
+            sql.push(" WHERE id = ").push_bind(id);
+        } else if self.list.model.name == "scratch" {
+            columns.push("created_by_id = ").push_bind_unseparated(user);
+            columns.push("created_at = UTC_TIMESTAMP(6)");
         }
-        let result = sql.push(")").build().execute(db).await?;
-        i32::try_from(result.last_insert_id()).map_err(|error| sqlx::Error::Decode(error.into()))
+        let result = sql.build().execute(&mut *db).await?;
+        let saved = match id {
+            Some(id) => id,
+            None => i32::try_from(result.last_insert_id())
+                .map_err(|error| sqlx::Error::Decode(error.into()))?,
+        };
+        for (field, value) in self.fields.iter().zip(values) {
+            if let Kind::Multiple(link) = field.kind {
+                link.save(db, saved, value.as_deref()).await?;
+            }
+        }
+        Ok(saved)
     }
+}
+
+fn join_ids(ids: BTreeSet<i32>) -> Option<String> {
+    (!ids.is_empty()).then(|| ids.iter().map(i32::to_string).collect::<Vec<_>>().join(","))
 }
 
 pub struct Form {
@@ -343,6 +604,7 @@ pub struct BoundField {
     pub field: &'static Field,
     pub value: Option<String>,
     pub options: Vec<(i32, String)>,
+    pub selected: Vec<String>,
     pub error: Option<String>,
 }
 
@@ -367,16 +629,26 @@ impl Form {
             };
             let options = match field.kind {
                 Kind::Relation(relation) => relation.options(db).await?,
+                Kind::Multiple(link) => link.relation.options(db).await?,
                 Kind::Choice(choices) => choices
                     .iter()
                     .map(|&(id, text)| (id, text.to_owned()))
                     .collect(),
                 _ => Vec::new(),
             };
+            let selected = match (field.kind, post) {
+                (Kind::Multiple(_), Some(post)) => post.all(field.name).to_vec(),
+                (Kind::Multiple(_), None) => value
+                    .iter()
+                    .flat_map(|value| value.split(',').map(str::to_owned))
+                    .collect(),
+                _ => value.iter().cloned().collect(),
+            };
             fields.push(BoundField {
                 field,
                 value,
                 options,
+                selected,
                 error: None,
             });
         }
@@ -393,24 +665,34 @@ impl Form {
         id: Option<i32>,
     ) -> Result<Option<Vec<Option<String>>>, sqlx::Error> {
         let values: Vec<_> = self.fields.iter_mut().map(BoundField::clean).collect();
-        if self.fields.iter().any(|field| field.error.is_some()) {
-            return Ok(None);
-        }
-        if resource.duplicate(db, id, &values).await? {
-            self.mark_duplicate(resource);
+        self.check_duplicates(resource, db, id, &values).await?;
+        if self.non_field_error.is_some() || self.fields.iter().any(|field| field.error.is_some()) {
             return Ok(None);
         }
         Ok(Some(values))
     }
 
-    pub fn mark_duplicate(&mut self, resource: &Resource) {
-        if let Some(unique) = &resource.unique {
-            if let Some(index) = unique.error_field {
-                self.fields[index].error = Some(unique.message.into());
-            } else {
-                self.non_field_error = Some(unique.message);
+    pub async fn check_duplicates(
+        &mut self,
+        resource: &Resource,
+        db: &mut MySqlConnection,
+        id: Option<i32>,
+        values: &[Option<String>],
+    ) -> Result<bool, sqlx::Error> {
+        let mut duplicate = false;
+        for unique in resource.unique {
+            if unique.fields.iter().all(|&index| values[index].is_some())
+                && resource.duplicate(db, id, values, unique).await?
+            {
+                duplicate = true;
+                if let Some(index) = unique.error_field {
+                    self.fields[index].error = Some(unique.message.into());
+                } else {
+                    self.non_field_error = Some(unique.message);
+                }
             }
         }
+        Ok(duplicate)
     }
 }
 
@@ -421,6 +703,24 @@ impl BoundField {
             *error = Some(message.into());
             None
         };
+        if matches!(self.field.kind, Kind::Multiple(_)) {
+            let mut ids = BTreeSet::new();
+            for value in &self.selected {
+                let Ok(id) = value.parse::<i32>() else {
+                    return invalid(&mut self.error, &format!("“{value}” is not a valid value."));
+                };
+                if !self.options.iter().any(|&(option, _)| option == id) {
+                    return invalid(
+                        &mut self.error,
+                        &format!(
+                            "Select a valid choice. {value} is not one of the available choices."
+                        ),
+                    );
+                }
+                ids.insert(id);
+            }
+            return join_ids(ids);
+        }
         if raw.is_empty() {
             return if self.field.required {
                 invalid(&mut self.error, "This field is required.")
@@ -429,7 +729,10 @@ impl BoundField {
             };
         }
         match self.field.kind {
-            Kind::Text(max) => {
+            Kind::Text(max) | Kind::Email(max) => {
+                if matches!(self.field.kind, Kind::Email(_)) && !valid_email(raw) {
+                    return invalid(&mut self.error, "Enter a valid email address.");
+                }
                 let len = raw.chars().count();
                 if len > max {
                     return invalid(
@@ -468,6 +771,7 @@ impl BoundField {
                 Err(reason) => invalid(&mut self.error, reason),
             },
             Kind::Checkbox => Some(raw.into()),
+            Kind::Multiple(_) => unreachable!("Multiple choices are cleaned above"),
             Kind::Relation(_) | Kind::Choice(_) => {
                 let id = raw.parse::<i32>().ok();
                 if self.options.iter().any(|&(option, _)| Some(option) == id) {
@@ -488,6 +792,71 @@ impl BoundField {
             }
         }
     }
+}
+
+fn valid_email(value: &str) -> bool {
+    let Some((local, domain)) = value.rsplit_once('@') else {
+        return false;
+    };
+    if value.chars().count() > 320 || !valid_email_local(local) {
+        return false;
+    }
+    if domain == "localhost" {
+        return true;
+    }
+    if let Some(ip) = domain.strip_prefix('[').and_then(|ip| ip.strip_suffix(']')) {
+        return ip
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() || matches!(byte, b':' | b'.'))
+            && ip.parse::<std::net::IpAddr>().is_ok();
+    }
+    if valid_email_domain(domain) {
+        return true;
+    }
+    !domain.is_ascii()
+        && matches!(url::Host::parse(domain), Ok(url::Host::Domain(punycode)) if valid_email_domain(&punycode))
+}
+
+fn valid_email_local(local: &str) -> bool {
+    if let Some(quoted) = local
+        .strip_prefix('"')
+        .and_then(|body| body.strip_suffix('"'))
+    {
+        let mut chars = quoted.chars();
+        while let Some(ch) = chars.next() {
+            if ch == '\\' {
+                if !chars.next().is_some_and(|escaped| matches!(escaped, '\x01'..='\x09' | '\x0b'..='\x0c' | '\x0e'..='\x7f')) {
+                    return false;
+                }
+            } else if !matches!(ch, '\x01'..='\x08' | '\x0b'..='\x0c' | '\x0e'..='\x1f' | '!' | '#'..='[' | ']'..='\x7f')
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    local.split('.').all(|part| {
+        !part.is_empty()
+            && part
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || "-!#$%&'*+/=?^_`{}|~İıſK".contains(ch))
+    })
+}
+
+fn valid_email_domain(domain: &str) -> bool {
+    let Some((host, ending)) = domain.rsplit_once('.') else {
+        return false;
+    };
+    let valid_chars = |ch: char| ch.is_ascii_alphanumeric() || "-İıſK".contains(ch);
+    (2..=63).contains(&ending.chars().count())
+        && !ending.ends_with('-')
+        && ending.chars().all(valid_chars)
+        && host.split('.').all(|label| {
+            (1..=63).contains(&label.chars().count())
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label.chars().all(valid_chars)
+        })
 }
 
 fn priority(raw: &str) -> Result<String, &'static str> {

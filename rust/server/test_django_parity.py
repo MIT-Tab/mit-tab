@@ -105,7 +105,7 @@ def request(port, path, *, method="GET", cookie=None, forwarded_proto=None, form
         if form is not None:
             headers["Content-Type"] = "application/x-www-form-urlencoded"
         client.request(method, path, headers=headers,
-                       body=raw_body if form is None else urlencode(form))
+                       body=raw_body if form is None else urlencode(form, doseq=True))
         reply = client.getresponse()
         return reply.status, reply.headers, reply.read()
     finally:
@@ -5266,6 +5266,176 @@ def test_admin_editable_model_forms_match_django_and_save(html_assets, subtests)
         assert not Bye.objects.filter(id=bye.id).exists()
         assert set(LogEntry.objects.filter(user=user).values_list("action_flag", flat=True)) == {ADDITION, CHANGE, DELETION}
         compare_admin_page(port, f"{base}roomtag/{new_tag.id}/history/", client)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_roster_forms_match_django_and_preserve_related_records(html_assets, subtests):
+    from django.contrib.admin.models import CHANGE, LogEntry
+
+    from mittab.apps.tab.models import RankingGroup
+
+    session = legacy_tab_session("admin-roster")
+    user = get_user_model().objects.get(username="admin-roster")
+    board = legacy_tab_session("admin-roster-board")
+    board_user = get_user_model().objects.get(username="admin-roster-board")
+    board_user.groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Roster & School")
+    other_school = School.objects.create(name="Other School")
+    gov = Team.objects.create(name="West <Team>", school=other_school, seed=0)
+    opp = Team.objects.create(name="East Team", school=other_school, seed=0)
+    judge = Judge.objects.create(name="Debate & Judge", rank=5)
+    room = Room.objects.create(name="Auditorium", rank=3)
+    assigned_room = Room.objects.create(name="East lecture hall", rank=5)
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, room=assigned_room, victor=Round.GOV)
+    tag = RoomTag.objects.create(tag="Main <Hall>", priority=1.25)
+    second_tag = RoomTag.objects.create(tag="Aisle seats", priority=2)
+    discarded_tag = RoomTag.objects.create(tag="Discarded", priority=3)
+    room.tags.add(tag, discarded_tag)
+    checkin = RoomCheckIn.objects.create(room=room, round_number=1)
+    debater = Debater.objects.create(name="Ada & Debater", school=school, novice_status=0, tiebreaker=128)
+    other_debater = Debater.objects.create(name="Grace", novice_status=1, tiebreaker=256)
+    gov.debaters.add(other_debater)
+    score = RoundStats.objects.create(debater=debater, round=debate, speaks=27, ranks=2)
+    group = RankingGroup.objects.create(name="Fixture & Club")
+    group.teams.add(gov)
+    group.debaters.add(debater)
+    scratch = Scratch.objects.create(judge=judge, team=gov, scratch_type=0, created_by=user)
+    client = Client()
+    csrf = "a" * 32
+    client.cookies["sessionid"] = session
+    client.cookies["csrftoken"] = csrf
+
+    def submit(port, path, fields, session_id=session, token=csrf):
+        return request(port, path, method="POST", form={**fields, "csrfmiddlewaretoken": token},
+                       extra_headers={"Cookie": f"sessionid={session_id}; csrftoken={csrf}"})
+
+    base = "/admin/tab/"
+    with rust_server(overrides=html_assets) as port:
+        records = [("school", school), ("debater", debater), ("room", room),
+                   ("rankinggroup", group), ("scratch", scratch)]
+        for name, record in records:
+            model = f"{base}{name}/"
+            for path in (f"{model}add/", f"{model}{record.id}/change/",
+                         f"{model}{record.id}/history/", f"{model}{record.id}/delete/"):
+                with subtests.test(path=path):
+                    compare_admin_page(port, path, client)
+                    assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+            with subtests.test(bulk=model):
+                compare_admin_page(port, model, client, post={
+                    "action": "delete_selected", "_selected_action": record.id, "index": 0,
+                })
+        invalid = [
+            ("school", {"name": school.name, "apda_id": "invalid"}),
+            ("debater", {"name": debater.name, "email": "bad", "tiebreaker": 256,
+                         "novice_status": "invalid", "school": 99999}),
+            ("debater", {"name": "Unquoted colon", "email": "alex:smith@example.org", "novice_status": 0}),
+            ("room", {"name": room.name, "rank": "24.123", "tags": [second_tag.id, 99999]}),
+            ("rankinggroup", {"name": "Group", "debaters": "non-number"}),
+            ("scratch", {"judge": judge.id, "team": gov.id, "scratch_type": 0}),
+            ("scratch", {}),
+        ]
+        for name, fields in invalid:
+            with subtests.test(invalid=name, fields=fields):
+                compare_admin_page(port, f"{base}{name}/add/", client, post=fields)
+
+        room_path = f"{base}room/{room.id}/change/"
+        tags = Room.tags.through.objects
+        original_link = tags.get(room_id=room.id, roomtag_id=tag.id).id
+        assert submit(port, room_path, {
+            "name": "West lecture hall", "rank": "4.25", "tags": [second_tag.id, tag.id, tag.id],
+        })[0] == 302
+        room.refresh_from_db()
+        assert (room.name, room.rank) == ("West lecture hall", Decimal("4.25"))
+        assert set(room.tags.values_list("id", flat=True)) == {tag.id, second_tag.id}
+        assert tags.get(room_id=room.id, roomtag_id=tag.id).id == original_link
+        compare_admin_page(port, room_path, client)
+
+        group_path = f"{base}rankinggroup/{group.id}/change/"
+        assert submit(port, group_path, {"name": group.name, "teams": [gov.id, opp.id],
+                                        "debaters": [debater.id, other_debater.id]})[0] == 302
+        assert set(group.teams.values_list("id", flat=True)) == {gov.id, opp.id}
+        assert set(group.debaters.values_list("id", flat=True)) == {debater.id, other_debater.id}
+        compare_admin_page(port, f"{base}rankinggroup/{group.id}/history/", client)
+        assert LogEntry.objects.get(content_type__model="rankinggroup", action_flag=CHANGE).get_change_message() == (
+            "Changed Teams and Debaters."
+        )
+
+        debater_path = f"{base}debater/{debater.id}/change/"
+        assert submit(port, debater_path, {"name": debater.name, "school": school.id, "novice_status": 1,
+                                          "email": "ada@example.org", "qualified": "on", "tiebreaker": 128})[0] == 302
+        debater.refresh_from_db()
+        assert (debater.novice_status, debater.email, debater.qualified) == (1, "ada@example.org", True)
+        assert 1 <= debater.tiebreaker <= 65535 and debater.tiebreaker not in (128, 256)
+        assert submit(port, f"{base}debater/add/", {
+            "name": "New roster debater", "novice_status": 0, "email": "alex@[192.0.2.1]",
+        })[0] == 302
+        new_debater = Debater.objects.get(name="New roster debater")
+        assert new_debater.school is None and new_debater.email == "alex@[192.0.2.1]"
+
+        fields = {"judge": judge.id, "team": opp.id, "scratch_type": 1, "created_by": board_user.id}
+        assert submit(port, f"{base}scratch/add/", fields, session_id=board)[1]["Location"] == "/403/"
+        assert submit(port, f"{base}scratch/add/", fields, token="bad")[0] == 403
+        assert not Scratch.objects.filter(team=opp).exists()
+        assert submit(port, f"{base}scratch/add/", fields)[0] == 302
+        added = Scratch.objects.get(team=opp)
+        assert added.created_by_id == user.id and added.created_at is not None
+        added_time = added.created_at
+        assert submit(port, f"{base}scratch/{added.id}/change/", {**fields, "scratch_type": 0,
+                                                                "created_at": "2000-01-01"})[0] == 302
+        added.refresh_from_db()
+        assert (added.scratch_type, added.created_by_id, added.created_at) == (0, user.id, added_time)
+        events = list(added.audit_events.order_by("id").values_list("event_type", "user_id", "changes"))
+        assert events == [("create", user.id, {}), ("edit", user.id, {"fields": ["scratch_type"]})]
+        compare_admin_page(port, f"{base}scratch/{added.id}/change/", client)
+        compare_admin_page(port, f"{base}scratch/{added.id}/history/", client)
+
+        TabSettings.set("teams_public", 1)
+        Team.objects.filter(id=gov.id).update(hybrid_school=school.id)
+        assert submit(port, f"{base}debater/{other_debater.id}/change/", {
+            "name": "Grace & Roster", "novice_status": 1, "school": school.id,
+        })[0] == 302
+        assert submit(port, f"{base}school/{school.id}/change/", {"name": "Renamed School"})[0] == 302
+
+        for protected in (f"{base}school/{other_school.id}/delete/",
+                          f"{base}debater/{other_debater.id}/delete/",
+                          f"{base}room/{assigned_room.id}/delete/"):
+            status, _, preview = request(port, protected, cookie=session)
+            assert status == 200 and b"Cannot delete" in preview and b'value="Yes, I' not in preview
+            assert submit(port, protected, {"post": "yes"})[0] == 409
+        assert submit(port, f"{base}school/", {"action": "delete_selected", "post": "yes",
+                                             "_selected_action": [school.id, other_school.id]})[0] == 409
+        assert School.objects.filter(id=school.id).exists()
+        assert submit(port, f"{base}school/{school.id}/delete/", {"post": "yes"})[0] == 302
+        assert not School.objects.filter(id=school.id).exists()
+        debater.refresh_from_db()
+        assert debater.school_id is None
+        assert list(PublicRosterChange.objects.order_by("id").values_list(
+            "list_kind", "message", "involves_debaters"
+        )) == [
+            ("teams", "Changed debater name for “Grace & Roster”: Grace → Grace & Roster.", True),
+            ("teams", "Changed debater affiliation for “Grace & Roster”: None → Roster & School.", True),
+            ("teams", "Changed affiliation name: Roster & School → Renamed School.", False),
+            ("teams", "Changed debater affiliation name: Roster & School → Renamed School.", True),
+            ("teams", "Removed hybrid affiliation “Renamed School” from team “West <Team>”.", False),
+            ("teams", "Removed affiliation “Renamed School” from debater “Grace & Roster”.", True),
+        ]
+        assert submit(port, f"{base}debater/{debater.id}/delete/", {"post": "yes"})[0] == 302
+        assert not RoundStats.objects.filter(id=score.id).exists()
+        audit = AuditEvent.objects.get(content_type__model="round", object_id=debate.id, user=user)
+        assert audit.changes["public"]["source"] == "admin scores"
+        assert audit.changes["public"]["before"]["scores"][0]["debater"] == debater.id
+        assert audit.changes["public"]["after"]["scores"] == []
+        assert not group.debaters.filter(id=debater.id).exists()
+        assert submit(port, f"{base}room/{room.id}/delete/", {"post": "yes"})[0] == 302
+        assert not RoomCheckIn.objects.filter(id=checkin.id).exists()
+        assert not tags.filter(room_id=room.id).exists()
+        assert submit(port, f"{base}rankinggroup/{group.id}/delete/", {"post": "yes"})[0] == 302
+        assert Team.objects.filter(id=gov.id).exists() and Debater.objects.filter(id=other_debater.id).exists()
+        assert submit(port, f"{base}scratch/{added.id}/delete/", {"post": "yes"})[0] == 302
+        assert not Scratch.objects.filter(id=added.id).exists()
+        assert added.audit_events.count() == 2
 
 
 def compare_admin_page(port, path, client, post=None):

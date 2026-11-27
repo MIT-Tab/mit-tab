@@ -1,6 +1,6 @@
-<select name="{{ name }}"{% if required %} required{% endif %} id="id_{{ name }}">
-{% if blank %}  <option value=""{% if not selected %} selected{% endif %}>---------</option>
+<select name="{{ name }}"{% if required %} required{% endif %} id="id_{{ name }}"{% if multiple %} multiple{% endif %}>
+{% if blank %}  <option value=""{% if not has_selection %} selected{% endif %}>---------</option>
 
-{% endif %}{% for id, label in options %}  <option value="{{ id }}"{% if id|string == selected %} selected{% endif %}>{{ label }}</option>
+{% endif %}{% for id, label in options %}  <option value="{{ id }}"{% if id|string in selected %} selected{% endif %}>{{ label }}</option>
 
 {% endfor %}</select>

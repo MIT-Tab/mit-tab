@@ -573,7 +573,7 @@ fn linebreaks(raw: &str) -> String {
         .replace('\n', "<br>")
 }
 
-fn readonly(name: &str, label: &str, contents: String) -> Value {
+pub(super) fn readonly(name: &str, label: &str, contents: String) -> Value {
     context! {
         has_visible_field => true,
         fields => [context! {
