@@ -301,6 +301,10 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/registration/admin_list.html"),
         ),
         (
+            "tab/public_homepage.html",
+            include_str!("../../../mittab/templates/tab/public_homepage.html"),
+        ),
+        (
             "registration/portal.html",
             include_str!("../../../mittab/templates/registration/portal.html"),
         ),
@@ -709,8 +713,11 @@ fn translate(name: &str, source: &str) -> String {
             | ["public_navigation_pages", ..]
             | ["motions_enabled", ..]
             | ["is_apda_board", ..]
-            | ["tournament_logo_url", ..]
             | ["staff_can", ..] => {}
+            ["tournament_logo_url", "as", "current_logo"] if name == "tab/public_homepage.html" => {
+                output.push_str("{% set current_logo = logo %}");
+            }
+            ["tournament_logo_url", ..] => {}
             ["autoescape", "on"] | ["endautoescape"] => {}
             ["url", name, "as", variable] => {
                 let name = argument(name);
@@ -754,6 +761,22 @@ fn translate(name: &str, source: &str) -> String {
             }
             ["url", "'tournament_link_delete'", "link_kind=link_kind", "link_id=link.pk"] => {
                 output.push_str("/registration/manage/links/{{ link_kind }}/{{ link.pk }}/delete/");
+            }
+            ["url", "'tournament_link_create'", "link_kind='info'"] => {
+                output.push_str("/registration/manage/links/info/");
+            }
+            ["url", "'tournament_link_update'", "link_kind='info'", "link_id=link.pk"] => {
+                output.push_str("/registration/manage/links/info/{{ link.pk }}/");
+            }
+            ["url", "'tournament_link_delete'", "link_kind='info'", "link_id=link.pk"] => {
+                output.push_str("/registration/manage/links/info/{{ link.pk }}/delete/");
+            }
+            ["url", "'info_text_create'"] => output.push_str("/registration/manage/info-text/"),
+            ["url", "'info_text_update'", "info_text_id=item.pk"] => {
+                output.push_str("/registration/manage/info-text/{{ item.pk }}/");
+            }
+            ["url", "'info_text_delete'", "info_text_id=item.pk"] => {
+                output.push_str("/registration/manage/info-text/{{ item.pk }}/delete/");
             }
             ["url", "'registration_portal_edit'", "summary.herokunator_code"] => {
                 output.push_str("/registration/{{ summary.herokunator_code }}/");
@@ -1018,6 +1041,12 @@ fn translate(name: &str, source: &str) -> String {
             }
             translated
         }
+        "tab/public_homepage.html" => translated
+            .replace("{{ form.tournament_name }}", "{{ form.tournament_name.input }}")
+            .replace("{{ form.theme_color }}", "{{ form.theme_color.input }}")
+            .replace("{{ form.tournament_logo }}", "{{ form.tournament_logo.input }}")
+            .replace("|striptags", "")
+            .replace("|default:'#00438A'", "|django_default('#00438A')"),
         "registration/portal.html" => translated
             .replace("{{ csrf_input|safe }}", "{{ csrf_input|safe }}{{ revision_input|safe }}")
             .replace("summary.teams.all", "summary.teams")

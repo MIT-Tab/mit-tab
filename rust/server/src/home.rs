@@ -355,8 +355,8 @@ fn uploads_dir() -> PathBuf {
     )
 }
 
-pub async fn logo_url(app: &App) -> Option<String> {
-    match database_logo_href(&app.db).await {
+pub async fn logo_url(db: &mut sqlx::MySqlConnection) -> Option<String> {
+    match database_logo_href(db).await {
         Some(logo) => Some(logo),
         None => legacy_logo_href().await,
     }

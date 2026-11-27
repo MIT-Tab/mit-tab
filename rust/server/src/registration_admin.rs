@@ -8,7 +8,6 @@ use axum::{
 use chrono::{DateTime, NaiveDateTime, TimeZone};
 use chrono_tz::America::New_York;
 use minijinja::context;
-use serde::Serialize;
 use sqlx::{AssertSqlSafe, MySqlConnection};
 
 use crate::{
@@ -17,7 +16,6 @@ use crate::{
     administration, legacy_html,
     legacy_session::Actor,
     login::{self, TemplateCsrf},
-    private,
     registration_admin_page::{self as view, FLAGS, Problems, Schedule, TIMES},
     registration_form::{Fields, integer_input, length, whole_number},
     registration_store::{self as store, Error},
@@ -27,7 +25,6 @@ use crate::{
 };
 
 const MANAGE: &str = "/registration/manage/";
-const HOMEPAGE: &str = "/settings/public-homepage/";
 const FORMAT: &str = "%Y-%m-%dT%H:%M";
 const SETTINGS_PROOF: &str = "registration settings edit";
 const DELETE_PROOF: &str = "staff registration deletion";
@@ -102,8 +99,7 @@ async fn admin_page(
         let registrations = view::registrations(&mut db, None).await?;
         let (recent_changes, attached) = view::activities(&mut db).await?;
         let registration_links: Vec<_> = resources(&mut db, Resource::RegistrationLink).await?
-            .into_iter().map(|link| context! { pk => link.id, is_active => link.active, ..minijinja::Value::from_serialize(link) })
-            .collect();
+            .into_iter().map(ResourceRow::context).collect();
         let shell = legacy_html::shell(&mut db, actor, MANAGE).await?;
         db.commit().await?;
         let registrations: Vec<_> = registrations.into_iter().map(|row| {
@@ -474,14 +470,19 @@ impl Resource {
         }
     }
 
-    fn next(self, success: bool) -> String {
-        let path = if matches!(self, Self::RegistrationLink) {
-            MANAGE
-        } else {
-            HOMEPAGE
-        };
-        let state = if success { "saved=3" } else { "error=1" };
-        format!("{path}?{state}")
+    fn path(self) -> &'static str {
+        match self {
+            Self::RegistrationLink => MANAGE,
+            Self::InfoLink | Self::InfoText => crate::homepage_admin::PATH,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::RegistrationLink => "Registration link",
+            Self::InfoLink => "Info link",
+            Self::InfoText => "Text information",
+        }
     }
 
     fn is_text(self) -> bool {
@@ -489,7 +490,6 @@ impl Resource {
     }
 }
 
-#[derive(Serialize)]
 pub struct ResourceRow {
     id: i32,
     title: String,
@@ -497,6 +497,13 @@ pub struct ResourceRow {
     description: String,
     display_order: u32,
     active: bool,
+}
+
+impl ResourceRow {
+    pub(super) fn context(self) -> minijinja::Value {
+        context! { pk => self.id, title => self.title, url => self.url, description => &self.description,
+        text => self.description, display_order => self.display_order, is_active => self.active }
+    }
 }
 
 pub async fn resources(
@@ -626,18 +633,15 @@ pub async fn text_delete(
     .await
 }
 
-fn registration_link_order(
+fn validated_display_order(
+    kind: Resource,
     title: &str,
     address: &str,
-    description: &str,
+    text: &str,
     order: &str,
 ) -> Result<u32, String> {
     let mut errors = Vec::new();
-    for (label, value, limit, required) in [
-        ("Title", title, 80, true),
-        ("Url", address, 500, true),
-        ("Description", description, 160, false),
-    ] {
+    let mut validate = |label, value: &str, limit, required| {
         let count = value.chars().count();
         if count == 0 && required {
             errors.push(format!("{label}: This field is required."));
@@ -649,6 +653,13 @@ fn registration_link_order(
         if value.contains('\0') {
             errors.push(format!("{label}: Null characters are not allowed."));
         }
+    };
+    validate("Title", title, 80, true);
+    if kind.is_text() {
+        validate("Text", text, 500, true);
+    } else {
+        validate("Url", address, 500, true);
+        validate("Description", text, 160, false);
     }
     let parsed = match whole_number(order).parse::<i128>() {
         _ if order.is_empty() => Err("This field is required."),
@@ -660,7 +671,8 @@ fn registration_link_order(
     if let Err(message) = parsed {
         errors.push(format!("Display order: {message}"));
     }
-    if !address.is_empty()
+    if !kind.is_text()
+        && !address.is_empty()
         && !address.contains('\0')
         && length(address, 500)
         && !valid_http_url(address)
@@ -686,19 +698,13 @@ async fn save_resource(
     if !login::valid_csrf(headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
-    let saved = |message: &str| {
-        if matches!(kind, Resource::RegistrationLink) {
-            staff_roster_notice::saved(app, headers, MANAGE, message)
-        } else {
-            access::found(kind.next(true))
-        }
-    };
-    let failed = |message: &str| {
-        if matches!(kind, Resource::RegistrationLink) {
-            staff_roster_notice::failed(app, headers, MANAGE, message)
-        } else {
-            access::found(kind.next(false))
-        }
+    let saved = |action| {
+        staff_roster_notice::saved(
+            app,
+            headers,
+            kind.path(),
+            &format!("{} {action}.", kind.label()),
+        )
     };
     let Ok(mut tx) = app.db.begin().await else {
         return unavailable();
@@ -713,7 +719,6 @@ async fn save_resource(
             return error.response(app, headers).await;
         }
     };
-    let registration_link = matches!(kind, Resource::RegistrationLink);
     if delete {
         let deleted = sqlx::query(AssertSqlSafe(format!(
             "DELETE FROM {} WHERE id = ?",
@@ -724,14 +729,13 @@ async fn save_resource(
         .await;
         return match deleted {
             Ok(result) if result.rows_affected() > 0 => match tx.commit().await {
-                Ok(()) => saved("Registration link removed."),
+                Ok(()) => saved("removed"),
                 Err(_) => unavailable(),
             },
-            Ok(_) if registration_link => {
+            Ok(_) => {
                 drop(tx);
                 administration::not_found(State(app.clone()), Extension(actor)).await
             }
-            Ok(_) => missing(),
             Err(_) => unavailable(),
         };
     }
@@ -744,54 +748,30 @@ async fn save_resource(
             "description"
         }),
     );
-    let order = fields.get("display_order");
-    let (title, address, text, order) = if registration_link {
-        if let Some(id) = id {
-            match sqlx::query_scalar::<_, i32>(
-                "SELECT id FROM registration_registrationlink WHERE id = ? FOR UPDATE",
-            )
-            .bind(id)
-            .fetch_optional(&mut *tx)
-            .await
-            {
-                Ok(Some(_)) => (),
-                Ok(None) => {
-                    drop(tx);
-                    return administration::not_found(State(app.clone()), Extension(actor)).await;
-                }
-                Err(_) => return unavailable(),
+    if let Some(id) = id {
+        match sqlx::query_scalar::<_, i32>(AssertSqlSafe(format!(
+            "SELECT id FROM {} WHERE id = ? FOR UPDATE",
+            kind.table(),
+        )))
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await
+        {
+            Ok(Some(_)) => (),
+            Ok(None) => {
+                drop(tx);
+                return administration::not_found(State(app.clone()), Extension(actor)).await;
             }
+            Err(_) => return unavailable(),
         }
-        let (title, address, text) = (title.trim(), address.trim(), text.trim());
-        match registration_link_order(title, address, text, order.trim()) {
-            Ok(order) => (title, address, text, order),
-            Err(message) => return failed(&message),
-        }
-    } else {
-        let order = if order.is_empty() {
-            0
-        } else {
-            let Ok(order) = order.parse::<u32>() else {
-                return failed("Display order: Enter a nonnegative whole number.");
-            };
-            order
+    }
+    let order =
+        match validated_display_order(kind, title, address, text, fields.get("display_order")) {
+            Ok(order) => order,
+            Err(message) => {
+                return staff_roster_notice::failed(app, headers, kind.path(), &message);
+            }
         };
-        let content_ok = if kind.is_text() {
-            !text.is_empty() && length(text, 500)
-        } else {
-            length(text, 160)
-                && length(address, 500)
-                && url::Url::parse(address).is_ok_and(|url| {
-                    matches!(url.scheme(), "http" | "https")
-                        && url.host().is_some()
-                        && url.username().is_empty()
-                })
-        };
-        if title.is_empty() || !length(title, 80) || !content_ok {
-            return failed("");
-        }
-        (title, address, text, order)
-    };
     let active = fields.flag("is_active");
     let columns = if kind.is_text() {
         "text = ?"
@@ -819,23 +799,12 @@ async fn save_resource(
         query = query.bind(id);
     }
     match query.execute(&mut *tx).await {
-        Ok(result) if result.rows_affected() == 0 && id.is_some() && !registration_link => {
-            missing()
-        }
         Ok(_) => match tx.commit().await {
-            Ok(()) => saved(if id.is_some() {
-                "Registration link updated."
-            } else {
-                "Registration link added."
-            }),
+            Ok(()) => saved(if id.is_some() { "updated" } else { "added" }),
             Err(_) => unavailable(),
         },
         Err(_) => unavailable(),
     }
-}
-
-fn missing() -> Response {
-    private((StatusCode::NOT_FOUND, "Item not found."))
 }
 
 #[cfg(test)]

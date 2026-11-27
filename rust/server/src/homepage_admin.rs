@@ -1,34 +1,45 @@
-use std::io::Cursor;
+use std::io::{self, Cursor, Read};
 
 use axum::{
     Extension,
-    extract::{Multipart, State},
-    http::{HeaderMap, StatusCode, header},
-    response::Response,
+    body::Bytes,
+    extract::{FromRequest, Multipart, Request, State},
+    http::{HeaderMap, StatusCode, Uri, header},
+    response::{IntoResponse, Response},
 };
+use flate2::read::ZlibDecoder;
 use image::{
-    DynamicImage, ImageDecoder, ImageFormat, Limits,
-    codecs::{jpeg::JpegDecoder, png::PngDecoder, webp::WebPDecoder},
+    DynamicImage, ImageDecoder, ImageEncoder, ImageFormat, Limits,
+    codecs::{
+        jpeg::JpegDecoder,
+        png::{PngDecoder, PngEncoder},
+        webp::WebPDecoder,
+    },
 };
-use minijinja::context;
+use minijinja::{Value, context};
 
 use crate::{
-    App, access, home,
-    html::{self, Navigation},
+    App, access, home, legacy_html,
     legacy_session::Actor,
-    login, private,
-    registration_admin::{Resource, resources},
-    registration_form::length,
+    login::{self, TemplateCsrf},
+    private,
+    registration_admin::{Resource, ResourceRow, resources},
+    registration_form::Fields,
     settings::{self, SettingValue, Settings},
-    staff_pairing::lock_round,
-    unavailable,
+    staff_pairing::lock_round_if_configured,
+    staff_roster::form_return_path,
+    staff_roster_notice, unavailable,
 };
 
-const PATH: &str = "/settings/public-homepage/";
+pub(super) const PATH: &str = "/settings/public-homepage/";
 const DEFAULT_THEME: &str = "#00438A";
 const MAX_LOGO_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_BODY: usize = MAX_LOGO_BYTES + 64 * 1024;
-const IMAGE_ERROR: &str = "Upload a valid PNG, JPEG, or WebP image.";
+const IMAGE_ERROR: &str =
+    "Upload a valid image. The file you uploaded was either not an image or a corrupted image.";
+// Django's ImageField checks the suffix using Pillow's registered extensions before the logo validator checks the format.
+const IMAGE_EXTENSIONS: &str = "bmp, dib, gif, jfif, jpe, jpg, jpeg, pbm, pgm, ppm, pnm, pfm, png, apng, tif, tiff, avif, avifs, blp, bufr, cur, pcx, dcx, dds, ps, eps, fit, fits, fli, flc, ftc, ftu, gbr, grib, h5, hdf, jp2, j2k, jpc, jpf, jpx, j2c, icns, ico, im, iim, mpg, mpeg, mpo, msp, palm, pcd, pdf, pxr, psd, qoi, bw, rgb, rgba, sgi, ras, tga, icb, vda, vst, webp, wmf, emf, xbm, xpm";
+const MAX_PNG_PROFILE_BYTES: u64 = 1024 * 1024;
 
 fn is_hex_color(color: &str) -> bool {
     color.starts_with('#')
@@ -50,9 +61,8 @@ fn theme_color(candidate: &str) -> String {
     }
 }
 
-async fn branding(app: &App) -> Result<(String, String), sqlx::Error> {
-    let mut db = app.db.acquire().await?;
-    let settings = Settings::load(&mut db, &["theme_color", "tournament_name"]).await?;
+async fn branding(db: &mut sqlx::MySqlConnection) -> Result<(String, String), sqlx::Error> {
+    let settings = Settings::load(db, &["theme_color", "tournament_name"]).await?;
     Ok((
         settings.string("tournament_name", "New Tournament"),
         theme_color(&settings.string("theme_color", DEFAULT_THEME)),
@@ -60,9 +70,12 @@ async fn branding(app: &App) -> Result<(String, String), sqlx::Error> {
 }
 
 pub async fn theme(State(app): State<App>) -> Response {
-    let color = branding(&app)
-        .await
-        .map_or_else(|_| DEFAULT_THEME.into(), |(_, color)| color);
+    let color = match app.db.acquire().await {
+        Ok(mut db) => branding(&mut db)
+            .await
+            .map_or_else(|_| DEFAULT_THEME.into(), |(_, color)| color),
+        Err(_) => DEFAULT_THEME.into(),
+    };
     private((
         [
             (header::CONTENT_TYPE, "text/css; charset=utf-8"),
@@ -90,76 +103,155 @@ pub async fn page(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
+    uri: Uri,
 ) -> Response {
-    render(&app, actor, &headers, None).await
+    render(&app, actor, &headers, &uri, None, &Errors::default()).await
 }
 
-async fn render(app: &App, actor: Actor, headers: &HeaderMap, error: Option<&str>) -> Response {
-    let Ok(csrf) = html::page_csrf(headers) else {
-        return unavailable();
-    };
-    let Ok((name, color)) = branding(app).await else {
-        return unavailable();
-    };
-    let logo = home::logo_url(app).await;
-    let Ok(mut db) = app.db.acquire().await else {
-        return unavailable();
-    };
-    let Ok(info_links) = resources(&mut db, Resource::InfoLink).await else {
-        return unavailable();
-    };
-    let Ok(info_text) = resources(&mut db, Resource::InfoText).await else {
-        return unavailable();
-    };
-    let response = html::render(
-        "homepage_admin.html",
-        context! {
-            title => "Public Homepage", nav => Navigation::new(actor, true), csrf, name, color, logo,
-            info_links, info_text, error,
-        },
-        if error.is_some() {
-            StatusCode::UNPROCESSABLE_ENTITY
+#[derive(Default)]
+struct Errors {
+    name: String,
+    color: &'static str,
+    logo: String,
+}
+
+fn form_context(name: &str, color: &str, errors: &Errors) -> Value {
+    let value = |raw: &str| {
+        if raw.is_empty() {
+            String::new()
         } else {
-            StatusCode::OK
+            format!(r#" value="{}""#, legacy_html::escape(raw))
+        }
+    };
+    let name_value = value(name);
+    let color_value = value(color);
+    context! {
+        tournament_name => context! {
+            id_for_label => "id_tournament_name", errors => errors.name,
+            input => Value::from_safe_string(format!(r#"<input type="text" name="tournament_name"{name_value} class="form-control" maxlength="200" id="id_tournament_name">"#)),
         },
-    );
-    html::form_response(response, headers, &csrf)
+        theme_color => context! {
+            id_for_label => "id_theme_color", value => color, errors => errors.color,
+            input => Value::from_safe_string(format!(r##"<input type="text" name="theme_color"{color_value} class="form-control theme-color-input" placeholder="#00438A" pattern="^#[0-9a-fA-F]{{6}}$" autocomplete="off" style="max-width: 12rem;" required id="id_theme_color">"##)),
+        },
+        tournament_logo => context! {
+            id_for_label => "id_tournament_logo", errors => errors.logo,
+            input => Value::from_safe_string(r#"<input type="file" name="tournament_logo" class="form-control-file" accept="image/png,image/jpeg,image/webp" id="id_tournament_logo">"#.into()),
+        },
+    }
+}
+
+async fn render(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    uri: &Uri,
+    posted: Option<&Fields>,
+    errors: &Errors,
+) -> Response {
+    let Ok(csrf) = TemplateCsrf::new(headers) else {
+        return unavailable();
+    };
+    let Ok(mut db) = app.db.begin().await else {
+        return unavailable();
+    };
+    let actor = match access::settings_actor(&mut db, app, actor, headers).await {
+        Ok(actor) => actor,
+        Err(error) => {
+            drop(db);
+            return error.response(app, headers).await;
+        }
+    };
+    let result = async {
+        let (name, color) = branding(&mut db).await?;
+        let form = if let Some(fields) = posted {
+            let raw = |key| fields.all(key).last().map_or("", String::as_str);
+            form_context(raw("tournament_name"), raw("theme_color"), errors)
+        } else {
+            form_context(&name, &color, errors)
+        };
+        let logo = home::logo_url(&mut db).await;
+        let info_links: Vec<_> = resources(&mut db, Resource::InfoLink)
+            .await?
+            .into_iter()
+            .map(ResourceRow::context)
+            .collect();
+        let info_texts: Vec<_> = resources(&mut db, Resource::InfoText)
+            .await?
+            .into_iter()
+            .map(ResourceRow::context)
+            .collect();
+        let shell = legacy_html::shell(&mut db, actor, PATH).await?;
+        db.commit().await?;
+        let mut response = staff_roster_notice::render(
+            app,
+            headers,
+            PATH,
+            "tab/public_homepage.html",
+            shell,
+            context! { form, logo, info_links, info_texts, csrf_input => csrf.input(),
+            return_path => form_return_path(uri, headers, posted), },
+            StatusCode::OK,
+        );
+        csrf.set_cookie(&mut response, headers);
+        Ok::<_, sqlx::Error>(response)
+    }
+    .await;
+    result.unwrap_or_else(|_| unavailable())
 }
 
 #[derive(Default)]
 struct Upload {
-    csrf: String,
-    name: String,
-    color: String,
-    logo: Option<Vec<u8>>,
+    fields: Fields,
+    logo: Option<(String, Vec<u8>)>,
 }
 
-async fn fields(mut parts: Multipart) -> Result<Upload, &'static str> {
+async fn submitted(app: &App, request: Request) -> Result<Upload, Box<Response>> {
+    let multipart = request
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("multipart/form-data"));
+    if !multipart {
+        let body = Bytes::from_request(request, app)
+            .await
+            .map_err(|error| Box::new(private(error.into_response())))?;
+        return Ok(Upload {
+            fields: Fields::parse(&body),
+            logo: None,
+        });
+    }
+    let mut parts = Multipart::from_request(request, app)
+        .await
+        .map_err(|error| Box::new(private(error.into_response())))?;
     let mut form = Upload::default();
     while let Some(field) = parts
         .next_field()
         .await
-        .map_err(|_| "Invalid branding form.")?
+        .map_err(|error| Box::new(private(error.into_response())))?
     {
-        match field.name() {
-            Some("csrfmiddlewaretoken") => {
-                form.csrf = field.text().await.map_err(|_| "Invalid branding form.")?
+        match (field.name(), field.file_name()) {
+            (
+                Some(
+                    name
+                    @ ("csrfmiddlewaretoken" | "tournament_name" | "theme_color" | "return_to"),
+                ),
+                None,
+            ) => {
+                let name = name.to_owned();
+                let value = field
+                    .text()
+                    .await
+                    .map_err(|error| Box::new(private(error.into_response())))?;
+                form.fields.push(name, value);
             }
-            Some("tournament_name") => {
-                form.name = field.text().await.map_err(|_| "Invalid tournament name.")?
-            }
-            Some("theme_color") => {
-                form.color = field.text().await.map_err(|_| "Invalid theme color.")?
-            }
-            Some("tournament_logo") if field.file_name().is_some_and(|name| !name.is_empty()) => {
+            (Some("tournament_logo"), Some(name)) if !name.is_empty() => {
+                let name = name.to_owned();
                 let bytes = field
                     .bytes()
                     .await
-                    .map_err(|_| "Logo must be 8 MB or smaller.")?;
-                if bytes.len() > MAX_LOGO_BYTES {
-                    return Err("Logo must be 8 MB or smaller.");
-                }
-                form.logo = Some(bytes.to_vec());
+                    .map_err(|error| Box::new(private(error.into_response())))?;
+                form.logo = Some((name, bytes.to_vec()));
             }
             _ => {}
         }
@@ -171,63 +263,86 @@ pub async fn update(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
-    parts: Multipart,
+    uri: Uri,
+    request: Request,
 ) -> Response {
-    let upload = match fields(parts).await {
+    let upload = match submitted(&app, request).await {
         Ok(upload) => upload,
-        Err(error) => return render(&app, actor, &headers, Some(error)).await,
+        Err(error) => return *error,
     };
-    if !login::valid_csrf(&headers, &upload.csrf) {
+    let fields = &upload.fields;
+    if !login::valid_csrf(&headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
-    let name = upload.name.trim();
-    let color = upload.color.trim();
-    if !length(name, 200) || !is_hex_color(color) {
-        return render(
-            &app,
-            actor,
-            &headers,
-            Some("Enter a tournament name and a six-digit hex theme color."),
-        )
-        .await;
+    let name = fields.get("tournament_name");
+    let color = fields.get("theme_color");
+    let mut errors = Errors::default();
+    let name_length = name.chars().count();
+    if name_length > 200 {
+        errors.name =
+            format!("Ensure this value has at most 200 characters (it has {name_length}).");
     }
-    let logo = if let Some(bytes) = upload.logo {
-        match tokio::task::spawn_blocking(move || decode_logo(&bytes)).await {
+    if name.contains('\0') {
+        errors.name.push_str("Null characters are not allowed.");
+    }
+    errors.color = if color.is_empty() {
+        "This field is required."
+    } else if !is_hex_color(color) {
+        "Please use a valid hex color (for example: #00438A)."
+    } else {
+        ""
+    };
+    let logo = if let Some((filename, bytes)) = upload.logo {
+        match tokio::task::spawn_blocking(move || validate_logo_upload(&filename, &bytes)).await {
             Ok(Ok(bytes)) => Some(bytes),
-            Ok(Err(error)) => return render(&app, actor, &headers, Some(error)).await,
+            Ok(Err(error)) => {
+                errors.logo = error;
+                None
+            }
             Err(_) => return unavailable(),
         }
     } else {
         None
     };
-    match save(&app, name, color, logo).await {
-        Ok(()) => access::found(PATH),
-        Err(_) => unavailable(),
+    if !errors.name.is_empty() || !errors.color.is_empty() || !errors.logo.is_empty() {
+        return render(&app, actor, &headers, &uri, Some(fields), &errors).await;
     }
+    save(&app, actor, &headers, name, color, logo).await
 }
 
 async fn save(
     app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
     name: &str,
     color: &str,
     logo: Option<Vec<u8>>,
-) -> Result<(), sqlx::Error> {
-    let mut tx = app.db.begin().await?;
-    lock_round(&mut tx).await?;
+) -> Response {
+    let Ok(mut tx) = app.db.begin().await else {
+        return unavailable();
+    };
+    if lock_round_if_configured(&mut tx).await.is_err() {
+        return unavailable();
+    }
+    if let Err(error) = access::settings_actor(&mut tx, app, actor, headers).await {
+        drop(tx);
+        return error.response(app, headers).await;
+    }
     let name = if name.is_empty() {
         "New Tournament"
     } else {
         name
     };
-    settings::put(&mut tx, "tournament_name", SettingValue::Text(name)).await?;
-    settings::put(
-        &mut tx,
-        "theme_color",
-        SettingValue::Text(&theme_color(color)),
-    )
-    .await?;
-    if let Some(bytes) = logo {
-        sqlx::query(
+    let result = async {
+        settings::put(&mut tx, "tournament_name", SettingValue::Text(name)).await?;
+        settings::put(
+            &mut tx,
+            "theme_color",
+            SettingValue::Text(&theme_color(color)),
+        )
+        .await?;
+        if let Some(bytes) = logo {
+            sqlx::query(
             "INSERT INTO mittab_public_logo (id, bytes, updated_at) VALUES (1, ?, UTC_TIMESTAMP(6))
              ON DUPLICATE KEY UPDATE bytes = ?, updated_at = UTC_TIMESTAMP(6)",
         )
@@ -235,23 +350,49 @@ async fn save(
         .bind(&bytes)
         .execute(&mut *tx)
         .await?;
+        }
+        tx.commit().await
     }
-    tx.commit().await
+    .await;
+    match result {
+        Ok(()) => staff_roster_notice::saved(app, headers, PATH, "Public homepage updated!"),
+        Err(_) => unavailable(),
+    }
+}
+
+fn validate_logo_upload(filename: &str, bytes: &[u8]) -> Result<Vec<u8>, String> {
+    let decoded = decode_logo(bytes).map_err(str::to_owned)?;
+    let extension = filename
+        .rsplit_once('.')
+        .filter(|(stem, _)| stem.chars().any(|character| character != '.'))
+        .map_or(String::new(), |(_, ext)| ext.to_lowercase());
+    if !IMAGE_EXTENSIONS.split(", ").any(|ext| ext == extension) {
+        return Err(format!(
+            "File extension “{extension}” is not allowed. Allowed extensions are: {IMAGE_EXTENSIONS}."
+        ));
+    }
+    Ok(decoded)
 }
 
 fn decode_logo(bytes: &[u8]) -> Result<Vec<u8>, &'static str> {
+    if bytes.is_empty() {
+        return Err("The submitted file is empty.");
+    }
+    if bytes.len() > MAX_LOGO_BYTES {
+        return Err("Logo must be 8MB or smaller.");
+    }
     let input = Cursor::new(bytes);
     let mut limits = Limits::default();
-    limits.max_image_width = Some(3000);
-    limits.max_image_height = Some(3000);
     limits.max_alloc = Some(80 * 1024 * 1024);
 
     let format = image::guess_format(bytes).map_err(|_| IMAGE_ERROR)?;
     let mut decoder: Box<dyn ImageDecoder> = match format {
         ImageFormat::Png => {
+            let is_static = validate_png_metadata(bytes)?;
             let decoder =
                 PngDecoder::with_limits(input, limits.clone()).map_err(|_| IMAGE_ERROR)?;
-            if decoder.is_apng().map_err(|_| IMAGE_ERROR)? {
+            validate_dimensions(decoder.dimensions())?;
+            if decoder.is_apng().map_err(|_| IMAGE_ERROR)? && !is_static {
                 return Err("Animated logos are not supported.");
             }
             Box::new(decoder)
@@ -259,34 +400,79 @@ fn decode_logo(bytes: &[u8]) -> Result<Vec<u8>, &'static str> {
         ImageFormat::Jpeg => Box::new(JpegDecoder::new(input).map_err(|_| IMAGE_ERROR)?),
         ImageFormat::WebP => {
             let decoder = WebPDecoder::new(input).map_err(|_| IMAGE_ERROR)?;
+            validate_dimensions(decoder.dimensions())?;
             if decoder.has_animation() {
                 return Err("Animated logos are not supported.");
             }
             Box::new(decoder)
         }
-        _ => return Err(IMAGE_ERROR),
+        _ => return Err("Logo must be a real image file."),
     };
-    let (width, height) = decoder.dimensions();
-    if width == 0 || height == 0 || width > 3000 || height > 3000 {
-        return Err("Logo dimensions must be at most 3000 by 3000 pixels.");
-    }
-    if width * 2 < height || height * 2 < width {
-        return Err("Logo aspect ratio must be between 1:2 and 2:1.");
-    }
+    validate_dimensions(decoder.dimensions())?;
+    limits.max_image_width = Some(3000);
+    limits.max_image_height = Some(3000);
     decoder.set_limits(limits).map_err(|_| IMAGE_ERROR)?;
-    let orientation = decoder.orientation().map_err(|_| IMAGE_ERROR)?;
-    let mut image = DynamicImage::from_decoder(decoder).map_err(|_| IMAGE_ERROR)?;
-    image.apply_orientation(orientation);
+    let profile = decoder.icc_profile().map_err(|_| IMAGE_ERROR)?;
+    let image = DynamicImage::from_decoder(decoder).map_err(|_| IMAGE_ERROR)?;
     let image = if image.color().has_alpha() {
         DynamicImage::ImageRgba8(image.into_rgba8())
     } else {
         DynamicImage::ImageRgb8(image.into_rgb8())
     };
-    let mut png = Cursor::new(Vec::new());
-    image
-        .write_to(&mut png, ImageFormat::Png)
-        .map_err(|_| IMAGE_ERROR)?;
-    Ok(png.into_inner())
+    let mut png = Vec::new();
+    let mut encoder = PngEncoder::new(&mut png);
+    if let Some(profile) = profile {
+        encoder.set_icc_profile(profile).map_err(|_| IMAGE_ERROR)?;
+    }
+    image.write_with_encoder(encoder).map_err(|_| IMAGE_ERROR)?;
+    Ok(png)
+}
+
+fn validate_png_metadata(bytes: &[u8]) -> Result<bool, &'static str> {
+    // A PNG with one animation frame is static only if that frame is also the default image.
+    let mut chunks = bytes.get(8..).ok_or(IMAGE_ERROR)?;
+    let mut one_frame = false;
+    let mut frame_precedes_image = false;
+    while let Some(header) = chunks.get(..8) {
+        let length = u32::from_be_bytes(header[..4].try_into().unwrap_or_default()) as usize;
+        let end = length.checked_add(12).ok_or(IMAGE_ERROR)?;
+        let chunk = chunks.get(..end).ok_or(IMAGE_ERROR)?;
+        match &header[4..] {
+            b"acTL" => one_frame = length == 8 && chunk[8..12] == 1u32.to_be_bytes(),
+            b"fcTL" => frame_precedes_image = true,
+            b"iCCP" => {
+                let data = &chunk[8..end - 4];
+                let name_end = data.iter().position(|byte| *byte == 0).ok_or(IMAGE_ERROR)?;
+                let compressed = data[name_end + 1..].strip_prefix(&[0]).ok_or(IMAGE_ERROR)?;
+                let mut plain = ZlibDecoder::new(compressed).take(MAX_PNG_PROFILE_BYTES + 1);
+                if io::copy(&mut plain, &mut io::sink()).map_err(|_| IMAGE_ERROR)?
+                    > MAX_PNG_PROFILE_BYTES
+                {
+                    return Err(IMAGE_ERROR);
+                }
+            }
+            b"IDAT" => return Ok(one_frame && frame_precedes_image),
+            _ => (),
+        }
+        chunks = &chunks[end..];
+    }
+    Err(IMAGE_ERROR)
+}
+
+fn validate_dimensions((width, height): (u32, u32)) -> Result<(), &'static str> {
+    if width == 0 || height == 0 {
+        return Err("Logo has invalid dimensions.");
+    }
+    if u64::from(width) * u64::from(height) > 9_000_000 {
+        return Err("Logo must be a real image file.");
+    }
+    if width > 3000 || height > 3000 {
+        return Err("Logo dimensions must be at most 3000x3000.");
+    }
+    if width * 2 < height || height * 2 < width {
+        return Err("Logo aspect ratio must be between 1:2 and 2:1.");
+    }
+    Ok(())
 }
 
 #[cfg(test)]

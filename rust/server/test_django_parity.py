@@ -4373,8 +4373,10 @@ def test_staff_registration_rejects_stale_and_paired_deletions():
 
 @pytest.mark.django_db(transaction=True)
 def test_native_public_homepage_branding_logo_and_resources():
+    from binascii import crc32
     from io import BytesIO
-    from PIL import Image
+    from struct import pack
+    from PIL import Image, ImageCms
 
     tab = legacy_tab_session("homepage-admin-tab")
     board = legacy_tab_session("homepage-admin-board")
@@ -4393,38 +4395,139 @@ def test_native_public_homepage_branding_logo_and_resources():
         fields = {"csrfmiddlewaretoken": csrf, "tournament_name": "Example Branding", "theme_color": "#F0C020"}
         invalid = multipart_request(port, page, fields=fields, file=("wrong.png", b"not an image"),
                                     cookie=jar, file_field="tournament_logo")
-        assert invalid[0] == 422
+        assert invalid[0] == 200 and b"Upload a valid image." in invalid[2]
         assert TabSettings.get("tournament_name", use_cache=False) == "Original Tournament"
         assert b"#00438A" in request(port, "/theme.css")[2]
         converted = BytesIO()
-        Image.new("RGB", (42, 26), color=(100, 140, 180)).save(converted, format="JPEG")
+        image = Image.new("RGB", (42, 26), color=(100, 140, 180))
+        exif = image.getexif()
+        exif[274] = 6
+        profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+        image.save(converted, format="JPEG", exif=exif, icc_profile=profile)
         valid = multipart_request(port, page, fields=fields, file=("logo.jpg", converted.getvalue()),
                                   cookie=jar, file_field="tournament_logo")
         assert valid[0] == 302 and valid[1]["Location"] == page, valid
+        notice = load_cookies(valid[1])["mittab_roster_notice"].value
+        assert b"Public homepage updated!" in request(port, page, extra_headers={
+            "Cookie": jar + f"; mittab_roster_notice={notice}",
+        })[2]
         assert TabSettings.get("tournament_name", use_cache=False) == "Example Branding"
         assert TabSettings.get("theme_color", use_cache=False) == "#F0C020"
         _, headers, css = request(port, "/theme.css")
         assert headers["Content-Type"].startswith("text/css") and b"#F0C020" in css and b"#1a1a1a" in css
         status, headers, logo = request(port, "/tournament-logo/")
         assert status == 200 and headers["Content-Type"] == "image/png"
-        assert Image.open(BytesIO(logo)).size == (42, 26)
+        with Image.open(BytesIO(logo)) as stored:
+            assert stored.size == (42, 26) and stored.getexif().get(274) is None
+            assert stored.info.get("icc_profile") == profile
         assert request(port, "/favicon.ico")[2] == logo
+
+        single_frame = BytesIO()
+        image.save(single_frame, format="PNG")
+        source = single_frame.getvalue()
+
+        def chunk(kind, content):
+            return pack(">I", len(content)) + kind + content + pack(">I", crc32(kind + content))
+
+        frame = pack(">IIIIIHHBB", 0, 42, 26, 0, 0, 1, 10, 0, 0)
+        encoded = source[:33] + chunk(b"acTL", pack(">II", 1, 0)) + chunk(b"fcTL", frame) + source[33:]
+        with Image.open(BytesIO(encoded)) as original:
+            assert not original.is_animated
+        valid = multipart_request(port, page, fields=fields, file=("logo.apng", encoded),
+                                  cookie=jar, file_field="tournament_logo")
+        assert valid[0] == 302 and valid[1]["Location"] == page
 
         def post(path, fields):
             return request(port, path, method="POST", extra_headers={"Cookie": jar},
                            form={"csrfmiddlewaretoken": csrf, **fields})
 
         path = "/registration/manage/info-text/"
-        assert post(path, {"title": "GA", "text": "Main library room 301", "is_active": "on"})[0] == 302
+        assert post(path, {"title": "GA", "text": "Main library room 301", "is_active": "on",
+                           "display_order": "0"})[1]["Location"] == page
         assert b"Main library room 301" in request(port, "/public/")[2]
         line = InfoText.objects.get()
-        assert post(f"{path}{line.id}/", {"title": "GA", "text": "Second room", "is_active": "on"})[0] == 302
+        assert post(f"{path}{line.id}/", {"title": "GA", "text": "Second room", "is_active": "on",
+                                       "display_order": "1.0"})[1]["Location"] == page
+        line.refresh_from_db()
+        assert line.display_order == 1
         assert b"Second room" in request(port, "/public/")[2]
         assert post(f"{path}{line.id}/delete/", {})[0] == 302
         assert b"Second room" not in request(port, "/public/")[2]
         assert post("/registration/manage/links/info/", {"title": "Handbook", "url": "https://example.test/guide",
-                                                        "is_active": "on"})[1]["Location"].startswith(page)
+                                                        "is_active": "on", "display_order": "0"})[1]["Location"] == page
         assert b"Handbook" in request(port, "/public/")[2]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_homepage_editor_matches_django(html_assets, tmp_path):
+    from io import BytesIO
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    sid = legacy_tab_session("homepage-reference")
+    TabSettings.set("tournament_name", 'Autumn & "Friends"')
+    TabSettings.set("theme_color", "#A04065")
+    client = Client()
+    csrf = "a" * 32
+    client.cookies["sessionid"] = sid
+    client.cookies["csrftoken"] = csrf
+    cookie = f"sessionid={sid}; csrftoken={csrf}"
+    page = "/settings/public-homepage/"
+
+    with patch("mittab.apps.tab.logo_utils.LOGO_UPLOAD_DIR", str(tmp_path)), rust_server(overrides={
+        **html_assets, "MITTAB_UPLOADS_ROOT": str(tmp_path),
+    }) as port:
+        def compare(path=page, fields=None, upload=None):
+            if upload:
+                status, _, body = multipart_request(
+                    port, path, fields={**fields, "csrfmiddlewaretoken": csrf}, cookie=cookie,
+                    file=upload, file_field="tournament_logo",
+                )
+            else:
+                status, _, body = request(
+                    port, path, extra_headers={"Cookie": cookie},
+                    method="GET" if fields is None else "POST",
+                    form=None if fields is None else {**fields, "csrfmiddlewaretoken": csrf},
+                )
+            assert status == 200
+            mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+            with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask[1][:32].decode()):
+                if fields is None:
+                    reference = client.get(path)
+                else:
+                    upload_data = {"tournament_logo": SimpleUploadedFile(*upload)} if upload else {}
+                    reference = client.post(path, {**fields, **upload_data})
+            assert reference.status_code == 200
+            assert_html_bytes(body, reference.content)
+            return body
+
+        assert b"No text information yet." in compare()
+        text = InfoText.objects.create(title="Room & time", text='West "Wing" <205>', display_order=1)
+        link = InfoLink.objects.create(title="Handbook", url="https://example.test/guide?day=1&room=2",
+                                      description="Accommodation <details>", is_active=False)
+        Image.new("RGBA", (42, 36), color=(20, 70, 150, 200)).save(tmp_path / "tournament_logo.png")
+        body = compare(f"{page}?return_to=%2Fregistration%2Fmanage%2F")
+        assert b'ph__logo-preview' in body and b'tournament-logo/?v=' in body
+        assert f'ph-link-{link.id}'.encode() in body and f'ph-text-{text.id}'.encode() in body
+        compare(fields={"tournament_name": "Ab" * 105, "theme_color": " <bad> ", "return_to": "/public/"},
+                upload=("invalid.png", b"not a valid image"))
+        compare(fields={"theme_color": "#A04065", "return_to": page},
+                upload=("wrong-extension.txt", (tmp_path / "tournament_logo.png").read_bytes()))
+        large_profile = BytesIO()
+        Image.new("RGB", (20, 20)).save(large_profile, format="PNG", icc_profile=b"x" * (1024 * 1024 + 1))
+        compare(fields={"theme_color": "#A04065", "return_to": page},
+                upload=("oversized-profile.png", large_profile.getvalue()))
+        compare(fields={"return_to": page})
+        assert TabSettings.get("theme_color", use_cache=False) == "#A04065"
+
+        rejected = request(port, "/registration/manage/info-text/", method="POST", form={
+            "title": "Information", "text": "", "display_order": "-1", "csrfmiddlewaretoken": csrf,
+        }, extra_headers={"Cookie": cookie})
+        assert rejected[0] == 302 and rejected[1]["Location"] == page
+        notice = load_cookies(rejected[1])["mittab_roster_notice"].value
+        _, _, body = request(port, page, extra_headers={"Cookie": cookie + f"; mittab_roster_notice={notice}"})
+        assert b"Text: This field is required. Display order: Ensure this value is greater than or equal to 0." in body
+        assert InfoText.objects.count() == 1
 
 
 @pytest.mark.django_db(transaction=True)
@@ -9292,7 +9395,8 @@ def test_registration_and_public_information_admin_link_parity(html_assets, subt
                     assert headers["Location"] == "/registration/manage/"
                     assert "mittab_roster_notice" in load_cookies(headers)
                 else:
-                    assert headers["Location"] == "/settings/public-homepage/?saved=3"
+                    assert headers["Location"] == "/settings/public-homepage/"
+                    assert "mittab_roster_notice" in load_cookies(headers)
                 added.refresh_from_db()
                 assert added.title == staff_title and added.display_order == 4294967295
                 add_form["title"] = staff_title
