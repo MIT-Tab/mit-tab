@@ -208,8 +208,28 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
             ],
         )
         .await?;
-        let standings = TournamentData::load(&mut db)
-            .await?
+        let tournament = TournamentData::load(&mut db).await?;
+        let mut metadata: HashMap<_, (String, Vec<String>)> = HashMap::new();
+        for (id, team, debater) in sqlx::query_as::<_, (i32, String, Option<String>)>(
+            "SELECT t.id, t.name, d.name FROM tab_team t
+             LEFT JOIN tab_team_debaters m ON m.team_id = t.id AND ?
+             LEFT JOIN tab_debater d ON d.id = m.debater_id
+             WHERE t.ranking_public = TRUE ORDER BY d.name, d.id",
+        )
+        .bind(settings.flag("debaters_public", true))
+        .fetch_all(&mut *db)
+        .await?
+        {
+            let (_, debaters) = metadata
+                .entry(i64::from(id))
+                .or_insert_with(|| (team, Vec::new()));
+            if let Some(debater) = debater {
+                debaters.push(debater);
+            }
+        }
+        db.commit().await?;
+
+        let standings = tournament
             .scores(
                 policy(&settings),
                 RoundFilter {
@@ -218,29 +238,6 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
                 },
             )
             .map_err(|message| sqlx::Error::Protocol(message.into()))?;
-        let mut metadata: HashMap<_, _> = sqlx::query_as::<_, (i32, String)>(
-            "SELECT id, name FROM tab_team WHERE ranking_public = TRUE",
-        )
-        .fetch_all(&mut *db)
-        .await?
-        .into_iter()
-        .map(|(id, name)| (i64::from(id), (name, Vec::<String>::new())))
-        .collect();
-        if settings.flag("debaters_public", true) {
-            for (id, name) in sqlx::query_as::<_, (i32, String)>(
-                "SELECT m.team_id, d.name FROM tab_team_debaters m
-                 JOIN tab_team t ON t.id = m.team_id JOIN tab_debater d ON d.id = m.debater_id
-                 WHERE t.ranking_public = TRUE ORDER BY d.name, d.id",
-            )
-            .fetch_all(&mut *db)
-            .await?
-            {
-                if let Some((_, speakers)) = metadata.get_mut(&i64::from(id)) {
-                    speakers.push(name);
-                }
-            }
-        }
-        db.commit().await?;
         let mut rows: Vec<_> = standings
             .into_iter()
             .filter_map(|standing| {

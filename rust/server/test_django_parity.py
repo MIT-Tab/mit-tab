@@ -1819,6 +1819,8 @@ def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_a
     ]
     for team, speaker in zip(teams, people):
         team.debaters.add(speaker)
+    extra_speaker = Debater.objects.create(name="A Ranking Speaker")
+    teams[0].debaters.add(extra_speaker)
     first = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
     private_debate = Round.objects.create(round_number=1, gov_team=teams[2], opp_team=teams[3], victor=Round.GOV)
     future = Round.objects.create(round_number=2, gov_team=teams[1], opp_team=teams[0], victor=Round.GOV)
@@ -1853,6 +1855,7 @@ def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_a
         assert PublicDisplaySetting.objects.get(slug="ballot_round_1").include_ranks
         teams_page = request(port, standings)[2]
         assert b"Top Example" in teams_page and b"Private Example" not in teams_page
+        assert b"A Ranking Speaker, Ranking Speaker 0" in teams_page
         assert b"31.75" not in teams_page and b"Speaks</th>" not in teams_page
         vars_page = request(port, speakers_page)[2]
         assert b"Varsity Speakers" in vars_page and b"Novice Speakers" not in vars_page
@@ -1873,6 +1876,18 @@ def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_a
         assert b"35.00" not in request(port, standings)[2]
         assert b"31.7500" in request(port, ballots)[2]
         assert b"Unadjusted speaks" in request(port, speakers_page)[2]
+
+        RoundStats.objects.filter(round=first, debater=people[0]).update(speaks=Decimal("32.25"))
+        assert b"32.25" in request(port, standings)[2]
+        TabSettings.set("debaters_public", 0)
+        hidden_debaters = request(port, standings)[2]
+        assert b"Top Example" in hidden_debaters and b"Ranking Speaker" not in hidden_debaters
+        Team.objects.filter(pk=teams[0].pk).update(ranking_public=False)
+        assert b"Top Example" not in request(port, standings)[2]
+        assert post({**policy, "team_public": ""})[0] == 302
+        for session in (None, board):
+            status, headers, _ = request(port, standings, cookie=session)
+            assert status == 302 and headers["Location"] == "/public/access-error/"
 
 
 class BracketMarkup(HTMLParser):
