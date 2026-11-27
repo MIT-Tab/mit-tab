@@ -94,7 +94,7 @@ def rust_server(session_key_configured=True, overrides=None):
 
 
 def request(port, path, *, method="GET", cookie=None, forwarded_proto=None, form=None,
-            extra_headers=None):
+            extra_headers=None, raw_body=None):
     client = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
     try:
         headers = dict(extra_headers or {})
@@ -105,7 +105,7 @@ def request(port, path, *, method="GET", cookie=None, forwarded_proto=None, form
         if form is not None:
             headers["Content-Type"] = "application/x-www-form-urlencoded"
         client.request(method, path, headers=headers,
-                       body=None if form is None else urlencode(form))
+                       body=raw_body if form is None else urlencode(form))
         reply = client.getresponse()
         return reply.status, reply.headers, reply.read()
     finally:
@@ -138,7 +138,7 @@ def isolate_tournament_settings(django_db_setup, django_db_blocker):
 def html_assets(tmp_path, monkeypatch):
     chunks = {
         bundle: [f"{bundle}.css", f"{bundle}-fixture.js"]
-        for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin", "bracket")
+        for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin", "bracket", "tournamentStart")
     }
     assets = {
         name: {"name": name, "publicPath": f"/static/webpack_bundles/{name}"}
@@ -2029,6 +2029,7 @@ def test_native_wizard_and_checklist_unlock_staff_on_valid_basics():
         "open_speaks": "2",
         "open_ranks": "1",
         "custom_staff-TOTAL_FORMS": "1",
+        "custom_staff-INITIAL_FORMS": "0",
         "custom_staff-0-title": "Room Coordinator",
         "custom_staff-0-names": "Robin Coordinator",
     }
@@ -2037,7 +2038,7 @@ def test_native_wizard_and_checklist_unlock_staff_on_valid_basics():
         assert request(port, todo, cookie=tab)[1]["Location"] == basics
         assert request(port, basics, cookie=board)[0] == 403
         status, headers, page = request(port, basics, cookie=tab)
-        assert status == 200 and b"Start Tournament" in page
+        assert status == 200 and b"Complete this form to unlock staff tools." in page
         assert b"Remote Institute" in page and b"Local Host" in page
         assert b'value="New Tournament"' not in page and b'value="TBD"' not in page
         csrf = load_cookies(headers)["csrftoken"].value
@@ -2083,11 +2084,110 @@ def test_native_wizard_and_checklist_unlock_staff_on_valid_basics():
         assert TabSettings.get("todo_add_tab_user_accounts", use_cache=False) == 0
         assert TabSettings.get("todo_set_tournament_name", use_cache=False) == 1
 
-        assert post(basics, {**ready, "host_school": f"pk:{school.id}",
-                             "custom_staff-0-DELETE": "on"})[1]["Location"] == basics
+        replacement = {**ready, "host_school": f"pk:{school.id}", "custom_staff-INITIAL_FORMS": "1",
+                       "custom_staff-0-DELETE": "on"}
+        for missing in ("custom_staff-TOTAL_FORMS", "custom_staff-INITIAL_FORMS"):
+            assert post(basics, {key: value for key, value in replacement.items() if key != missing})[0] == 422
+            assert TournamentStaffRole.objects.get().title == "Room Coordinator"
+        stale = post(basics, {**replacement, "custom_staff-INITIAL_FORMS": "0"})
+        assert stale[0] == 422 and b"Other staff roles changed" in stale[2]
+        assert TournamentStaffRole.objects.get().title == "Room Coordinator"
+        edited = {key: value for key, value in replacement.items() if key != "custom_staff-0-DELETE"}
+        for missing in ("custom_staff-0-title", "custom_staff-0-names"):
+            assert post(basics, {key: value for key, value in edited.items() if key != missing})[0] == 422
+            assert TournamentStaffRole.objects.get().title == "Room Coordinator"
+        assert post(basics, replacement)[1]["Location"] == basics
         assert TabSettings.get("host_school_name", use_cache=False) == "Local Host"
         assert TabSettings.get("tournament_date", use_cache=False) == tournament_date
         assert not TournamentStaffRole.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_tournament_basics_matches_django_form_markup(html_assets, subtests):
+    from mittab.apps.tab.models import TournamentStaffRole
+
+    staff = legacy_tab_session("setup-html-staff")
+    path = "/setup/start-tournament/"
+    school = School.objects.create(name="Local & School")
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("start_tournament_wizard_completed", 0)
+    TabSettings.set("start_tournament_staff_invites_sent", 2)
+    TabSettings.set("tournament_name", "New Tournament")
+    TabSettings.set("theme_color", "#225577")
+    InfoText.objects.create(title="GA", text="TBD", is_active=True)
+    InfoLink.objects.create(title="Facebook", url="https://example.test/announcement", is_active=True)
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = csrf
+    cookie = {"Cookie": f"sessionid={staff}; csrftoken={csrf}"}
+
+    def compare(port, fields=None):
+        form = None if fields is None else {"csrfmiddlewaretoken": csrf, **fields}
+        status, _, body = request(port, path, extra_headers=cookie,
+                                  method="GET" if fields is None else "POST", form=form)
+        assert status == (200 if fields is None else 422)
+        token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)[1]
+        with patch("django.middleware.csrf._get_new_csrf_string", return_value=token[:32].decode()):
+            reference = client.get(path) if fields is None else client.post(path, form)
+        assert reference.status_code == 200
+        assert_html_bytes(body.replace(b'name="wizard_action" value="send_invite"',
+                                      b'name="action" value="send_invite"'), reference.content)
+        return body
+
+    with patch("mittab.apps.registration.services.fetch_remote_schools", return_value=[]), \
+            rust_server(overrides={**html_assets, "MITTAB_SCHOOL_DIRECTORY_URL": ""}) as port:
+        with subtests.test(state="initial"):
+            body = compare(port)
+            assert b"2 tab staff invitations sent." in body and b"example.test/announcement" not in body
+        with subtests.test(state="bound invalid"):
+            compare(port, {
+                "action": "save", "tournament_name": "Test & <Tournament>", "host_school": f"pk:{school.id}",
+                "tournament_type": "0", "sanctioned": "on", "ga_room": "  ", "facebook_url": "bad:url",
+                "tournament_director": "First Person", "tab_director": "Second Person",
+                "equity_officers": "Third Person\nFourth Person", "tournament_observer": "",
+                "open_speaks": "3", "open_ranks": "2",
+                "custom_staff-TOTAL_FORMS": "2", "custom_staff-INITIAL_FORMS": "0",
+                "custom_staff-MIN_NUM_FORMS": "0", "custom_staff-MAX_NUM_FORMS": "1000",
+                "custom_staff-0-title": "Room <Director>", "custom_staff-0-names": "",
+                "custom_staff-1-title": "Removed role", "custom_staff-1-DELETE": "on",
+            })
+            assert TabSettings.get("start_tournament_wizard_completed", use_cache=False) == 0
+            assert not TournamentStaffRole.objects.exists()
+        with subtests.test(state="invite invalid"):
+            compare(port, {"action": "send_invite", "invite-permission_preset": "checkin_helper"})
+            for invalid in ({}, {"invite-email": "bad-address", "invite-username": "valid-user",
+                                "invite-permission_preset": "invalid-preset"}):
+                form = {"action": "send_invite", "csrfmiddlewaretoken": csrf, **invalid}
+                status, _, body = request(port, path, method="POST",
+                    extra_headers={**cookie, "X-Requested-With": "XMLHttpRequest"}, form=form)
+                assert status == 400
+                reference = client.post(path, form, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+                assert json.loads(body) == reference.json()
+            multipart = "".join(
+                f'--fixture\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'
+                for key, value in {"wizard_action": "send_invite", "csrfmiddlewaretoken": csrf,
+                                   "invite-email": "bad-address", "invite-username": "valid-user",
+                                   "invite-permission_preset": "invalid-preset"}.items()
+            ) + "--fixture--\r\n"
+            status, _, body = request(port, path, method="POST",
+                extra_headers={**cookie, "X-Requested-With": "XMLHttpRequest",
+                               "Content-Type": "multipart/form-data; boundary=fixture"},
+                raw_body=multipart)
+            assert status == 400 and json.loads(body) == reference.json()
+        with subtests.test(state="populated"):
+            TabSettings.set("start_tournament_wizard_completed", 1)
+            TabSettings.set("tournament_name", "Invitational 'A' & 'B'")
+            TabSettings.set("host_school", "apda:77")
+            TabSettings.set("host_school_name", "Historic Host")
+            TabSettings.set("open_speaks", 2)
+            TabSettings.set("open_ranks", 1)
+            TabSettings.set("equity_officers", "Equity Person\nSecond Person")
+            InfoText.objects.filter(title="GA").update(text="Main & West")
+            TournamentStaffRole.objects.create(title="Runner & <coord>", names="One\nTwo", sort_order=0)
+            body = compare(port)
+            assert b"Historic Host" in body and b"example.test/announcement" in body
+            assert b"staff-invite-form" not in body
 
 
 @pytest.mark.django_db(transaction=True)
@@ -3296,7 +3396,7 @@ def test_native_staff_invites_and_legacy_password_links_are_single_use():
         start = "/setup/start-tournament/"
         invite = "/staff/invite/"
         status, headers, body = request(port, start, cookie=tab)
-        assert status == 200 and b"Send Staff Invite" in body
+        assert status == 200 and b"Send invitation" in body
         csrf = load_cookies(headers)["csrftoken"].value
 
         def post(path, fields, session=None, *, token=csrf, ajax=False):
@@ -3833,7 +3933,7 @@ def test_native_staff_pairing_stats_checkin_and_csv():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path):
+def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path, html_assets):
     tab = legacy_tab_session("elimination-staff")
     board = legacy_tab_session("elimination-board")
     get_user_model().objects.get(username="elimination-board").groups.add(Group.objects.create(name="APDA Board"))
@@ -3863,18 +3963,33 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path)
         judges.append(judge)
     Scratch.objects.create(team=teams[0], judge=judges[-1], scratch_type=Scratch.TAB_SCRATCH)
 
-    with rust_server(overrides={"BACKUP_PREFIX": str(tmp_path), "BACKUP_STORAGE": ""}) as port:
+    with rust_server(overrides={**html_assets, "BACKUP_PREFIX": str(tmp_path), "BACKUP_STORAGE": ""}) as port:
         start = "/break/"
         status, headers, body = request(port, start, cookie=tab)
-        assert status == 200 and b"Enter all preliminary outcomes" in body
+        assert status == 200 and b"Pairing Outrounds" in body
         csrf = load_cookies(headers)["csrftoken"].value
+        jar = {"Cookie": f"sessionid={tab}; csrftoken={csrf}"}
+        reference = Client()
+        reference.cookies["sessionid"] = tab
+        reference.cookies["csrftoken"] = csrf
+        room_check = RoomCheckIn.objects.order_by("pk").last()
+        for available in (3, 2):
+            if available == 2:
+                room_check.delete()
+            status, _, body = request(port, start, extra_headers=jar)
+            assert status == 200 and f"Need 3, have {available}".encode() in body
+            mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)[1][:32]
+            with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask.decode()):
+                assert_html_bytes(body, reference.get(start).content)
+        RoomCheckIn.objects.create(room_id=room_check.room_id, round_number=0)
 
         def post(path, fields=None, session=tab):
             return request(port, path, method="POST",
                            extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
                            form={"csrfmiddlewaretoken": csrf, **(fields or {})})
 
-        assert post(start)[0] == 422
+        not_ready = post(start)
+        assert not_ready[0] == 422 and b"Enter all preliminary outcomes" in not_ready[2]
         assert not BreakingTeam.objects.exists() and not list(tmp_path.glob("*.dump.sql"))
         Round.objects.filter(id=preliminary.id).update(victor=Round.GOV)
         result = post(start)
@@ -3884,7 +3999,8 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path)
         assert Outround.objects.filter(type_of_round=1, num_teams=2).count() == 1
         assert not Outround.objects.exclude(chair=None, room=None).exists()
         assert list(tmp_path.glob("Before the Break*.dump.sql"))
-        assert post(start)[0] == 422
+        unconfirmed = post(start)
+        assert unconfirmed[0] == 422 and b'name="confirm"' in unconfirmed[2]
         scope = {"selected_varsity": 4, "selected_novice": 2}
         endpoint = "/outround_pairing/assign_judges/"
         assert post(endpoint, scope, session=board)[1]["Location"] == "/403/"
@@ -3922,6 +4038,23 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path)
         assert not final.judges.exists() and final.chair_id is None
         assert set(Outround.objects.filter(type_of_round=0, num_teams=4).values_list("id", flat=True)) == {row.id for row in rows}
         assert TabSettings.get("var_teams_visible", use_cache=False) == 4
+        def replacement_token(body):
+            return re.search(rb'name="break_revision" value="([a-f0-9]{64})"', body)[1].decode()
+
+        first_revision = replacement_token(post(start)[2])
+        Outround.objects.filter(pk=final.id).update(choice=Outround.GOV)
+        conflict = post(start, {"confirm": "on", "break_revision": first_revision})
+        assert conflict[0] == 422 and Outround.objects.filter(pk=final.id, choice=Outround.GOV).exists()
+        updated_revision = replacement_token(conflict[2])
+        assert updated_revision != first_revision
+        assert json.loads(post("/outround_pairing/release/2/1/")[2])["pairing_released"]
+        released = post(start, {"confirm": "on", "break_revision": updated_revision})
+        assert released[0] == 422 and TabSettings.get("nov_teams_visible", use_cache=False) == 2
+        confirmed = replacement_token(released[2])
+        assert confirmed != updated_revision
+        assert post(start, {"confirm": "on", "break_revision": confirmed})[0] == 302
+        assert not Outround.objects.filter(pk=final.id).exists()
+        assert post(start, {"confirm": "on", "break_revision": confirmed})[0] == 422
 
 
 @pytest.mark.django_db(transaction=True)
@@ -4109,6 +4242,12 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
         assert post(path, {"action": "delete_challenge", "challenger_id": a})[0] == 302
         assert not OutroundChallenge.objects.exists()
         assert post(path, action)[0] == 302
+        before_rebreak = list(BreakingTeam.objects.order_by("pk").values_list("id", "team_id", "seed"))
+        unconfirmed_break = post("/break/")
+        assert unconfirmed_break[0] == 422 and b'name="confirm"' in unconfirmed_break[2]
+        assert list(BreakingTeam.objects.order_by("pk").values_list("id", "team_id", "seed")) == before_rebreak
+        assert OutroundChallenge.objects.filter(challenger_id=a, challenged_id=c).exists()
+        assert not Outround.objects.exists()
         result = post(path)
         assert result[0] == 302 and result[1]["Location"] == "/outround_pairing/0/4", result
         assert {frozenset((row.gov_team_id, row.opp_team_id)) for row in Outround.objects.all()} == {

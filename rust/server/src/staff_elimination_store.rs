@@ -26,11 +26,14 @@ pub const SETTINGS: &[&str] = &[
     "challenge_seed_basis",
     "var_teams_visible",
     "nov_teams_visible",
+    "var_outrounds_public",
+    "nov_outrounds_public",
     "var_panel_size",
     "nov_panel_size",
     "choice",
 ];
 pub const VISIBILITY: [&str; 2] = ["var_teams_visible", "nov_teams_visible"];
+pub const CONFIRM_REPLACEMENT: &str = "Confirm replacement of the existing elimination rounds.";
 const PAIRING_PUBLIC: [&str; 2] = ["var_outrounds_public", "nov_outrounds_public"];
 
 #[derive(Debug)]
@@ -106,7 +109,7 @@ pub fn stage_size(teams: i32) -> Option<i32> {
         .then(|| (teams as u32).next_power_of_two() as i32)
 }
 
-pub async fn readiness(
+async fn readiness(
     db: &mut MySqlConnection,
     settings: &Settings,
 ) -> Result<Vec<&'static str>, sqlx::Error> {
@@ -150,7 +153,39 @@ pub async fn readiness(
     Ok(problems)
 }
 
-pub async fn break_tournament(app: &App, user: i32, confirm: bool) -> Result<(), Error> {
+pub async fn break_revision(
+    db: &mut MySqlConnection,
+    pairings: &BTreeMap<i32, Snapshot>,
+    settings: &Settings,
+) -> Result<Option<String>, sqlx::Error> {
+    let seeds = sqlx::query_as::<_, (i32, i32, i32, i32, i32)>(
+        "SELECT id, team_id, type_of_team, seed, effective_seed FROM tab_breakingteam ORDER BY id",
+    )
+    .fetch_all(&mut *db)
+    .await?;
+    let challenges = sqlx::query_as::<_, (i32, i32, i32, i32, i32)>(
+        "SELECT id, type_of_round, num_teams, challenger_id, challenged_id FROM tab_outroundchallenge ORDER BY id",
+    ).fetch_all(db).await?;
+    if pairings.is_empty() && seeds.is_empty() && challenges.is_empty() {
+        return Ok(None);
+    }
+    let policy: Vec<_> = SETTINGS
+        .iter()
+        .map(|key| settings.string(key, ""))
+        .collect();
+    let snapshot = serde_json::to_vec(&(pairings, seeds, challenges, policy))
+        .expect("serializable break snapshot");
+    Ok(Some(hex::encode(ring::digest::digest(
+        &ring::digest::SHA256,
+        &snapshot,
+    ))))
+}
+
+pub async fn break_tournament(
+    app: &App,
+    user: i32,
+    confirmation: Option<&str>,
+) -> Result<(), Error> {
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
@@ -158,10 +193,13 @@ pub async fn break_tournament(app: &App, user: i32, confirm: bool) -> Result<(),
         return Err(Error::Invalid(problem));
     }
     let before = board_snapshot::capture(&mut db, Pairings::Outround).await?;
-    if !before.is_empty() && !confirm {
-        return Err(Error::Invalid(
-            "Confirm replacement of the existing elimination rounds.",
-        ));
+    let replacement = break_revision(&mut db, &before, &settings).await?;
+    if replacement.as_deref() != confirmation {
+        return Err(Error::Invalid(if replacement.is_some() {
+            CONFIRM_REPLACEMENT
+        } else {
+            "The elimination rounds changed. Reload this page before breaking teams."
+        }));
     }
     publication::refresh_placements(&mut db, &settings).await?;
     let round = settings.integer("cur_round", 1).to_string();

@@ -10,11 +10,11 @@ use axum::{
 };
 use minijinja::context;
 use serde_json::json;
+use sqlx::MySqlConnection;
 
 use crate::{
     App, access,
     board_snapshot::{self, Pairings},
-    html::{self, Navigation},
     legacy_html,
     legacy_session::Actor,
     login, private,
@@ -99,45 +99,104 @@ async fn show_break(
     headers: &HeaderMap,
     message: Option<&str>,
 ) -> Response {
-    let Ok(mut db) = app.db.acquire().await else {
-        return unavailable();
-    };
-    let Ok(settings) = Settings::load(&mut db, store::SETTINGS).await else {
-        return unavailable();
-    };
-    let Ok(problems) = store::readiness(&mut db, &settings).await else {
-        return unavailable();
-    };
-    let Ok(existing) = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM tab_outround)")
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let settings = Settings::load(&mut db, store::SETTINGS).await?;
+        let rooms = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM tab_roomcheckin WHERE round_number = 0",
+        )
         .fetch_one(&mut *db)
-        .await
-    else {
-        return unavailable();
-    };
-    let Ok(rooms) =
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tab_roomcheckin WHERE round_number = 0")
-            .fetch_one(&mut *db)
-            .await
-    else {
-        return unavailable();
-    };
-    let [varsity, novice] = store::break_sizes(&settings);
-    let Ok(csrf) = html::page_csrf(headers) else {
-        return unavailable();
-    };
-    let result = html::render(
-        "staff_break.html",
-        context! {
-            title => "Break Teams", nav => Navigation::new(actor, true), csrf, problems, rooms, existing,
-            varsity, novice, error => message,
-        },
-        if message.is_some() {
-            StatusCode::UNPROCESSABLE_ENTITY
+        .await?;
+        let [varsity, novice] = store::break_sizes(&settings);
+        let needed = i64::from(varsity.div_euclid(2)) + i64::from(novice.div_euclid(2));
+        let final_round = settings.integer("tot_rounds", 5);
+        let previous_error = break_preview_error(&mut db).await?;
+        let break_revision = if message == Some(store::CONFIRM_REPLACEMENT) {
+            let pairings = board_snapshot::capture(&mut db, Pairings::Outround).await?;
+            store::break_revision(&mut db, &pairings, &settings).await?
         } else {
-            StatusCode::OK
-        },
-    );
-    html::form_response(result, headers, &csrf)
+            None
+        };
+        let shell = legacy_html::shell(&mut db, actor, BREAK).await?;
+        db.commit().await?;
+        let Ok(csrf) = login::TemplateCsrf::new(headers) else {
+            return Ok(unavailable());
+        };
+        let checks = [
+            (
+                format!("All Rounds properly entered for Round {final_round}"),
+                if previous_error.is_some() {
+                    "No"
+                } else {
+                    "Yes"
+                },
+                previous_error.as_deref().unwrap_or("All rounds look good"),
+            ),
+            (
+                format!("N/2 Rooms available Round Out-rounds? Need {needed}, have {rooms}"),
+                if rooms >= needed { "Yes" } else { "No" },
+                if rooms >= needed {
+                    "Rooms are checked in"
+                } else {
+                    "Not enough rooms"
+                },
+            ),
+        ];
+        let mut page = legacy_html::render(
+            "pairing/pair_round.html",
+            shell,
+            context! {
+                title => "Pairing Outrounds", check_status => checks, csrf_input => csrf.input(),
+                checked_in_judges => Vec::<minijinja::Value>::new(),
+                break_revision,
+                messages => message.map(|text| [context! {text, tags => "danger", level => 40}]),
+                DEFAULT_MESSAGE_LEVELS => context! {ERROR => 40},
+            },
+            if message.is_some() {
+                StatusCode::UNPROCESSABLE_ENTITY
+            } else {
+                StatusCode::OK
+            },
+        );
+        csrf.set_cookie(&mut page, headers);
+        Ok::<_, sqlx::Error>(page)
+    }
+    .await;
+    result.unwrap_or_else(|_| unavailable())
+}
+
+async fn break_preview_error(db: &mut MySqlConnection) -> Result<Option<String>, sqlx::Error> {
+    // The reference gives the pairing check stage 0, so its preview reads
+    // round -1. The write transaction checks the actual preliminary rounds.
+    type Row = (i32, String, bool, bool, String, bool, bool);
+    let rows = sqlx::query_as::<_, Row>(
+        "SELECT r.victor, g.name,
+                EXISTS(SELECT 1 FROM tab_bye b WHERE b.round_number = -1 AND b.bye_team_id = g.id),
+                EXISTS(SELECT 1 FROM tab_noshow n WHERE n.round_number = -1 AND n.no_show_team_id = g.id),
+                o.name,
+                EXISTS(SELECT 1 FROM tab_bye b WHERE b.round_number = -1 AND b.bye_team_id = o.id),
+                EXISTS(SELECT 1 FROM tab_noshow n WHERE n.round_number = -1 AND n.no_show_team_id = o.id)
+         FROM tab_round r JOIN tab_team g ON g.id = r.gov_team_id JOIN tab_team o ON o.id = r.opp_team_id
+         WHERE r.round_number = -1 ORDER BY r.id",
+    ).fetch_all(db).await?;
+    for (outcome, gov, gov_bye, gov_absent, opp, opp_bye, opp_absent) in rows {
+        if outcome == 0 {
+            return Ok(Some("Not all rounds are entered. 'You have not entered all the results from the previous round.'".into()));
+        }
+        for (team, bye, absent) in [(gov, gov_bye, gov_absent), (opp, opp_bye, opp_absent)] {
+            if bye {
+                return Ok(Some(format!(
+                    "You have a bye and results. {team} both had a bye and debated last round"
+                )));
+            }
+            if absent {
+                return Ok(Some(format!(
+                    "You have a noshow and results. {team} both debated and had a no show"
+                )));
+            }
+        }
+    }
+    Ok(None)
 }
 
 async fn break_submit(
@@ -153,7 +212,8 @@ async fn break_submit(
     let Some(user) = user(actor) else {
         return access::access_denied();
     };
-    match store::break_tournament(&app, user, fields.flag("confirm")).await {
+    let confirmation = fields.flag("confirm").then(|| fields.get("break_revision"));
+    match store::break_tournament(&app, user, confirmation).await {
         Ok(()) => access::found(ROOT),
         Err(Error::Invalid(message)) => show_break(&app, actor, &headers, Some(message)).await,
         Err(issue) => error(issue),

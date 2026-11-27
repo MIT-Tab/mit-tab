@@ -277,8 +277,16 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             "public/staff_login.html",
             include_str!("../../../mittab/templates/public/staff_login.html"),
         ),
+        (
+            "tab/start_tournament.html",
+            include_str!("../../../mittab/templates/tab/start_tournament.html"),
+        ),
+        (
+            "tab/_custom_staff_role_form.html",
+            include_str!("../../../mittab/templates/tab/_custom_staff_role_form.html"),
+        ),
     ] {
-        env.add_template_owned(name, translate(template))
+        env.add_template_owned(name, translate(name, template))
             .expect("valid legacy template");
     }
     env
@@ -328,7 +336,7 @@ fn tag_words(tag: &str) -> Vec<&str> {
     words
 }
 
-fn translate(source: &str) -> String {
+fn translate(name: &str, source: &str) -> String {
     let mut output = String::new();
     let mut rest = source;
     while let Some((before, tail)) = rest.split_once("{%") {
@@ -478,9 +486,51 @@ fn translate(source: &str) -> String {
         .replace("item.4", "item[4]")
         .replace("forloop.last", "loop.last")
         .replace("|pluralize ", "|django_pluralize ");
+    let translated = if matches!(
+        name,
+        "tab/start_tournament.html" | "tab/_custom_staff_role_form.html"
+    ) {
+        setup_widgets(translated)
+    } else {
+        translated
+    };
     ["default", "date", "yesno", "pluralize"]
         .into_iter()
         .fold(translated, translate_filter_arguments)
+}
+
+fn setup_widgets(source: String) -> String {
+    let source = source
+        // The input named "action" shadows form.action in the browser.
+        .replace(
+            "name=\"action\" value=\"send_invite\"",
+            "name=\"wizard_action\" value=\"send_invite\"",
+        )
+        .replace(
+            "for role_form in custom_staff_formset %",
+            "for role_form in custom_staff_formset.rows %",
+        )
+        .replace(
+            "{{ custom_staff_formset.management_form }}",
+            "{{ custom_staff_formset.management_form|safe }}",
+        )
+        .replace(
+            "{{ custom_staff_formset.non_form_errors }}",
+            "{{ custom_staff_formset.non_form_errors|safe }}",
+        );
+    [
+        ("form", "tournament_name host_school tournament_type sanctioned ga_room facebook_url tournament_director tab_director equity_officers tournament_observer open_speaks open_ranks non_field_errors"),
+        ("role_form", "DELETE title names"),
+        ("invite_form", "email username permission_preset"),
+    ]
+    .into_iter()
+    .fold(source, |mut source, (form, fields)| {
+        for field in fields.split_ascii_whitespace() {
+            let property = if field == "non_field_errors" { "" } else { ".html" };
+            source = source.replace(&format!("{{{{ {form}.{field} }}}}"), &format!("{{{{ {form}.{field}{property}|safe }}}}"));
+        }
+        source
+    })
 }
 
 fn translate_filter_arguments(source: String, filter: &str) -> String {
