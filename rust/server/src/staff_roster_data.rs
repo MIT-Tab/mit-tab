@@ -1,7 +1,8 @@
 use std::{collections::BTreeSet, ops::RangeInclusive};
 
+use chrono::NaiveDateTime;
 use serde_json::json;
-use sqlx::{AssertSqlSafe, MySqlConnection, QueryBuilder};
+use sqlx::{AssertSqlSafe, FromRow, MySqlConnection, QueryBuilder, Row, mysql::MySqlRow};
 
 use crate::{
     codes::{self, Credential},
@@ -9,7 +10,7 @@ use crate::{
     registration_form::{Fields, integer_input, length, valid_email},
     roster_log,
     settings::Settings,
-    staff_roster_fields::{email_errors, rank_input},
+    staff_roster_fields::{checkbox_value, email_errors, rank_input},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -274,18 +275,25 @@ pub async fn save_on(db: &mut MySqlConnection, kind: Kind, edit: Edit<'_>) -> Re
     } else {
         None
     };
+    let mut team_audit = None;
     let id = match kind {
         Kind::School => save_school(db, &edit, new_name).await?,
         Kind::Room => save_room(db, &edit, new_name).await?,
         Kind::Debater => save_debater(db, &edit, new_name).await?,
         Kind::Judge => save_judge(db, &edit, new_name).await?,
-        Kind::Team => save_team(db, &edit, new_name).await?,
+        Kind::Team => {
+            let (id, changes) = save_team(db, &edit, new_name).await?;
+            team_audit = Some(changes);
+            id
+        }
     };
     if matches!(kind, Kind::Team | Kind::Judge) {
-        let category = if kind == Kind::Team {
-            "teams"
-        } else {
-            "judges"
+        let changes = match (team_audit, original.as_deref()) {
+            (Some(fields), Some(_)) => json!({ "fields": fields }),
+            (None, Some(previous)) if previous != new_name => {
+                json!({"fields": ["name"], "name": {"before": previous, "after": new_name}})
+            }
+            _ => json!({}),
         };
         audit(
             db,
@@ -294,10 +302,10 @@ pub async fn save_on(db: &mut MySqlConnection, kind: Kind, edit: Edit<'_>) -> Re
             new_name,
             edit.user,
             edit.id.is_none(),
-            original.as_deref(),
+            changes,
         )
         .await?;
-        if edit.public_log && roster_log::enabled(db).await? {
+        if kind == Kind::Judge && edit.public_log && roster_log::enabled(db).await? {
             let message = match original {
                 None => Some(format!("Added {} “{new_name}”.", kind.model())),
                 Some(old) if old != new_name => {
@@ -306,7 +314,7 @@ pub async fn save_on(db: &mut MySqlConnection, kind: Kind, edit: Edit<'_>) -> Re
                 _ => None,
             };
             if let Some(message) = message {
-                roster_log::record(db, category, &message, false).await?;
+                roster_log::record(db, "judges", &message, false).await?;
             }
         }
     }
@@ -520,7 +528,114 @@ async fn save_judge(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Re
     Ok(id)
 }
 
-async fn save_team(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Result<i32, Error> {
+pub struct TeamRow {
+    pub name: String,
+    pub school: i32,
+    pub hybrid: Option<i32>,
+    pub registration: Option<i32>,
+    pub seed: i32,
+    pub division: i32,
+    pub ranking_public: bool,
+    pub checked_in: bool,
+    pub creator: String,
+    pub created: Option<NaiveDateTime>,
+}
+
+impl FromRow<'_, MySqlRow> for TeamRow {
+    fn from_row(row: &MySqlRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            name: row.try_get("name")?,
+            school: row.try_get("school")?,
+            hybrid: row.try_get("hybrid")?,
+            registration: row.try_get("registration")?,
+            seed: row.try_get("seed")?,
+            division: row.try_get("division")?,
+            ranking_public: row.try_get("ranking_public")?,
+            checked_in: row.try_get::<i64, _>("checked_in")? != 0,
+            creator: row.try_get("creator")?,
+            created: row.try_get("created")?,
+        })
+    }
+}
+
+impl TeamRow {
+    pub async fn load(db: &mut MySqlConnection, id: i32, checkins: bool) -> Result<Self, Error> {
+        sqlx::query_as(
+            "SELECT t.name, t.school_id AS school, t.hybrid_school_id AS hybrid,
+                    t.registration_id AS registration, t.seed, t.break_preference AS division,
+                    t.ranking_public, CAST(IF(?, t.checked_in, FALSE) AS SIGNED) AS checked_in,
+                    COALESCE(u.username, 'Unknown') AS creator, t.created_at AS created
+             FROM tab_team t LEFT JOIN auth_user u ON t.created_by_id = u.id WHERE t.id = ?",
+        )
+        .bind(checkins)
+        .bind(id)
+        .fetch_optional(db)
+        .await?
+        .ok_or(Error::Missing)
+    }
+}
+
+pub async fn team_members(
+    db: &mut MySqlConnection,
+    id: i32,
+) -> Result<Vec<(i32, String)>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT d.id, d.name FROM tab_debater d JOIN tab_team_debaters t ON d.id = t.debater_id
+         WHERE t.team_id = ? ORDER BY d.name",
+    )
+    .bind(id)
+    .fetch_all(db)
+    .await
+}
+
+pub async fn team_tags(db: &mut MySqlConnection, team: i32) -> Result<BTreeSet<i32>, sqlx::Error> {
+    Ok(
+        sqlx::query_scalar("SELECT roomtag_id FROM tab_team_required_room_tags WHERE team_id = ?")
+            .bind(team)
+            .fetch_all(db)
+            .await?
+            .into_iter()
+            .collect(),
+    )
+}
+
+pub async fn team_members_conflict(
+    db: &mut MySqlConnection,
+    team: Option<i32>,
+    members: &BTreeSet<i32>,
+) -> Result<bool, sqlx::Error> {
+    if members.is_empty() {
+        return Ok(false);
+    }
+    let mut query =
+        QueryBuilder::new("SELECT EXISTS(SELECT 1 FROM tab_team_debaters WHERE debater_id IN (");
+    let mut ids = query.separated(", ");
+    for &id in members {
+        ids.push_bind(id);
+    }
+    ids.push_unseparated(")");
+    if let Some(team) = team {
+        query.push(" AND team_id <> ").push_bind(team);
+    }
+    query.push(")").build_query_scalar().fetch_one(db).await
+}
+
+pub const TEAM_CHECKIN_CONFLICT: &str =
+    "Team check-in changed. Review the current check-in before saving again.";
+
+pub fn team_checkin_initial(fields: &Fields) -> Option<bool> {
+    match fields.get("mittab_team_checkin_initial") {
+        "0" => Some(false),
+        "1" => Some(true),
+        _ => None,
+    }
+}
+
+async fn save_team(
+    db: &mut MySqlConnection,
+    edit: &Edit<'_>,
+    name: &str,
+) -> Result<(i32, Vec<&'static str>), Error> {
     let fields = edit.fields;
     let school = foreign(db, fields, "school", "tab_school")
         .await?
@@ -533,75 +648,187 @@ async fn save_team(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Res
     let members = ids(fields, "debaters")?;
     require_existing(db, "tab_roomtag", tags.iter().copied()).await?;
     require_existing(db, "tab_debater", members.iter().copied()).await?;
-    if members.len() > 2 || (edit.id.is_some() && members.is_empty()) {
+    if edit.id.is_some() && !(1..=2).contains(&members.len()) {
         return Err(Error::Invalid("Choose one or two debaters."));
     }
-    for &member in &members {
-        let other: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM tab_team_debaters WHERE debater_id = ? AND (? IS NULL OR team_id <> ?))",
-        ).bind(member).bind(edit.id).bind(edit.id).fetch_one(&mut *db).await?;
-        if other {
-            return Err(Error::Invalid(
-                "A selected debater is already on another team.",
-            ));
-        }
+    if team_members_conflict(db, edit.id, &members).await? {
+        return Err(Error::Invalid(
+            "A selected debater is already on another team.",
+        ));
     }
+    let checked_in = checkbox_value(fields, "checked_in");
+    let ranking_public = checkbox_value(fields, "ranking_public");
+    let coin = codes::coin(db, true).await?;
+    let mut changes = Vec::new();
+    let mut previous_members = BTreeSet::new();
+    let mut previous_tags = BTreeSet::new();
+    let mut affiliations = Vec::new();
     let id = if let Some(id) = edit.id {
+        let before = TeamRow::load(db, id, edit.checkins).await?;
+        let edit_checkin = if edit.checkins {
+            match team_checkin_initial(fields) {
+                Some(initial) => initial != checked_in,
+                None if before.checked_in != checked_in => {
+                    return Err(Error::Invalid(TEAM_CHECKIN_CONFLICT));
+                }
+                None => false,
+            }
+        } else {
+            false
+        };
+        affiliations = [(Some(before.school), Some(school)), (before.hybrid, hybrid)]
+            .into_iter()
+            .filter(|(old, new)| old != new)
+            .collect();
+        previous_members = team_members(db, id)
+            .await?
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        previous_tags = team_tags(db, id).await?;
+        changes.extend(
+            [
+                ("name", before.name != name),
+                ("school", before.school != school),
+                ("hybrid_school", before.hybrid != hybrid),
+                ("debaters", previous_members != members),
+                ("registration", before.registration != registration),
+                ("seed", before.seed != seed),
+                (
+                    "checked_in",
+                    edit_checkin && before.checked_in != checked_in,
+                ),
+                ("required_room_tags", previous_tags != tags),
+                ("break_preference", before.division != division),
+                ("ranking_public", before.ranking_public != ranking_public),
+            ]
+            .into_iter()
+            .filter_map(|(field, changed)| changed.then_some(field)),
+        );
+        let missing_code: bool = sqlx::query_scalar(
+            "SELECT team_code IS NULL OR team_code = '' FROM tab_team WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(&mut *db)
+        .await?;
+        let code = if missing_code {
+            Some(codes::unique(db, Credential::Team).await?)
+        } else {
+            None
+        };
         sqlx::query(
             "UPDATE tab_team SET name = ?, school_id = ?, hybrid_school_id = ?, registration_id = ?, seed = ?,
-             break_preference = ?, ranking_public = ?, checked_in = IF(?, ?, checked_in) WHERE id = ?",
+             break_preference = ?, ranking_public = ?, checked_in = IF(?, ?, checked_in),
+             team_code = COALESCE(?, team_code), tiebreaker = ? WHERE id = ?",
         ).bind(name).bind(school).bind(hybrid).bind(registration).bind(seed).bind(division)
-            .bind(fields.flag("ranking_public")).bind(edit.checkins).bind(fields.flag("checked_in")).bind(id)
+            .bind(ranking_public).bind(edit_checkin).bind(checked_in).bind(code).bind(coin).bind(id)
             .execute(&mut *db).await?;
         id
     } else {
-        let coin = codes::coin(db, true).await?;
         let code = codes::unique(db, Credential::Team).await?;
         sqlx::query(
             "INSERT INTO tab_team (name, school_id, hybrid_school_id, registration_id, seed, break_preference,
              ranking_public, checked_in, tiebreaker, team_code, created_by_id, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(6))",
         ).bind(name).bind(school).bind(hybrid).bind(registration).bind(seed).bind(division)
-            .bind(fields.flag("ranking_public")).bind(!edit.checkins || fields.flag("checked_in"))
+            .bind(ranking_public).bind(!edit.checkins || checked_in)
             .bind(coin).bind(code).bind(edit.user).execute(&mut *db).await?.last_insert_id() as i32
     };
-    let previous: BTreeSet<i32> =
-        sqlx::query_scalar("SELECT debater_id FROM tab_team_debaters WHERE team_id = ?")
-            .bind(id)
-            .fetch_all(&mut *db)
-            .await?
-            .into_iter()
-            .collect();
-    if previous != members {
-        set_links(
-            db,
-            "tab_team_debaters",
-            "team_id",
-            "debater_id",
-            id,
-            members,
-        )
-        .await?;
-        if edit.public_log && edit.id.is_some() && roster_log::enabled(db).await? {
+    if edit.public_log && roster_log::enabled(db).await? {
+        if edit.id.is_none() {
+            roster_log::record(db, "teams", &format!("Added team “{name}”."), false).await?;
+        }
+        for (old, new) in affiliations {
+            let old_id = old.map(|id| id.to_string());
+            let new_id = new.map(|id| id.to_string());
+            let (old, new) =
+                roster_log::affiliation_names(db, old_id.as_deref(), new_id.as_deref()).await?;
             roster_log::record(
                 db,
                 "teams",
-                &format!("Updated debaters for “{name}”."),
-                true,
+                &format!("Changed affiliation for “{name}”: {old} → {new}."),
+                false,
             )
             .await?;
         }
+        for (verb, prep, ids) in [
+            ("Removed", "from", previous_members.difference(&members)),
+            ("Added", "on", members.difference(&previous_members)),
+        ] {
+            for &debater_id in ids {
+                let debater = self::name(db, Kind::Debater, debater_id)
+                    .await?
+                    .ok_or(Error::Missing)?;
+                roster_log::record(
+                    db,
+                    "teams",
+                    &format!("{verb} debater “{debater}” {prep} team “{name}”."),
+                    true,
+                )
+                .await?;
+            }
+        }
     }
-    set_links(
+    change_team_links(
         db,
-        "tab_team_required_room_tags",
-        "team_id",
-        "roomtag_id",
+        "tab_team_debaters",
+        "debater_id",
         id,
-        tags,
+        &previous_members,
+        &members,
     )
     .await?;
-    Ok(id)
+    change_team_links(
+        db,
+        "tab_team_required_room_tags",
+        "roomtag_id",
+        id,
+        &previous_tags,
+        &tags,
+    )
+    .await?;
+    Ok((id, changes))
+}
+
+async fn change_team_links(
+    db: &mut MySqlConnection,
+    table: &'static str,
+    related: &'static str,
+    team: i32,
+    before: &BTreeSet<i32>,
+    after: &BTreeSet<i32>,
+) -> Result<(), sqlx::Error> {
+    let mut removed = before.difference(after).peekable();
+    if removed.peek().is_some() {
+        let mut delete = QueryBuilder::new("DELETE FROM ");
+        delete
+            .push(table)
+            .push(" WHERE team_id = ")
+            .push_bind(team)
+            .push(" AND ")
+            .push(related)
+            .push(" IN (");
+        let mut ids = delete.separated(", ");
+        for &id in removed {
+            ids.push_bind(id);
+        }
+        ids.push_unseparated(")");
+        delete.build().execute(&mut *db).await?;
+    }
+    let mut added = after.difference(before).peekable();
+    if added.peek().is_some() {
+        let mut insert = QueryBuilder::new("INSERT INTO ");
+        insert
+            .push(table)
+            .push(" (team_id, ")
+            .push(related)
+            .push(") ");
+        insert.push_values(added, |mut row, &id| {
+            row.push_bind(team).push_bind(id);
+        });
+        insert.build().execute(db).await?;
+    }
+    Ok(())
 }
 
 async fn checkins(
@@ -687,13 +914,8 @@ async fn audit(
     name: &str,
     user: i32,
     created: bool,
-    previous: Option<&str>,
+    changes: serde_json::Value,
 ) -> Result<(), sqlx::Error> {
-    let changes = if let Some(previous) = previous.filter(|&previous| previous != name) {
-        json!({"fields": ["name"], "name": {"before": previous, "after": name}})
-    } else {
-        json!({})
-    };
     sqlx::query(
         "INSERT INTO tab_auditevent (object_id, object_repr, event_type, created_at, changes, note, content_type_id, user_id)
          VALUES (?, ?, ?, UTC_TIMESTAMP(6), ?, '',

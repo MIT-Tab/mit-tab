@@ -11,7 +11,7 @@ use axum::{
 use minijinja::{Value as TemplateValue, context};
 use serde::Serialize;
 use serde_json::Value;
-use sqlx::{AssertSqlSafe, MySqlConnection};
+use sqlx::MySqlConnection;
 
 use crate::{
     App, access,
@@ -25,7 +25,7 @@ use crate::{
     staff_pairing::lock_round,
     staff_rankings, staff_roles, staff_room,
     staff_roster_data::{self as data, Edit, Error, Kind},
-    staff_roster_notice, staff_school, unavailable,
+    staff_roster_notice, staff_school, staff_team, unavailable,
 };
 
 pub fn routes() -> Router<App> {
@@ -506,22 +506,45 @@ async fn save_edit(
     let Some((current, checkins)) = roster_writer(app, &mut db, headers, user, true).await? else {
         return Ok(access::access_denied());
     };
-    let result = data::save_on(
-        &mut db,
-        kind,
-        Edit {
-            id,
-            user,
-            checkins: checkins && fields.flag("mittab_checkins_present"),
-            public_log: true,
-            fields,
-        },
-    )
-    .await;
+    let initial_scratches = kind == Kind::Team
+        && id.is_none()
+        && matches!(
+            current,
+            Actor::User {
+                superuser: true,
+                ..
+            }
+        );
+    let scratch_count = if kind == Kind::Team {
+        staff_team::validate_post(fields, initial_scratches)
+    } else {
+        Ok(0)
+    };
+    let result = match scratch_count {
+        Ok(count) => data::save_on(
+            &mut db,
+            kind,
+            Edit {
+                id,
+                user,
+                checkins: checkins && fields.flag("mittab_checkins_present"),
+                public_log: true,
+                fields,
+            },
+        )
+        .await
+        .map(|saved| (saved, count)),
+        Err(error) => Err(error),
+    };
     match result {
-        Ok(saved) => {
+        Ok((saved, scratch_count)) => {
             db.commit().await?;
-            if matches!(kind, Kind::School | Kind::Room | Kind::Debater) {
+            if scratch_count > 0 {
+                return Ok(access::found(format!(
+                    "/team/{saved}/scratches/add/{scratch_count}"
+                )));
+            }
+            if matches!(kind, Kind::School | Kind::Room | Kind::Debater | Kind::Team) {
                 let name = fields.get("name");
                 let (target, message) = if id.is_some() {
                     // The Django room edit also uses "School" in its success message.
@@ -616,6 +639,7 @@ async fn show(
         Kind::Debater => {
             Some(staff_debater::show(app, actor, headers, id, return_path, posted).await)
         }
+        Kind::Team => Some(staff_team::show(app, actor, headers, id, return_path, posted).await),
         _ => None,
     };
     if let Some(legacy) = legacy {
@@ -628,7 +652,7 @@ async fn show(
     let Ok(csrf) = html::page_csrf(headers) else {
         return unavailable();
     };
-    match edit_page(app, actor, &csrf, kind, id, posted).await {
+    match edit_judge_page(app, actor, &csrf, id, posted).await {
         Ok(response) => html::form_response(response, headers, &csrf),
         Err(Error::Missing) => missing(),
         Err(_) => unavailable(),
@@ -690,24 +714,21 @@ impl FormField {
     }
 }
 
-async fn edit_page(
+async fn edit_judge_page(
     app: &App,
     actor: Actor,
     csrf: &str,
-    kind: Kind,
     id: Option<i32>,
     posted: Option<(&Fields, &str)>,
 ) -> Result<Response, Error> {
     let mut db = app.db.acquire().await?;
     let checkins = staff_roles::can_check_in(&mut *db, actor).await?;
-    let values = current(&mut db, kind, id, checkins).await?;
-    let mut fields = form_fields(&mut db, kind, &values, id, checkins).await?;
-    let checkin_fields = checkins && (kind == Kind::Team || id.is_some() && kind == Kind::Judge);
+    let values = current_judge(&mut db, id, checkins).await?;
+    let mut fields = judge_fields(&mut db, &values, id, checkins).await?;
+    let checkin_fields = checkins && id.is_some();
     if let Some((posted, _)) = posted {
         for field in &mut fields {
-            if (field.name == "checked_in" || field.name.starts_with("checkin_"))
-                && !posted.flag("mittab_checkins_present")
-            {
+            if field.name.starts_with("checkin_") && !posted.flag("mittab_checkins_present") {
                 continue;
             }
             field.values = posted.all(&field.name).to_vec();
@@ -715,18 +736,16 @@ async fn edit_page(
             field.checked = posted.flag(&field.name);
         }
     }
-    let subject = kind.singular();
-    let key = kind.model();
     let title = values
         .get("name")
         .and_then(|name| name.first())
-        .map(|name| format!("{subject} · {name}"))
-        .unwrap_or_else(|| format!("Create {subject}"));
+        .map(|name| format!("Judge · {name}"))
+        .unwrap_or_else(|| "Create Judge".into());
     let error = posted.map(|(_, error)| error);
     Ok(html::render(
         "staff_roster_edit.html",
         context! {
-            title, key, id, fields, nav => Navigation::new(actor, true), toolbar => toolbar(), csrf, error,
+            title, key => "judge", id, fields, nav => Navigation::new(actor, true), toolbar => toolbar(), csrf, error,
             checkin_fields, admin => is_tab(actor),
         },
         if error.is_some() {
@@ -748,91 +767,44 @@ const JUDGE_FLAGS: &[(&str, &str)] = &[
     ("no_wings", "Requests no wings"),
 ];
 
-async fn form_fields(
+async fn judge_fields(
     db: &mut MySqlConnection,
-    kind: Kind,
     values: &Values,
     id: Option<i32>,
-    tab: bool,
+    checkins: bool,
 ) -> Result<Vec<FormField>, sqlx::Error> {
     let field = |name, label, control| FormField::new(values, name, label, control);
-    let mut output = vec![field("name", "Name", "text").input(true, kind.limit())];
-    if kind == Kind::Judge {
-        let mut rank = field("rank", "Rank", "number");
-        rank.required = true;
-        rank.step = Some("0.01");
-        output.push(rank);
+    let mut rank = field("rank", "Rank", "number");
+    rank.required = true;
+    rank.step = Some("0.01");
+    let mut output = vec![
+        field("name", "Name", "text").input(true, Kind::Judge.limit()),
+        rank,
+        field("email", "Email", "email").input(false, 254),
+    ];
+    for &(name, label) in BASE {
+        output.push(field(name, label, "checkbox"));
     }
-    if kind == Kind::Judge {
-        output.push(field("email", "Email", "email").input(false, 254));
-        for &(name, label) in BASE {
-            output.push(field(name, label, "checkbox"));
-        }
+    output.extend([
+        field("schools", "School affiliations", "multi").choices(
+            options(db, "SELECT id, name FROM tab_school ORDER BY name, id").await?, false,
+        ),
+        field("registration", "Registration", "select").choices(
+            options(db, "SELECT r.id, CONCAT(s.name, ' — ', r.email) FROM registration_registration r JOIN tab_school s ON r.school_id = s.id ORDER BY s.name, r.id").await?, false,
+        ),
+        field("ballot_code", "Ballot code", "text").input(false, 30),
+        field("reported_experience", "Reported years of experience", "number"),
+    ]);
+    for &(name, label) in JUDGE_FLAGS {
+        output.push(field(name, label, "checkbox"));
     }
-    if matches!(kind, Kind::Judge | Kind::Team) {
-        let choices = options(db, "SELECT id, name FROM tab_school ORDER BY name, id").await?;
-        match kind {
-            Kind::Judge => output
-                .push(field("schools", "School affiliations", "multi").choices(choices, false)),
-            Kind::Team => {
-                output.push(field("school", "School", "select").choices(choices.clone(), true));
-                output.push(
-                    field("hybrid_school", "Hybrid school", "select").choices(choices, false),
-                );
-            }
-            Kind::School | Kind::Room | Kind::Debater => unreachable!(),
-        }
-    }
-    if matches!(kind, Kind::Judge | Kind::Team) {
-        let registrations = options(db,
-            "SELECT r.id, CONCAT(s.name, ' — ', r.email) FROM registration_registration r JOIN tab_school s ON r.school_id = s.id ORDER BY s.name, r.id").await?;
-        output.push(field("registration", "Registration", "select").choices(registrations, false));
-    }
-    if kind == Kind::Judge {
-        output.push(field("ballot_code", "Ballot code", "text").input(false, 30));
-        output.push(field(
-            "reported_experience",
-            "Reported years of experience",
-            "number",
-        ));
-        for &(name, label) in JUDGE_FLAGS {
-            output.push(field(name, label, "checkbox"));
-        }
-    }
-    if kind == Kind::Team {
-        output.push(
-            field("seed", "Seed", "select").choices(
-                ["Unseeded", "Free seed", "Half seed", "Full seed"]
-                    .into_iter()
-                    .enumerate()
-                    .map(|(id, value)| (id.to_string(), value.into()))
-                    .collect(),
-                true,
-            ),
-        );
-        output.push(
-            field("break_preference", "Break preference", "select").choices(divisions(), true),
-        );
-        let debaters = options(db, "SELECT id, name FROM tab_debater ORDER BY name, id").await?;
-        output.push(field("debaters", "Debaters", "multi").choices(debaters, false));
-        output.push(field(
-            "ranking_public",
-            "Include in public rankings",
-            "checkbox",
-        ));
-        if tab {
-            output.push(field("checked_in", "Checked in", "checkbox"));
-        }
-    }
-    if matches!(kind, Kind::Team | Kind::Judge) {
-        output.push(
-            field("required_room_tags", "Required room tags", "multi").choices(
-                options(db, "SELECT id, tag FROM tab_roomtag ORDER BY tag, id").await?,
-                false,
-            ),
-        );
-    }
-    if tab && id.is_some() && kind == Kind::Judge {
+    output.push(
+        field("required_room_tags", "Required room tags", "multi").choices(
+            options(db, "SELECT id, tag FROM tab_roomtag ORDER BY tag, id").await?,
+            false,
+        ),
+    );
+    if checkins && id.is_some() {
         for round in data::checkin_rounds(db).await? {
             let label = if round == 0 {
                 "Checked in for outrounds".into()
@@ -850,13 +822,6 @@ async fn form_fields(
     Ok(output)
 }
 
-fn divisions() -> Choices {
-    vec![
-        ("0".into(), "Varsity".into()),
-        ("1".into(), "Novice".into()),
-    ]
-}
-
 async fn options(
     db: &mut MySqlConnection,
     statement: &'static str,
@@ -869,39 +834,22 @@ async fn options(
         .collect())
 }
 
-async fn current(
+async fn current_judge(
     db: &mut MySqlConnection,
-    kind: Kind,
     id: Option<i32>,
-    tab: bool,
+    checkins: bool,
 ) -> Result<Values, Error> {
     let Some(id) = id else {
-        return Ok(["checked_in", "ranking_public"]
-            .map(|key| (key.into(), vec!["1".into()]))
-            .into_iter()
-            .chain(
-                ["novice_status", "seed", "break_preference"]
-                    .map(|key| (key.into(), vec!["0".into()])),
-            )
-            .collect());
+        return Ok(Values::new());
     };
-    let fields = match kind {
-        Kind::School | Kind::Room | Kind::Debater => unreachable!(),
-        Kind::Judge => "'rank', CAST(`rank` AS CHAR), 'email', email, 'registration', registration_id,
-            'ballot_code', ballot_code, 'reported_experience', reported_experience, 'wing_only', wing_only,
+    let text: Option<String> = sqlx::query_scalar(
+        "SELECT CAST(JSON_OBJECT('name', name, 'rank', CAST(`rank` AS CHAR), 'email', email,
+            'registration', registration_id, 'ballot_code', ballot_code,
+            'reported_experience', reported_experience, 'wing_only', wing_only,
             'is_dino', is_dino, 'request_wing', request_wing, 'no_wings', no_wings,
-            'needs_crash_housing', needs_crash_housing, 'requests_wgm_housing', requests_wgm_housing",
-        Kind::Team => "'school', school_id, 'hybrid_school', hybrid_school_id, 'registration', registration_id,
-            'seed', seed, 'break_preference', break_preference, 'ranking_public', ranking_public, 'checked_in', checked_in",
-    };
-    let sql = format!(
-        "SELECT CAST(JSON_OBJECT('name', name, {fields}) AS CHAR) FROM {} WHERE id = ?",
-        kind.table()
-    );
-    let text: Option<String> = sqlx::query_scalar(AssertSqlSafe(sql))
-        .bind(id)
-        .fetch_optional(&mut *db)
-        .await?;
+            'needs_crash_housing', needs_crash_housing, 'requests_wgm_housing', requests_wgm_housing)
+         AS CHAR) FROM tab_judge WHERE id = ?",
+    ).bind(id).fetch_optional(&mut *db).await?;
     let values = serde_json::from_str::<BTreeMap<String, Value>>(&text.ok_or(Error::Missing)?)
         .map_err(|_| Error::Database)?;
     let mut values: Values = values
@@ -913,30 +861,16 @@ async fn current(
             Value::Array(_) | Value::Object(_) => None,
         })
         .collect();
-    let relations: &[(&str, &str)] = match kind {
-        Kind::Team => &[
-            (
-                "required_room_tags",
-                "SELECT roomtag_id FROM tab_team_required_room_tags WHERE team_id = ?",
-            ),
-            (
-                "debaters",
-                "SELECT debater_id FROM tab_team_debaters WHERE team_id = ?",
-            ),
-        ],
-        Kind::Judge => &[
-            (
-                "required_room_tags",
-                "SELECT roomtag_id FROM tab_judge_required_room_tags WHERE judge_id = ?",
-            ),
-            (
-                "schools",
-                "SELECT school_id FROM tab_judge_schools WHERE judge_id = ?",
-            ),
-        ],
-        _ => &[],
-    };
-    for &(key, sql) in relations {
+    for (key, sql) in [
+        (
+            "required_room_tags",
+            "SELECT roomtag_id FROM tab_judge_required_room_tags WHERE judge_id = ?",
+        ),
+        (
+            "schools",
+            "SELECT school_id FROM tab_judge_schools WHERE judge_id = ?",
+        ),
+    ] {
         let ids = sqlx::query_scalar::<_, i32>(sql)
             .bind(id)
             .fetch_all(&mut *db)
@@ -946,7 +880,7 @@ async fn current(
             ids.into_iter().map(|id| id.to_string()).collect(),
         );
     }
-    if tab && kind == Kind::Judge {
+    if checkins {
         let rounds =
             sqlx::query_scalar::<_, i32>("SELECT round_number FROM tab_checkin WHERE judge_id = ?")
                 .bind(id)
@@ -1046,12 +980,12 @@ async fn delete_entry(
     match data::delete_on(&mut db, kind, id).await {
         Ok(()) => {
             db.commit().await?;
-            if kind == Kind::Debater {
+            if matches!(kind, Kind::Debater | Kind::Team) {
                 Ok(staff_roster_notice::saved(
                     app,
                     headers,
                     "/",
-                    "Debater deleted successfully",
+                    &format!("{} deleted successfully", kind.singular()),
                 ))
             } else {
                 Ok(access::found(format!("/view_{}s/", kind.model())))

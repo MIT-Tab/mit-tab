@@ -16,7 +16,7 @@ use sqlx::MySqlConnection;
 use crate::{
     App, access,
     html::{self, Navigation},
-    legacy_session::{self, Actor},
+    legacy_session::{self, Actor, SessionError},
     login, private,
     registration_form::Fields,
     staff_pairing::lock_round,
@@ -27,7 +27,7 @@ use crate::{
 
 const ENTER: &str = "/enter_scratch/";
 const LIST: &str = "/scratches/view/";
-const MAX_BATCH: usize = 50;
+pub const MAX_BATCH: usize = 50;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
@@ -42,6 +42,7 @@ impl Scope {
         match path {
             ENTER => read || *method == Method::POST,
             LIST => self != Self::Submit && read,
+            "/team/{id}/scratches/add/{count}" => self != Self::Submit && read,
             "/judge/{id}/scratches/add/{count}/" | "/team/{id}/scratches/add/{count}/" => {
                 self != Self::Submit && (read || *method == Method::POST)
             }
@@ -60,7 +61,8 @@ impl Scope {
 pub fn routes() -> Router<App> {
     let mut router = Router::new()
         .route(ENTER, get(enter).post(submit))
-        .route(LIST, get(all));
+        .route(LIST, get(all))
+        .route("/team/{id}/scratches/add/{count}", get(batch_redirect));
     for label in ["team", "judge"] {
         router = router
             .route(
@@ -79,6 +81,12 @@ pub fn routes() -> Router<App> {
     router
 }
 
+async fn batch_redirect(Path((id, count)): Path<(i32, usize)>) -> Response {
+    let mut response = access::found(format!("/team/{id}/scratches/add/{count}/"));
+    *response.status_mut() = StatusCode::MOVED_PERMANENTLY;
+    response
+}
+
 pub async fn middleware(State(app): State<App>, mut request: Request, next: Next) -> Response {
     let actor =
         match legacy_session::actor(&app.db, request.headers(), app.django_secret.as_deref()).await
@@ -86,7 +94,7 @@ pub async fn middleware(State(app): State<App>, mut request: Request, next: Next
             Ok(actor) => actor,
             Err(error) => return error.response(),
         };
-    let scope = match actor {
+    match actor {
         Actor::Anonymous => {
             return access::found(format!("/public/login/?next={}", request.uri().path()));
         }
@@ -96,19 +104,16 @@ pub async fn middleware(State(app): State<App>, mut request: Request, next: Next
         Actor::User {
             superuser: true, ..
         } => match access::wizard_complete(&app).await {
-            Ok(true) => Scope::Admin,
+            Ok(true) => {}
             Ok(false) => return access::found("/setup/start-tournament/"),
             Err(_) => return unavailable(),
         },
-        Actor::User {
-            id, staff: true, ..
-        } => match staff_roles::preset(&app.db, id).await {
-            Ok(Some(Preset::Scratches)) => Scope::Submit,
-            Ok(Some(Preset::ScratchRead)) => Scope::Review,
-            Ok(_) => return access::access_denied(),
-            Err(_) => return unavailable(),
-        },
-        Actor::User { .. } => return access::access_denied(),
+        Actor::User { .. } => {}
+    }
+    let scope = match scratch_scope(&app.db, actor).await {
+        Ok(Some(scope)) => scope,
+        Ok(None) => return access::access_denied(),
+        Err(_) => return unavailable(),
     };
     let path = request
         .extensions()
@@ -121,6 +126,30 @@ pub async fn middleware(State(app): State<App>, mut request: Request, next: Next
     request.extensions_mut().insert(actor);
     request.extensions_mut().insert(scope);
     next.run(request).await
+}
+
+async fn scratch_scope<'db>(
+    db: impl sqlx::MySqlExecutor<'db>,
+    actor: Actor,
+) -> Result<Option<Scope>, sqlx::Error> {
+    match actor {
+        Actor::User {
+            superuser: true,
+            board: false,
+            ..
+        } => Ok(Some(Scope::Admin)),
+        Actor::User {
+            id,
+            staff: true,
+            board: false,
+            ..
+        } => Ok(match staff_roles::preset_on(db, id).await? {
+            Some(Preset::Scratches) => Some(Scope::Submit),
+            Some(Preset::ScratchRead) => Some(Scope::Review),
+            _ => None,
+        }),
+        _ => Ok(None),
+    }
 }
 
 #[derive(Clone, Copy, Serialize, Default)]
@@ -318,7 +347,18 @@ pub async fn submit(
     };
     let input = read_input(&fields, "", 0, Scratch::default());
     let result = match input {
-        Some(input) => apply(&app, user, &[input], None, scope == Scope::Submit).await,
+        Some(input) => {
+            apply(
+                &app,
+                &headers,
+                user,
+                ENTER,
+                &[input],
+                None,
+                scope == Scope::Submit,
+            )
+            .await
+        }
         None => Err(Error::Invalid("Choose a team, judge, and scratch type.")),
     };
     match result {
@@ -338,7 +378,8 @@ pub async fn submit(
             )
             .await
         }
-        Err(_) => unavailable(),
+        Err(Error::Forbidden) => access::access_denied(),
+        Err(Error::Database) => unavailable(),
     }
 }
 
@@ -367,7 +408,18 @@ pub async fn add_batch(
         .map(|index| read_input(&fields, &format!("{index}-"), 0, subject.seed()))
         .collect();
     let result = match batch {
-        Some(batch) => apply(&app, user, &batch, Some(subject), false).await,
+        Some(batch) => {
+            apply(
+                &app,
+                &headers,
+                user,
+                path.as_str(),
+                &batch,
+                Some(subject),
+                false,
+            )
+            .await
+        }
         None => Err(Error::Invalid(
             "Choose a team, judge, and scratch type for each entry.",
         )),
@@ -377,7 +429,8 @@ pub async fn add_batch(
         Err(Error::Invalid(error)) => {
             batch_page(&app, actor, &headers, subject, count, Some(error)).await
         }
-        Err(_) => unavailable(),
+        Err(Error::Forbidden) => access::access_denied(),
+        Err(Error::Database) => unavailable(),
     }
 }
 
@@ -406,6 +459,7 @@ fn user_id(actor: Actor) -> Option<i32> {
 enum Error {
     Invalid(&'static str),
     Database,
+    Forbidden,
 }
 
 impl From<sqlx::Error> for Error {
@@ -423,13 +477,17 @@ impl From<sqlx::Error> for Error {
 
 async fn apply(
     app: &App,
+    headers: &HeaderMap,
     user: i32,
+    path: &str,
     inputs: &[Scratch],
     subject: Option<Subject>,
     blind: bool,
 ) -> Result<(), Error> {
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
+    let current = write_scope(&mut db, app, headers, user, path).await?;
+    let blind = blind || current == Scope::Submit;
     let scope: BTreeSet<i32> = if inputs.iter().any(|input| input.id != 0) {
         rows(&mut db, subject)
             .await?
@@ -487,6 +545,25 @@ async fn apply(
     }
     db.commit().await?;
     Ok(())
+}
+
+async fn write_scope(
+    db: &mut MySqlConnection,
+    app: &App,
+    headers: &HeaderMap,
+    user: i32,
+    path: &str,
+) -> Result<Scope, Error> {
+    let session = legacy_session::cookie(headers, "sessionid").ok_or(Error::Forbidden)?;
+    let actor = match legacy_session::actor_on(db, session, app.django_secret.as_deref()).await {
+        Ok(actor) if user_id(actor) == Some(user) => actor,
+        Err(SessionError::Database) => return Err(Error::Database),
+        _ => return Err(Error::Forbidden),
+    };
+    scratch_scope(db, actor)
+        .await?
+        .filter(|scope| scope.allows(path, &Method::POST))
+        .ok_or(Error::Forbidden)
 }
 
 pub async fn audit(
@@ -627,9 +704,20 @@ pub async fn update(
         .collect();
     match inputs {
         Some(inputs) if !inputs.is_empty() => {
-            match apply(&app, user, &inputs, Some(subject), false).await {
+            match apply(
+                &app,
+                &headers,
+                user,
+                path.as_str(),
+                &inputs,
+                Some(subject),
+                false,
+            )
+            .await
+            {
                 Ok(()) => access::found(subject.url()),
                 Err(Error::Invalid(error)) => private((StatusCode::UNPROCESSABLE_ENTITY, error)),
+                Err(Error::Forbidden) => access::access_denied(),
                 Err(Error::Database) => unavailable(),
             }
         }
@@ -675,6 +763,7 @@ pub async fn delete_page(
 
 pub async fn remove(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     path: MatchedPath,
     Path((id, scratch)): Path<(i32, i32)>,
     headers: HeaderMap,
@@ -687,9 +776,13 @@ pub async fn remove(
     if !login::valid_csrf(&headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
+    let Some(user) = user_id(actor) else {
+        return access::access_denied();
+    };
     let result = async {
         let mut tx = app.db.begin().await?;
         lock_round(&mut tx).await?;
+        write_scope(&mut tx, &app, &headers, user, path.as_str()).await?;
         let sql = if subject.kind == Kind::Team {
             "DELETE FROM tab_scratch WHERE id = ? AND team_id = ?"
         } else {
@@ -701,12 +794,13 @@ pub async fn remove(
             .execute(&mut *tx)
             .await?;
         tx.commit().await?;
-        Ok::<_, sqlx::Error>(change.rows_affected())
+        Ok::<_, Error>(change.rows_affected())
     }
     .await;
     match result {
         Ok(1) => access::found(subject.url()),
         Ok(_) => missing(),
+        Err(Error::Forbidden) => access::access_denied(),
         Err(_) => unavailable(),
     }
 }

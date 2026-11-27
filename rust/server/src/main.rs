@@ -102,6 +102,7 @@ mod staff_round_tools;
 mod staff_rounds;
 mod staff_school;
 mod staff_scratches;
+mod staff_team;
 mod tab_cards;
 mod team_portal;
 mod telemetry;

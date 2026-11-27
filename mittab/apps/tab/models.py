@@ -616,7 +616,7 @@ class Team(AuditAttributionMixin):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
-            "ranking_groups",
+            models.Prefetch("ranking_groups", queryset=RankingGroup.objects.order_by("name")),
         )
 
     def set_unique_team_code(self):

@@ -362,6 +362,14 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/tab/debater_detail.html"),
         ),
         (
+            "tab/team_detail.html",
+            include_str!("../../../mittab/templates/tab/team_detail.html"),
+        ),
+        (
+            "common/_audit_trail.html",
+            include_str!("../../../mittab/templates/common/_audit_trail.html"),
+        ),
+        (
             "ui/form.html",
             include_str!("../../../mittab/templates/ui/form.html"),
         ),
@@ -636,7 +644,12 @@ fn translate(name: &str, source: &str) -> String {
             ["csrf_token"] => output.push_str("{{ csrf_input|safe }}"),
             ["widthratio", "num_rounds", "1", "72"] => output.push_str("{{ table_width }}"),
             ["render_form", "form", "files_last=True"] => output.push_str(
-                "{% with files_last=true %}{% include 'ui/form.html' %}{% endwith %}{% if room_checkin_revision %}<input type=\"hidden\" name=\"mittab_checkins_present\" value=\"1\"><input type=\"hidden\" name=\"mittab_room_checkin_revision\" value=\"{{ room_checkin_revision }}\">{% endif %}",
+                concat!(
+                    "{% with files_last=true %}{% include 'ui/form.html' %}{% endwith %}",
+                    "{% if room_checkin_revision or team_checkins %}<input type=\"hidden\" name=\"mittab_checkins_present\" value=\"1\">{% endif %}",
+                    "{% if room_checkin_revision %}<input type=\"hidden\" name=\"mittab_room_checkin_revision\" value=\"{{ room_checkin_revision }}\">{% endif %}",
+                    "{% if team_checkin_initial %}<input type=\"hidden\" name=\"mittab_team_checkin_initial\" value=\"{{ team_checkin_initial }}\">{% endif %}",
+                ),
             ),
             ["render_field", "field"] if name == "ui/form.html" => output.push_str(
                 "{% with checkbox=field.checkbox, choices=field.choices, widget_html=field.input|safe, help_id=field.help_id, error_id=field.error_id %}{% include 'ui/field.html' %}{% endwith %}",
@@ -737,6 +750,14 @@ fn translate(name: &str, source: &str) -> String {
             .replace("{{ team_school.team }}", "{{ team_school.team.name }}")
             .replace("{{ team_school.school }}", "{{ team_school.school.name }}")
             .replace("{{ team_school.hybrid_school }}", "{{ team_school.hybrid_school.name }}"),
+        "tab/team_detail.html" => translated
+            .replace("team_obj.debaters.all", "team_obj.debaters")
+            .replace("team_obj.ranking_groups.count", "team_obj.ranking_groups")
+            .replace("team_obj.ranking_groups.all", "team_obj.ranking_groups"),
+        "common/_audit_trail.html" => translated.replace(
+            "event.changes.fields|join:\", \"",
+            "event.changes.fields|join(\", \")",
+        ),
         "tab/_email_preview.html" => translated.replace(
             "|default:email.to_address", "|django_default(email.to_address)",
         ).replace("{{ email.html_body }}", "{{ email.html_body|isolated_email_preview }}"),

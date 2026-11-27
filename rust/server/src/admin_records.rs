@@ -249,7 +249,7 @@ pub(super) fn content_label(application: &str, model: &str) -> String {
         .map_or_else(|| model.into(), |name| format!("{application} | {name}"))
 }
 
-fn event_label(event: &str) -> &str {
+pub(super) fn event_label(event: &str) -> &str {
     EVENTS
         .iter()
         .find(|&&(value, _)| value == event)

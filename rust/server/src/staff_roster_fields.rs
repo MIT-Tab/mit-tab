@@ -4,7 +4,9 @@ use minijinja::{Value, context};
 use sqlx::{AssertSqlSafe, MySqlConnection};
 
 use crate::{
-    admin_model_data::valid_email, legacy_html::escape, registration_form::integer_input,
+    admin_model_data::valid_email,
+    legacy_html::escape,
+    registration_form::{Fields, integer_input},
     staff_roster_data::Kind,
 };
 
@@ -108,13 +110,16 @@ pub fn select(
     options: &[(String, String)],
     selected: &str,
     required: bool,
+    blank: bool,
     error: Option<String>,
 ) -> Value {
     let id = format!("id_{name}");
     let attrs = attributes(&id, "form-control", error.is_some());
     let required = if required { " required" } else { "" };
     let mut input = format!(r#"<select name="{name}" {attrs}{required} id="{id}">"#);
-    option(&mut input, "", "---------", selected.is_empty());
+    if blank {
+        option(&mut input, "", "---------", selected.is_empty());
+    }
     for (value, label) in options {
         option(&mut input, value, label, selected == value);
     }
@@ -165,6 +170,13 @@ pub fn email_errors(value: &str) -> Vec<String> {
         errors.push("Null characters are not allowed.".into());
     }
     errors
+}
+
+pub fn checkbox_value(fields: &Fields, name: &str) -> bool {
+    fields
+        .all(name)
+        .last()
+        .is_some_and(|value| !value.is_empty() && !value.eq_ignore_ascii_case("false"))
 }
 
 pub fn checkbox(name: &str, label: &str, value: bool) -> Value {

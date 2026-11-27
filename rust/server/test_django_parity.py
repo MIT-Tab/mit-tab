@@ -31,11 +31,11 @@ from django.test import Client, override_settings
 from django.utils import timezone
 from webpack_loader import utils as webpack_utils
 
-from mittab.apps.registration.models import InfoLink, InfoText, RegistrationConfig
+from mittab.apps.registration.models import InfoLink, InfoText, Registration, RegistrationConfig
 
 from mittab.apps.tab.models import (
     AuditEvent, BreakingTeam, Bye, CheckIn, Debater, Judge, JudgeCodeEmailLog, JudgeExpectedCheckIn, Motion, Outround, PublishedTeamPlacement, Round, RoundStats,
-    NoShow, PublicDisplaySetting, PublicRosterChange, RankingGroup, Room, RoomCheckIn, RoomTag, School, Scratch, TabSettings, Team,
+    NoShow, PublicDisplaySetting, PublicRosterChange, PublicRosterLogState, RankingGroup, Room, RoomCheckIn, RoomTag, School, Scratch, TabSettings, Team,
     WrittenRFDEmailLog,
 )
 
@@ -114,7 +114,12 @@ def request(port, path, *, method="GET", cookie=None, forwarded_proto=None, form
 
 
 @pytest.fixture(autouse=True)
-def isolate_tournament_settings(django_db_setup, django_db_blocker):
+def isolate_tournament_settings(django_db_setup, django_db_blocker, settings, tmp_path_factory):
+    cache_dir = tmp_path_factory.mktemp("django-cache")
+    settings.CACHES = {
+        **settings.CACHES,
+        "filesystem": {**settings.CACHES["filesystem"], "LOCATION": str(cache_dir)},
+    }
     caches["default"].clear()
     caches["filesystem"].clear()
     with django_db_blocker.unblock(), connection.cursor() as cursor:
@@ -4444,6 +4449,195 @@ def test_debater_roster_forms_and_history_match_django(html_assets, subtests):
         assert not awards.debaters.filter(id=added.id).exists()
 
 
+@pytest.mark.django_db(transaction=True)
+def test_team_roster_forms_stats_and_history_match_django(html_assets, subtests):
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 5)
+    TabSettings.set("tot_rounds", 4)
+    TabSettings.set("lenient_late", 3)
+    school = School.objects.create(name="Z & University")
+    hybrid = School.objects.create(name="A <College>")
+    registration = Registration.objects.create(school=school, email="team@example.test")
+    Registration.objects.create(school=hybrid, email="other@example.test")
+    users = get_user_model().objects
+    admin = users.create_superuser(username="team-form-admin")
+    other_admin = users.create_superuser(username="team-form-other-admin")
+    team = Team.objects.create(name="Team <One>", school=school, hybrid_school=hybrid,
+                               registration=registration, seed=2, checked_in=False, created_by=admin)
+    opponent = Team.objects.create(name="Shore <Opp>", school=hybrid, seed=0)
+    empty = Team.objects.create(name="Empty Team", school=hybrid, seed=0)
+    member = Debater.objects.create(name="Debater & Member", novice_status=1)
+    foreign_member = Debater.objects.create(name="Other & Speaker", novice_status=0)
+    unassigned = [Debater.objects.create(name=f"Unassigned {i}", novice_status=0) for i in range(3)]
+    team.debaters.add(member)
+    opponent.debaters.add(foreign_member)
+    tag = RoomTag.objects.create(tag="Z projector & screen", priority="1.00")
+    RoomTag.objects.create(tag="A microphone", priority="2.00")
+    team.required_room_tags.add(tag)
+    award = RankingGroup.objects.create(name="Z Award <Fixture>")
+    award.teams.add(team)
+    RankingGroup.objects.create(name="A Award & Friends").teams.add(team)
+    first = Round.objects.create(round_number=1, gov_team=team, opp_team=opponent,
+                                 victor=Round.GOV, pullup=Round.OPP)
+    Round.objects.create(round_number=2, gov_team=opponent, opp_team=team,
+                         victor=Round.OPP_VIA_FORFEIT, pullup=Round.OPP)
+    Round.objects.create(round_number=3, gov_team=team, opp_team=opponent,
+                         victor=Round.ALL_WIN, pullup=Round.GOV)
+    Outround.objects.create(num_teams=2, type_of_round=Outround.VARSITY, gov_team=opponent, opp_team=team)
+    Bye.objects.create(bye_team=opponent, round_number=4)
+    NoShow.objects.create(no_show_team=team, round_number=4)
+    points = RoundStats.objects.create(round=first, debater=member, speaks="27.3750", ranks="2.0000")
+    RoundStats.objects.create(round=first, debater=member, speaks="28.0000", ranks="1.0000")
+    event = AuditEvent.record(team, AuditEvent.EDIT, admin, changes={"fields": ["seed", "hybrid_school"]},
+                              note="Original & <Edited>")
+    AuditEvent.objects.filter(pk=event.pk).update(created_at=timezone.now().replace(hour=0, minute=0))
+    board = users.create_superuser(username="team-form-board")
+    board.groups.add(Group.objects.create(name="APDA Board"))
+    entry = users.create_user(username="entry")
+
+    def staff(username, group):
+        user = users.create_user(username=username, is_staff=True)
+        user.groups.add(Group.objects.create(name=group))
+        return user
+
+    helper = staff("team-form-helper", "MIT-TAB: Data entry helper")
+    assistant = staff("team-form-assistant", "MIT-TAB: Tab assistant")
+    scratch = staff("team-form-scratch", "MIT-TAB: Create and view scratches")
+    clients = {}
+    for user in (admin, other_admin, helper, assistant, entry, board, scratch):
+        client = Client()
+        client.force_login(user)
+        client.cookies["csrftoken"] = "a" * 32
+        clients[user.username] = client
+
+    create, detail = "/enter_team/", f"/team/{team.id}/"
+    valid = {"name": team.name, "school": school.id, "hybrid_school": hybrid.id,
+             "registration": registration.id, "debaters": [member.id], "required_room_tags": [tag.id],
+             "seed": "2", "break_preference": "0", "ranking_public": "on"}
+    with rust_server(overrides=html_assets) as port:
+        for user in (admin, assistant, helper, entry):
+            for path in (create, detail, f"/team/{empty.id}/"):
+                with subtests.test(user=user.username, path=path):
+                    compare_admin_page(port, path, clients[user.username], team_checkins=user in (admin, assistant))
+        invalid = (
+            (create, {"name": "", "school": "999999", "seed": "4", "break_preference": "2",
+                      "debaters": ["invalid"], "required_room_tags": ["999999"]}),
+            (create, {**valid, "number_scratches": "fraction", "name": team.name,
+                      "debaters": [foreign_member.id]}),
+            (detail, {**valid, "debaters": []}),
+            (detail, {**valid, "debaters": [foreign_member.id]}),
+        )
+        for path, fields in invalid:
+            with subtests.test(path=path, fields=fields):
+                compare_admin_page(
+                    port, path, clients[admin.username],
+                    {**fields, "return_to": path, "mittab_checkins_present": "1"}, team_checkins=True,
+                )
+
+        def request_as(user, path, fields=None, *, notice=None, stable=False):
+            session = clients[user.username].cookies["sessionid"].value
+            csrf = "a" * (43 if stable else 32)
+            headers = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+            if notice:
+                headers["Cookie"] += f"; mittab_roster_notice={notice}"
+            form = {**fields, "csrfmiddlewaretoken": csrf} if fields is not None else None
+            return request(port, path, method="POST" if form is not None else "GET", extra_headers=headers, form=form)
+
+        for user in (board, scratch):
+            for path in (create, detail):
+                for payload in (None, valid):
+                    assert request_as(user, path, payload)[1]["Location"] == "/403/"
+        before = request_as(helper, detail, stable=True)[2]
+        assert b"Team Stats" not in before and b"Ranking Groups" not in before
+        assert b"Scratches for" not in before and b'id_checked_in' not in before
+        Team.objects.filter(id=team.id).update(checked_in=True)
+        RoundStats.objects.filter(id=points.id).update(speaks="33.0000")
+        award.teams.remove(team)
+        Scratch.objects.create(team=team, judge=Judge.objects.create(name="Judge <Hidden>", rank="2.00"),
+                               scratch_type=Scratch.TEAM_SCRATCH)
+        assert request_as(helper, detail, stable=True)[2] == before
+        # The direct score edit bypasses Django's normal ballot invalidation.
+        cache_logic.clear_cache()
+        RegistrationConfig.objects.update(allow_new_registrations=False)
+        PublicRosterLogState.objects.update_or_create(
+            pk=1, defaults={"first_published_at": timezone.now(), "started_at": timezone.now()},
+        )
+        PublicRosterChange.objects.all().delete()
+
+        ranks_path = "/team/ranking/"
+        assert request_as(admin, ranks_path)[0] == 200
+        old_tie = team.tiebreaker
+        Team.objects.filter(pk=team.id).update(team_code=None)
+        response = request_as(admin, detail, {**valid, "name": "Team & Updated", "seed": "1",
+                                               "hybrid_school": "", "required_room_tags": [], "return_to": ranks_path,
+                                               "mittab_checkins_present": "1", "mittab_team_checkin_initial": "1"})
+        assert response[0] == 302 and response[1]["Location"] == ranks_path
+        team.refresh_from_db()
+        assert team.team_code and team.tiebreaker != old_tie and team.created_by == admin and not team.checked_in
+        assert team.audit_events.first().changes == {
+            "fields": ["name", "hybrid_school", "seed", "checked_in", "required_room_tags"],
+        }
+        assert list(team.debaters.all()) == [member]
+        assert list(PublicRosterChange.objects.values_list("message", "involves_debaters")) == [
+            ("Changed affiliation for “Team & Updated”: A <College> → None.", False),
+        ]
+        notice = load_cookies(response[1])["mittab_roster_notice"].value
+        success = b"Team Team &amp; Updated updated successfully"
+        assert success not in request_as(other_admin, ranks_path, notice=notice)[2]
+        result = request_as(admin, ranks_path, notice=notice)
+        assert success in result[2] and result[1]["Cache-Control"] == "private, no-store"
+        assert success not in request_as(admin, ranks_path)[2]
+        compare_admin_page(port, detail, clients[admin.username], team_checkins=True)
+        compare_admin_page(port, detail, clients[helper.username])
+        helper_page = request_as(helper, detail)[2]
+        assert b"Fields: name, hybrid_school, seed, checked_in, required_room_tags" in helper_page
+        assert b'name="checked_in"' not in helper_page
+
+        # The desk checks the team in while an assistant is editing other fields.
+        Team.objects.filter(id=team.id).update(checked_in=True)
+        assert request_as(assistant, detail, {
+            **valid, "name": team.name, "hybrid_school": "", "seed": "3", "required_room_tags": [],
+            "mittab_checkins_present": "1", "mittab_team_checkin_initial": "0",
+        })[0] == 302
+        team.refresh_from_db()
+        assert team.checked_in and team.seed == 3
+        assert team.audit_events.first().changes == {"fields": ["seed"]}
+        older_form = request_as(assistant, detail, {
+            **valid, "name": team.name, "seed": "0", "mittab_checkins_present": "1",
+        })
+        assert older_form[0] == 409 and b"Team check-in changed." in older_form[2]
+        assert b'id="id_checked_in" checked>' in older_form[2]
+        team.refresh_from_db()
+        assert team.checked_in and team.seed == 3
+
+        draft = {"name": "Multiple Debaters", "school": school.id, "seed": "1", "break_preference": "0",
+                 "debaters": [debater.id for debater in unassigned], "number_scratches": "2"}
+        result = request_as(helper, create, draft)
+        assert result[0] == 302 and result[1]["Location"] == "/"
+        new_team = Team.objects.get(name=draft["name"])
+        assert set(new_team.debaters.all()) == set(unassigned) and new_team.checked_in
+        assert list(PublicRosterChange.objects.order_by("id").values_list("message", "involves_debaters"))[-4:] == [
+            ("Added team “Multiple Debaters”.", False),
+            *((f"Added debater “{debater.name}” on team “Multiple Debaters”.", True) for debater in unassigned),
+        ]
+        result = request_as(admin, create, {**draft, "name": "Team With Scratches", "debaters": []})
+        scratch_team = Team.objects.get(name="Team With Scratches")
+        scratch_path = f"/team/{scratch_team.id}/scratches/add/2"
+        assert result[0] == 302 and result[1]["Location"] == scratch_path
+        assert request_as(admin, scratch_path)[1]["Location"] == scratch_path + "/"
+        assert request_as(admin, scratch_path + "/")[0] == 200
+        assert request_as(board, scratch_path)[1]["Location"] == "/403/"
+        first_judge, second_judge = Judge.objects.create(name="Batch Judge One", rank=3), Judge.objects.create(name="Batch Judge Two", rank=3)
+        batch = {"1-judge": first_judge.id, "1-scratch_type": 0,
+                 "2-judge": second_judge.id, "2-scratch_type": 0}
+        blocked = roster_request_waiting_for_lock(
+            lambda: request_as(admin, scratch_path + "/", batch),
+            lambda: admin.groups.add(board.groups.get()),
+        )
+        assert blocked[1]["Location"] == "/403/"
+        assert not Scratch.objects.filter(team=scratch_team).exists()
+
+
 def roster_request_waiting_for_lock(submit, change_role):
     from time import monotonic, sleep
 
@@ -4519,14 +4713,16 @@ def test_native_staff_roster_edits_and_data_entry_scope():
             assert response[0] == 302, response
         first, second = list(Debater.objects.order_by("id"))
         team_path = "/enter_team/"
-        team_fields = [("school", school.id), ("name", "Roster Team"), ("seed", 2), ("debaters", first.id),
+        team_fields = [("school", school.id), ("name", "Roster Team"), ("seed", 2), ("break_preference", 0), ("debaters", first.id),
                        ("debaters", second.id), ("required_room_tags", tag.id), ("ranking_public", "on")]
         assert post(team_path, team_fields, session=helper)[0] == 302
         team = Team.objects.get(name="Roster Team")
         assert team.team_code and team.tiebreaker and team.created_by.username == "native-roster-helper"
         assert team.required_room_tags.get() == tag and team.checked_in
         assert set(team.debaters.values_list("id", flat=True)) == {first.id, second.id}
-        assert post(team_path, [(key, "Different Team" if key == "name" else value) for key, value in team_fields], session=helper)[0] == 422
+        assert b"A debater cannot already be on a different team!" in post(
+            team_path, [(key, "Different Team" if key == "name" else value) for key, value in team_fields], session=helper,
+        )[2]
         path = f"/team/{team.id}/"
         helper_form = request(port, path, cookie=helper)[2]
         assert b'name="checked_in"' not in helper_form and b'name="mittab_checkins_present"' not in helper_form
@@ -4536,10 +4732,11 @@ def test_native_staff_roster_edits_and_data_entry_scope():
         assert post(path, team_fields, session=helper)[0] == 302
         team.refresh_from_db()
         assert team.checked_in
-        assert post(path, [*team_fields, checkin_intent], session=assistant)[0] == 302
+        assert post(path, [*team_fields, checkin_intent, ("mittab_team_checkin_initial", "1")], session=assistant)[0] == 302
         team.refresh_from_db()
         assert not team.checked_in
-        assert post(path, [*team_fields, checkin_intent, ("checked_in", "on")], session=assistant)[0] == 302
+        assert post(path, [*team_fields, checkin_intent, ("checked_in", "on"),
+                           ("mittab_team_checkin_initial", "0")], session=assistant)[0] == 302
         team.refresh_from_db()
         assert team.checked_in
         assert post(f"/debater/{second.id}/delete/", [], session=helper)[0] == 422
@@ -4586,6 +4783,19 @@ def test_native_staff_roster_edits_and_data_entry_scope():
         promoted = submit_during_role_change(path, team_fields, assistant,
                                              lambda: assistant_user.groups.set([assistant_group]))
         assert promoted[1]["Location"] == path
+        team.refresh_from_db()
+        assert team.checked_in
+
+        assistant_user.groups.set([helper_group])
+        status, _, denied_form = submit_during_role_change(
+            path, [*team_fields, ("seed", "not a seed")], assistant,
+            lambda: assistant_user.groups.set([assistant_group]),
+        )
+        assert status == 200 and b"Select a valid choice." in denied_form
+        assert b'id="id_checked_in" checked>' in denied_form
+        assert b'name="mittab_team_checkin_initial" value="1"' in denied_form
+        assert post(path, [*team_fields, checkin_intent, ("checked_in", "on"),
+                           ("mittab_team_checkin_initial", "1")], session=assistant)[0] == 302
         team.refresh_from_db()
         assert team.checked_in
 
@@ -4682,6 +4892,12 @@ def test_native_scratch_roles_keep_submission_blind_and_board_excluded():
         assert post(delete, {}, reviewer)[1]["Location"] == "/403/"
         assert request(port, delete, cookie=tab)[0] == 200
         assert Scratch.objects.filter(id=scratch.id).exists()
+        tab_user = get_user_model().objects.get(username="native-scratch-tab")
+        board_role = Group.objects.get(name="APDA Board")
+        denied = roster_request_waiting_for_lock(lambda: post(delete, {}), lambda: tab_user.groups.add(board_role))
+        assert denied[1]["Location"] == "/403/"
+        assert Scratch.objects.filter(id=scratch.id).exists()
+        tab_user.groups.remove(board_role)
         assert post(delete, {})[1]["Location"] == edit
         assert not Scratch.objects.filter(id=scratch.id).exists()
 
@@ -6981,7 +7197,7 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
                        registration_revision=False, configuration_revision=False, list_revision=False,
                        content_revision=False, motion_revision=False, staff_motion_revision=False,
-                       email_log_revision=False, challenge_revision=False, roster_checkins=False):
+                       email_log_revision=False, challenge_revision=False, roster_checkins=False, team_checkins=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
@@ -7079,12 +7295,16 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
                 rb'<input type="hidden" name="mittab_list_revision" value="[a-f0-9]{64}" id="id_mittab_list_revision">', b"", body,
             )
             assert metadata == 1
-        if roster_checkins:
+        if roster_checkins or team_checkins:
             proof = b'<input type="hidden" name="mittab_checkins_present" value="1">'
             assert body.count(proof) == 1
             body = body.replace(proof, b"")
+        if roster_checkins:
             body, removed = re.subn(rb'<input type="hidden" name="mittab_room_checkin_revision" value="[a-f0-9]{64}">', b"", body)
             assert removed == 1
+        if team_checkins:
+            body, removed = re.subn(rb'<input type="hidden" name="mittab_team_checkin_initial" value="[01]">', b"", body)
+            assert removed == (0 if path == "/enter_team/" else 1)
         assert_html_bytes(body, reference.content)
 
 

@@ -211,20 +211,52 @@ async fn groups(
     Ok(groups)
 }
 
-async fn team_rankings(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    public_cache::render(&app, actor, Page::StaffTeamRankings, async |db| {
-        let settings = Settings::load(db, SETTINGS).await?;
-        let rankings = teams(db, &settings).await?;
-        let memberships = groups(db, true).await?;
-        let novice: Vec<_> = rankings.iter().filter(|row| row.novice).collect();
-        let groups: Vec<_> = memberships.into_iter().map(|(title, members)| {
-            (title, rankings.iter().filter(|row| members.contains(&(row.id as i32))).collect::<Vec<_>>())
-        }).collect();
-        Ok::<_, sqlx::Error>(html::render("staff_rankings.html", context! {
+async fn team_rankings(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Response {
+    rankings_response(
+        &app,
+        actor,
+        Page::StaffTeamRankings,
+        &headers,
+        uri.path(),
+        async |db, message| render_team_rankings(db, actor, message).await,
+    )
+    .await
+}
+
+async fn render_team_rankings(
+    db: &mut MySqlConnection,
+    actor: Actor,
+    message: Option<&str>,
+) -> Result<Response, sqlx::Error> {
+    let settings = Settings::load(db, SETTINGS).await?;
+    let rankings = teams(db, &settings).await?;
+    let memberships = groups(db, true).await?;
+    let novice: Vec<_> = rankings.iter().filter(|row| row.novice).collect();
+    let groups: Vec<_> = memberships
+        .into_iter()
+        .map(|(title, members)| {
+            (
+                title,
+                rankings
+                    .iter()
+                    .filter(|row| members.contains(&(row.id as i32)))
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect();
+    Ok(html::render(
+        "staff_rankings.html",
+        context! {
             title => "Team Rankings", nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-            varsity => rankings, novice, groups, team => true,
-        }, StatusCode::OK))
-    }).await
+            varsity => rankings, novice, groups, team => true, message,
+        },
+        StatusCode::OK,
+    ))
 }
 
 async fn speaker_rankings(
@@ -233,24 +265,43 @@ async fn speaker_rankings(
     headers: HeaderMap,
     uri: Uri,
 ) -> Response {
-    if let Some(message) = staff_roster_notice::message(&app, &headers, uri.path()) {
+    rankings_response(
+        &app,
+        actor,
+        Page::StaffSpeakerRankings,
+        &headers,
+        uri.path(),
+        async |db, message| render_speaker_rankings(db, actor, message).await,
+    )
+    .await
+}
+
+async fn rankings_response(
+    app: &App,
+    actor: Actor,
+    page: Page,
+    headers: &HeaderMap,
+    path: &str,
+    load: impl for<'db, 'message> AsyncFnOnce(
+        &'db mut MySqlConnection,
+        Option<&'message str>,
+    ) -> Result<Response, sqlx::Error>,
+) -> Response {
+    if let Some(message) = staff_roster_notice::message(app, headers, path) {
         // Render session-specific notices outside the shared rankings cache.
         let result = async {
             let mut db = app.db.begin().await?;
-            let mut response = render_speaker_rankings(&mut db, actor, Some(&message)).await?;
+            let mut response = load(&mut db, Some(&message)).await?;
             db.commit().await?;
             if response.status().is_success() {
-                staff_roster_notice::clear(&mut response, &headers);
+                staff_roster_notice::clear(&mut response, headers);
             }
             Ok::<_, sqlx::Error>(response)
         }
         .await;
         return result.unwrap_or_else(|_| unavailable());
     }
-    public_cache::render(&app, actor, Page::StaffSpeakerRankings, async |db| {
-        render_speaker_rankings(db, actor, None).await
-    })
-    .await
+    public_cache::render(app, actor, page, async |db| load(db, None).await).await
 }
 
 async fn render_speaker_rankings(

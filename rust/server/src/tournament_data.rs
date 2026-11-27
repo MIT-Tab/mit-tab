@@ -1,7 +1,9 @@
 use std::{collections::HashMap, future::poll_fn};
 
 use mittab_tabulation::{
-    ballots::{Ballot, Outcome, Round, RoundFilter, ScoringPolicy, TeamAttendance, TeamId},
+    ballots::{
+        Ballot, Outcome, Round, RoundFilter, ScoringPolicy, TeamAttendance, TeamId, speaker_points,
+    },
     pairing::{PairingTeam, SideHistory},
     prelim::{Entrant, PairingPlan, Policy, plan_prelim},
     rankings::{Score, Stat},
@@ -44,7 +46,7 @@ struct BallotRow {
 struct TeamHistory {
     government: u32,
     opposition: u32,
-    was_pulled: bool,
+    pullups: usize,
     faced_pullup: bool,
     forfeit_wins: usize,
     opponents: Vec<TeamId>,
@@ -185,7 +187,7 @@ impl TournamentData {
             {
                 let government_history = history.entry(government).or_default();
                 government_history.government += 1;
-                government_history.was_pulled |= pullup == 1;
+                government_history.pullups += usize::from(pullup == 1);
                 government_history.faced_pullup |= pullup == 2;
                 government_history.forfeit_wins += usize::from(matches!(victor, 3 | 6));
                 government_history.opponents.push(opposition);
@@ -193,7 +195,7 @@ impl TournamentData {
             {
                 let opposition_history = history.entry(opposition).or_default();
                 opposition_history.opposition += 1;
-                opposition_history.was_pulled |= pullup == 2;
+                opposition_history.pullups += usize::from(pullup == 2);
                 opposition_history.faced_pullup |= pullup == 1;
                 opposition_history.forfeit_wins += usize::from(matches!(victor, 4 | 6));
                 opposition_history.opponents.push(government);
@@ -263,18 +265,7 @@ impl TournamentData {
         let ballots: Vec<Vec<_>> = self
             .speakers
             .iter()
-            .map(|speaker| {
-                self.ballots
-                    .get(&speaker.id)
-                    .map_or(&[][..], Vec::as_slice)
-                    .iter()
-                    .map(|ballot| Ballot {
-                        round: &self.rounds[ballot.round],
-                        speaks: ballot.speaks,
-                        ranks: ballot.ranks,
-                    })
-                    .collect()
-            })
+            .map(|speaker| self.speaker_ballots(speaker.id))
             .collect();
         let speakers: Vec<_> = self
             .speakers
@@ -349,7 +340,7 @@ impl TournamentData {
                     seed: team.seed,
                     previous_byes,
                     ranking: score,
-                    has_been_pulled_up: history.was_pulled,
+                    has_been_pulled_up: history.pullups > 0,
                     average_score_rounds: previous_byes + lenient_no_shows + history.forfeit_wins,
                     opponents: &history.opponents,
                     team: PairingTeam {
@@ -372,6 +363,91 @@ impl TournamentData {
         self.history
             .get(&team)
             .map_or((0, 0), |history| (history.government, history.opposition))
+    }
+
+    fn speaker_ballots(&self, speaker: i32) -> Vec<Ballot<'_>> {
+        self.ballots
+            .get(&speaker)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .map(|ballot| Ballot {
+                round: &self.rounds[ballot.round],
+                speaks: ballot.speaks,
+                ranks: ballot.ranks,
+            })
+            .collect()
+    }
+
+    pub fn team_details(
+        &self,
+        team: TeamId,
+        policy: ScoringPolicy,
+    ) -> Option<Vec<(&'static str, String)>> {
+        let mut wins: HashMap<_, usize> = self
+            .byes
+            .iter()
+            .map(|(&team, byes)| (team, byes.len()))
+            .collect();
+        for round in &self.rounds {
+            let (gov, opp) = round.winning_sides();
+            *wins.entry(round.government).or_default() += usize::from(gov);
+            *wins.entry(round.opposition).or_default() += usize::from(opp);
+        }
+        let mut speaks = None;
+        for &index in self.memberships.get(&team).into_iter().flatten() {
+            let speaker = &self.speakers[index];
+            let attendance = speaker.team.map(|id| TeamAttendance {
+                id,
+                byes: self.byes.get(&id).map_or(&[], Vec::as_slice),
+                no_shows: self.no_shows.get(&id).map_or(&[], Vec::as_slice),
+            });
+            let points = speaker_points(
+                &self.speaker_ballots(speaker.id),
+                attendance.as_ref(),
+                policy,
+                RoundFilter::default(),
+                false,
+            )?;
+            if !points.speaks.is_empty() {
+                let total = points.speaks.iter().fold(0.0, |sum, point| sum + point);
+                speaks = Some(speaks.unwrap_or(0.0) + total);
+            }
+        }
+        let (gov, opp) = self.side_counts(team);
+        let history = self.history.get(&team);
+        let opponents = history.map_or(&[][..], |history| history.opponents.as_slice());
+        let strength = if opponents.is_empty() {
+            0.0
+        } else {
+            opponents
+                .iter()
+                .map(|id| wins.get(id).copied().unwrap_or(0))
+                .sum::<usize>() as f64
+                / opponents.len() as f64
+        };
+        Some(vec![
+            ("Wins", wins.get(&team).copied().unwrap_or(0).to_string()),
+            (
+                "Total Speaks",
+                speaks.map_or_else(|| "0".into(), |value| format!("{value:?}")),
+            ),
+            ("Govs", gov.to_string()),
+            ("Opps", opp.to_string()),
+            ("Avg. Opp Wins", format!("{strength:?}")),
+            (
+                "Been Pullup",
+                history.map_or(0, |history| history.pullups).to_string(),
+            ),
+            (
+                "Hit Pullup",
+                if history.is_some_and(|history| history.faced_pullup) {
+                    "True"
+                } else {
+                    "False"
+                }
+                .into(),
+            ),
+        ])
     }
 
     pub fn scores_by_team(

@@ -266,6 +266,7 @@ async fn form_fields(
             &levels,
             &fields.novice_status,
             true,
+            true,
             invalid_level,
         ),
         checkbox(
@@ -294,6 +295,7 @@ async fn form_fields(
             &schools,
             &fields.school,
             false,
+            true,
             invalid_school,
         ),
     ])
