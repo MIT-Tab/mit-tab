@@ -8,16 +8,14 @@ use axum::{
     response::Response,
     routing::get,
 };
-use minijinja::context;
+use bigdecimal::BigDecimal;
+use minijinja::{Value as TemplateValue, context};
 use mittab_tabulation::rankings::Stat;
-use serde::Serialize;
 use serde_json::{Map, Value, json};
-use sqlx::Row;
 
 use crate::{
     App, access,
     board_snapshot::{self, Pairings, Snapshot},
-    html::{self, Navigation},
     legacy_html,
     legacy_session::Actor,
     login, private, public_rankings,
@@ -34,10 +32,10 @@ pub fn routes() -> Router<App> {
     Router::new()
         .route(
             "/pairings/quick_judge_checkin/",
-            get(checkin_page).post(checkin),
+            get(checkin_requires_post).post(checkin),
         )
         .route("/pairings/view_rounds/", get(rounds))
-        .route("/pairings/round_stats/", get(stats))
+        .route(STATS_PATH, get(stats))
         .route("/round/{number}/stats/", get(team_stats))
         .route("/outround/{number}/stats/", get(team_stats))
         .route("/pairings/export_csv/", get(export_inround))
@@ -47,45 +45,8 @@ pub fn routes() -> Router<App> {
         )
 }
 
-async fn checkin_page(
-    State(app): State<App>,
-    Extension(actor): Extension<Actor>,
-    headers: HeaderMap,
-) -> Response {
-    let Ok(mut db) = app.db.acquire().await else {
-        return unavailable();
-    };
-    let Ok(settings) = Settings::load(&mut db, &["cur_round", "tot_rounds"]).await else {
-        return unavailable();
-    };
-    let Ok(judges) =
-        sqlx::query_as::<_, (i32, String)>("SELECT id, name FROM tab_judge ORDER BY name, id")
-            .fetch_all(&mut *db)
-            .await
-    else {
-        return unavailable();
-    };
-    let Ok(schools) =
-        sqlx::query_as::<_, (i32, String)>("SELECT id, name FROM tab_school ORDER BY name, id")
-            .fetch_all(&mut *db)
-            .await
-    else {
-        return unavailable();
-    };
-    let Ok(csrf) = html::page_csrf(&headers) else {
-        return unavailable();
-    };
-    let round = settings.integer("cur_round", 1);
-    let total = settings.integer("tot_rounds", 5).clamp(0, 50);
-    let response = html::render(
-        "quick_judge_checkin.html",
-        context! {
-            title => "Quick Judge Check-In", csrf, nav => Navigation::new(actor, true),
-            round, total, judges, schools,
-        },
-        StatusCode::OK,
-    );
-    html::form_response(response, &headers, &csrf)
+async fn checkin_requires_post() -> Response {
+    checkin_error(StatusCode::METHOD_NOT_ALLOWED, "POST required")
 }
 
 async fn checkin(
@@ -441,99 +402,123 @@ async fn pairing_stats(app: &App, number: i32, out: bool) -> Result<Value, sqlx:
 
 #[derive(Default)]
 struct Sample {
-    government: u64,
-    opposition: u64,
+    gov_wins: u64,
+    opp_wins: u64,
     speaks: Vec<f64>,
 }
 
 impl Sample {
     fn add(&mut self, winner: i32) {
-        self.government += u64::from(matches!(winner, 1 | 3));
-        self.opposition += u64::from(matches!(winner, 2 | 4));
+        self.gov_wins += u64::from(matches!(winner, 1 | 3));
+        self.opp_wins += u64::from(matches!(winner, 2 | 4));
     }
 
-    fn summary(mut self, label: String) -> Option<Summary> {
-        let count = self.government + self.opposition;
+    fn summary(mut self) -> Option<TemplateValue> {
+        let count = self.gov_wins + self.opp_wins;
         if count == 0 {
             return None;
         }
-        let percent = self.government as f64 / count as f64 * 100.0;
-        let speaks = self.speaks.len();
+
+        let gov_pct = self.gov_wins as f64 / count as f64 * 100.0;
+        let opp_pct = self.opp_wins as f64 / count as f64 * 100.0;
+        let len = self.speaks.len();
         self.speaks.sort_by(f64::total_cmp);
-        let mean = (speaks > 0).then(|| self.speaks.iter().sum::<f64>() / speaks as f64);
-        let median =
-            (speaks > 0).then(|| (self.speaks[(speaks - 1) / 2] + self.speaks[speaks / 2]) / 2.0);
-        let deviation = mean.filter(|_| speaks > 1).map(|mean| {
-            (self
-                .speaks
-                .iter()
-                .map(|score| (score - mean).powi(2))
-                .sum::<f64>()
-                / (speaks - 1) as f64)
-                .sqrt()
-        });
-        let fmt =
-            |value: Option<f64>| value.map_or_else(|| "—".into(), |value| format!("{value:.2}"));
-        Some(Summary {
-            label,
-            government: self.government,
-            opposition: self.opposition,
-            percent: format!("{percent:.1}%"),
-            mean: fmt(mean),
-            median: fmt(median),
-            deviation: fmt(deviation),
-            minimum: fmt(self.speaks.first().copied()),
-            maximum: fmt(self.speaks.last().copied()),
+        let median_speak =
+            (len > 0).then(|| (self.speaks[(len - 1) / 2] + self.speaks[len / 2]) / 2.0);
+        let (mean_speak, stddev_speak) = speak_moments(&self.speaks);
+        Some(context! {
+            gov_wins => self.gov_wins,
+            opp_wins => self.opp_wins,
+            gov_pct, opp_pct, median_speak, mean_speak, stddev_speak,
+            highest_speak => self.speaks.last(),
+            lowest_speak => self.speaks.first(),
         })
     }
 }
 
-#[derive(Serialize)]
-struct Summary {
-    label: String,
-    government: u64,
-    opposition: u64,
-    percent: String,
-    mean: String,
-    median: String,
-    deviation: String,
-    minimum: String,
-    maximum: String,
+fn speak_moments(speaks: &[f64]) -> (Option<f64>, Option<f64>) {
+    if speaks.is_empty() {
+        return (None, None);
+    }
+    // Python's statistics module sums the exact values of the binary floats. Preserve
+    // those values through the mean and sample variance before rounding back to f64.
+    let mut sum = BigDecimal::from(0);
+    let mut sum_squared = BigDecimal::from(0);
+    for &score in speaks {
+        let score = BigDecimal::try_from(score).expect("stored speaker score is finite");
+        sum_squared += score.square();
+        sum += score;
+    }
+    let count = BigDecimal::from(speaks.len() as u64);
+    let as_float = |value: BigDecimal| value.to_string().parse::<f64>().expect("finite statistic");
+    let mean = as_float(&sum / &count);
+    let deviation = (speaks.len() > 1).then(|| {
+        let variance = (&count * sum_squared - sum.square()) / (&count * (&count - 1_i32));
+        // Python 3.10 rounds the variance to a float before taking its square root.
+        as_float(variance).sqrt()
+    });
+    (Some(mean), deviation)
 }
+
+const STATS_PATH: &str = "/pairings/round_stats/";
 
 async fn stats(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
     let result = async {
         let mut db = app.db.begin().await?;
         let mut overall = Sample::default();
         let mut prelim = BTreeMap::<i32, Sample>::new();
-        for (round, winner) in sqlx::query_as::<_, (i32, i32)>("SELECT round_number, victor FROM tab_round")
-            .fetch_all(&mut *db).await? {
+        let rounds = sqlx::query_as::<_, (i32, i32)>("SELECT round_number, victor FROM tab_round")
+            .fetch_all(&mut *db)
+            .await?;
+        for (round, winner) in rounds {
             prelim.entry(round).or_default().add(winner);
             overall.add(winner);
         }
-        for row in sqlx::query("SELECT r.round_number, CAST(s.speaks AS CHAR) AS speaks
-                               FROM tab_roundstats s JOIN tab_round r ON r.id = s.round_id")
-            .fetch_all(&mut *db).await? {
-            let round: i32 = row.try_get("round_number")?;
-            if let Ok(score) = row.try_get::<String, _>("speaks")?.parse::<f64>() {
-                overall.speaks.push(score);
-                prelim.entry(round).or_default().speaks.push(score);
-            }
+        let scores = sqlx::query_as::<_, (i32, String)>(
+            "SELECT r.round_number, CAST(s.speaks AS CHAR)
+             FROM tab_roundstats s JOIN tab_round r ON r.id = s.round_id WHERE s.speaks IS NOT NULL",
+        )
+        .fetch_all(&mut *db)
+        .await?;
+        for (round, score) in scores {
+            let score = score.parse::<f64>().expect("stored decimal speaker score");
+            overall.speaks.push(score);
+            prelim.entry(round).or_default().speaks.push(score);
         }
         let mut out = BTreeMap::<(i32, i32), Sample>::new();
-        for (division, stage, winner) in sqlx::query_as::<_, (i32, i32, i32)>("SELECT type_of_round, num_teams, victor FROM tab_outround")
-            .fetch_all(&mut *db).await? {
+        for (division, stage, winner) in sqlx::query_as::<_, (i32, i32, i32)>(
+            "SELECT type_of_round, num_teams, victor FROM tab_outround",
+        )
+        .fetch_all(&mut *db)
+        .await?
+        {
             out.entry((division, stage)).or_default().add(winner);
         }
-        let overall = overall.summary("All preliminary rounds".into());
-        let prelim: Vec<_> = prelim.into_iter().filter_map(|(round, scores)| scores.summary(format!("Round {round}"))).collect();
-        let out: Vec<_> = out.into_iter().filter_map(|((division, stage), scores)| {
-            scores.summary(format!("{} · {stage} teams", if division == 0 { "Varsity" } else { "Novice" }))
-        }).collect();
+        let shell = legacy_html::shell(&mut db, actor, STATS_PATH).await?;
         db.commit().await?;
-        Ok::<_, sqlx::Error>(html::render("round_stats.html", context! {
-            title => "Round Statistics", nav => Navigation::new(actor, true), overall, prelim, out,
-        }, StatusCode::OK))
-    }.await;
+
+        let tournament_stats = overall.summary();
+        let prelim_stats: Vec<_> = prelim
+            .into_iter()
+            .filter_map(|(round_number, sample)| {
+                sample.summary().map(|stats| context! { round_number, ..stats })
+            })
+            .collect();
+        let outround_stats: Vec<_> = out
+            .into_iter()
+            .filter_map(|((division, stage), sample)| {
+                let division = if division == 0 { "Varsity" } else { "Novice" };
+                let name = format!("{division} - {stage} Teams");
+                sample.summary().map(|stats| context! { name, ..stats })
+            })
+            .collect();
+        Ok::<_, sqlx::Error>(legacy_html::render(
+            "tab/round_stats.html",
+            shell,
+            context! { title => "Round Statistics", tournament_stats, prelim_stats, outround_stats },
+            StatusCode::OK,
+        ))
+    }
+    .await;
     result.unwrap_or_else(|_| unavailable())
 }

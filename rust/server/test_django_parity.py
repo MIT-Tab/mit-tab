@@ -5911,7 +5911,13 @@ def test_native_staff_pairing_stats_checkin_and_csv():
 
     with rust_server() as port:
         checkin = "/pairings/quick_judge_checkin/"
-        status, headers, page = request(port, checkin, cookie=tab)
+        status, _, body = request(port, checkin, cookie=tab)
+        reference = Client()
+        reference.cookies["sessionid"] = tab
+        legacy = reference.get(checkin)
+        assert status == legacy.status_code == 405
+        assert json.loads(body) == legacy.json() == {"success": False, "error": "POST required"}
+        status, headers, page = request(port, "/pairings/status/", cookie=tab)
         assert status == 200 and b"Export Judge" in page
         csrf = load_cookies(headers)["csrftoken"].value
 
@@ -5942,8 +5948,82 @@ def test_native_staff_pairing_stats_checkin_and_csv():
         assert stats[str(gov.id)]["total_speaks"] == 28.0
         assert stats[str(opp.id)]["opps"] == 1 and stats[str(opp.id)]["debaters"] == opp_speaker.name
         stats_page = request(port, "/pairings/round_stats/", cookie=tab)[2]
-        assert b"All preliminary rounds" in stats_page and b"27.75" in stats_page
+        assert b"Tournament Overview" in stats_page and b"27.75" in stats_page
         assert b"Round 5" in request(port, "/pairings/view_rounds/", cookie=tab)[2]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_round_statistics_and_invalid_historical_pairing_match_django(html_assets):
+    TabSettings.set("cur_round", 5)
+    TabSettings.set("motions_enabled", 1)
+    TabSettings.set("theme_color", "#76258B")
+    tab = legacy_tab_session("round-stats-parity")
+    board = legacy_tab_session("round-stats-board")
+    get_user_model().objects.get(username="round-stats-board").groups.add(
+        Group.objects.create(name="APDA Board")
+    )
+    admin = Client()
+    admin.cookies["sessionid"] = tab
+    public = Client()
+    path = "/pairings/round_stats/"
+    school = School.objects.create(name="Statistics School")
+    teams = [
+        Team.objects.create(name=f"Statistics Team {i}", school=school, seed=Team.UNSEEDED)
+        for i in range(2)
+    ]
+    speaker = Debater.objects.create(name="Fixture Speaker", novice_status=Debater.VARSITY)
+    with rust_server(overrides=html_assets) as port:
+        def compare_stats():
+            status, _, body = request(port, path, cookie=tab)
+            reference = admin.get(path)
+            assert status == reference.status_code == 200
+            assert_html_bytes(body, reference.content)
+            return body
+
+        assert b"No round data available yet." in compare_stats()
+        early = Round.objects.create(round_number=1, victor=Round.ALL_WIN, gov_team=teams[0], opp_team=teams[1])
+        RoundStats.objects.create(round=early, debater=speaker, speaks=99, ranks=1, debater_role="pm")
+        assert b"No round data available yet." in compare_stats()
+
+        single = Round.objects.create(round_number=2, victor=Round.GOV_VIA_FORFEIT,
+                                      gov_team=teams[0], opp_team=teams[1])
+        RoundStats.objects.create(round=single, debater=speaker, speaks=Decimal("28.1250"),
+                                  ranks=1, debater_role="pm")
+        Round.objects.create(round_number=3, victor=Round.OPP_VIA_FORFEIT, gov_team=teams[0], opp_team=teams[1])
+        for winner in (Round.GOV, Round.GOV, Round.GOV, Round.GOV, Round.GOV, Round.GOV, Round.OPP):
+            scored = Round.objects.create(round_number=4, victor=winner, gov_team=teams[0], opp_team=teams[1])
+            for value in (Decimal("29.6750"), Decimal("31.1250"), Decimal("0.0000"), Decimal("-0.0001")):
+                RoundStats.objects.create(round=scored, debater=speaker, speaks=value, ranks=1)
+        rounding = Round.objects.create(round_number=6, victor=Round.OPP, gov_team=teams[0], opp_team=teams[1])
+        for value in ("26.3480", "28.4940", "29.5630"):
+            RoundStats.objects.create(round=rounding, debater=speaker, speaks=Decimal(value), ranks=1)
+        for division, stage, winner in (
+            (Outround.NOVICE, 2, Outround.GOV),
+            (Outround.VARSITY, 4, Outround.GOV_VIA_FORFEIT),
+            (Outround.VARSITY, 4, Outround.OPP_VIA_FORFEIT),
+            (Outround.VARSITY, 8, Outround.GOV),
+            (Outround.VARSITY, 16, Outround.UNKNOWN),
+        ):
+            Outround.objects.create(type_of_round=division, num_teams=stage, victor=winner,
+                                    gov_team=teams[0], opp_team=teams[1])
+        body = compare_stats()
+        assert b"Tournament Overview" in body and b"Gov 85.7%" in body
+        assert b"Opp 14.3%" not in body
+        assert b"28.13" in body and b"99.00" in body and b">0.00<" in body
+        row_six = re.search(rb'>6</td>(.*?)</tr>', body, re.DOTALL)[1]
+        assert b">28.13<" in row_six and b">1.64<" in row_six and b">28.14<" not in row_six
+        assert b"N/A" in body
+        assert body.index(b"Varsity - 4 Teams") < body.index(b"Varsity - 8 Teams") < body.index(b"Novice - 2 Teams")
+        assert b"Varsity - 16 Teams" not in body
+        assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+
+        for round_number in (0, 4, 5, 2147483648, "unknown", "-1", "+2"):
+            missing = f"/public/pairings/{round_number}/"
+            status, _, body = request(port, missing)
+            with override_settings(DEBUG=False):
+                reference = public.get(missing)
+            assert status == reference.status_code == 404
+            assert_html_bytes(body, reference.content)
 
 
 @pytest.mark.django_db(transaction=True)

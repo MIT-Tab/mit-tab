@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use axum::{
     Extension,
-    extract::{Path, State},
-    http::StatusCode,
+    extract::{Path, State, rejection::PathRejection},
+    http::{StatusCode, Uri},
     response::Response,
 };
 use minijinja::context;
@@ -11,9 +11,7 @@ use serde::Serialize;
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access,
-    html::{self, Navigation},
-    legacy_html,
+    App, access, legacy_html,
     legacy_session::Actor,
     public_cache::{self, Page},
     settings::Settings,
@@ -23,9 +21,6 @@ const DISPLAY_SETTINGS: &[&str] = &[
     "cur_round",
     "pairing_released",
     "debaters_public",
-    "teams_public",
-    "judges_public",
-    "motions_enabled",
     "var_teams_visible",
     "nov_teams_visible",
 ];
@@ -55,12 +50,41 @@ pub async fn current(State(app): State<App>, Extension(actor): Extension<Actor>)
 pub async fn previous(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
-    Path(round): Path<i32>,
+    uri: Uri,
+    round: Result<Path<String>, PathRejection>,
 ) -> Response {
-    public_cache::render(&app, actor, Page::Pairings(Some(round)), async |db| {
-        pairings(db, actor, Some(round)).await
-    })
-    .await
+    if let Ok(Path(raw)) = round
+        && raw.bytes().all(|digit| digit.is_ascii_digit())
+        && let Ok(round) = raw.parse::<i32>()
+    {
+        return public_cache::render(&app, actor, Page::Pairings(Some(round)), async |db| {
+            pairings(db, actor, Some(round)).await
+        })
+        .await;
+    }
+
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let response = pairing_not_found(&mut db, actor, uri.path()).await?;
+        db.commit().await?;
+        Ok::<_, sqlx::Error>(response)
+    }
+    .await;
+    result.unwrap_or_else(|_| crate::unavailable())
+}
+
+async fn pairing_not_found(
+    db: &mut MySqlConnection,
+    actor: Actor,
+    path: &str,
+) -> Result<Response, sqlx::Error> {
+    let shell = legacy_html::shell(db, actor, path).await?;
+    Ok(legacy_html::render(
+        "common/404.html",
+        shell,
+        context! {},
+        StatusCode::NOT_FOUND,
+    ))
 }
 
 async fn pairings(
@@ -71,15 +95,11 @@ async fn pairings(
     let settings = Settings::load(db, DISPLAY_SETTINGS).await?;
     let current = settings.integer("cur_round", 1).saturating_sub(1);
     let round = selected.unwrap_or(current);
+    let path = selected.map_or("/public/pairings/".into(), |round| {
+        format!("/public/pairings/{round}/")
+    });
     if selected.is_some() && (round < 1 || round >= current) {
-        return Ok(html::render(
-            "error.html",
-            context! {
-                title => "Page Not Found", heading => "Page Not Found",
-                nav => nav(actor, &settings),
-            },
-            StatusCode::NOT_FOUND,
-        ));
+        return pairing_not_found(db, actor, &path).await;
     }
     if selected.is_none() && !has_inrounds(db).await? {
         return Ok(access::found("/public/access-error/"));
@@ -136,9 +156,6 @@ async fn pairings(
             }
         })
         .collect();
-    let path = selected.map_or("/public/pairings/".into(), |round| {
-        format!("/public/pairings/{round}/")
-    });
     let shell = legacy_html::shell(db, actor, &path).await?;
     let navigation = navigation(db, &settings).await?;
     Ok(legacy_html::render(
@@ -317,11 +334,4 @@ async fn missing_ballots(db: &mut MySqlConnection, actor: Actor) -> Result<Respo
         context! { rounds, pairing_exists => true },
         StatusCode::OK,
     ))
-}
-
-fn nav(actor: Actor, settings: &Settings) -> Navigation {
-    let mut nav = Navigation::new(actor, settings.flag("motions_enabled", false));
-    nav.teams_public = settings.flag("teams_public", false);
-    nav.judges_public = settings.flag("judges_public", false);
-    nav
 }

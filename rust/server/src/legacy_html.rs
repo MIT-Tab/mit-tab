@@ -153,6 +153,19 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
     env.add_filter("django_default", |value: Value, fallback: Value| {
         if value.is_true() { value } else { fallback }
     });
+    env.add_filter("django_floatformat", |value: Value, places: i64| {
+        use bigdecimal::{BigDecimal, RoundingMode};
+
+        // Django rounds the shortest decimal representation, not the binary fraction.
+        value.to_string().parse::<BigDecimal>().map_or_else(
+            |_| String::new(),
+            |decimal| {
+                decimal
+                    .with_scale_round(places, RoundingMode::HalfUp)
+                    .to_plain_string()
+            },
+        )
+    });
     env.add_filter("django_pluralize", |value: i64, suffix: Option<String>| {
         if value == 1 {
             String::new()
@@ -564,6 +577,10 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/common/_return_to_input.html"),
         ),
         (
+            "tab/round_stats.html",
+            include_str!("../../../mittab/templates/tab/round_stats.html"),
+        ),
+        (
             "tab/backup_list.html",
             include_str!("../../../mittab/templates/tab/backup_list.html"),
         ),
@@ -811,7 +828,14 @@ fn translate(name: &str, source: &str) -> String {
         .replace("if judge.rank %}", "if judge.has_rank %}")
         .replace("|default_if_none:''", "")
         .replace("|date:'Y-m-d H:i:s T'", "")
-        .replace("|floatformat:2", "")
+        .replace(
+            "|floatformat:2",
+            if name == "tab/round_stats.html" {
+                "|django_floatformat(2)"
+            } else {
+                ""
+            },
+        )
         .replace(" is not None", " is not none")
         .replace("section.rows.0.", "section.rows[0].")
         // Django renders this unresolved lookup as the empty filter group.
@@ -893,6 +917,9 @@ fn translate(name: &str, source: &str) -> String {
                 &translated,
             ].concat()
         }
+        "tab/round_stats.html" => translated
+            .replace("|floatformat:1", "|django_floatformat(1)")
+            .replace("|default:\"N/A\"", "|django_default(\"N/A\")"),
         "tab/_rank_teams_table.html" => translated
             .replace("|default_if_none:True", "|default(true)")
             .replace("teams.0|length", "teams[0]|django_length")
