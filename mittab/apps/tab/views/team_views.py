@@ -236,7 +236,7 @@ def view_scratches(request, team_id):
         team_id = int(team_id)
     except ValueError:
         return redirect_and_flash_error(request, "Received invalid data")
-    scratches = Scratch.objects.filter(team=team_id)
+    scratches = Scratch.objects.filter(team=team_id).select_related("team", "judge").order_by("id")
     number_scratches = len(scratches)
     team = Team.objects.get(pk=team_id)
     all_teams = Team.objects.all()

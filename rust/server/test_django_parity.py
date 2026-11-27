@@ -4628,8 +4628,8 @@ def test_team_roster_forms_stats_and_history_match_django(html_assets, subtests)
         assert request_as(admin, scratch_path + "/")[0] == 200
         assert request_as(board, scratch_path)[1]["Location"] == "/403/"
         first_judge, second_judge = Judge.objects.create(name="Batch Judge One", rank=3), Judge.objects.create(name="Batch Judge Two", rank=3)
-        batch = {"1-judge": first_judge.id, "1-scratch_type": 0,
-                 "2-judge": second_judge.id, "2-scratch_type": 0}
+        batch = {"1-judge": first_judge.id, "1-team": scratch_team.id, "1-scratch_type": 0,
+                 "2-judge": second_judge.id, "2-team": scratch_team.id, "2-scratch_type": 0}
         blocked = roster_request_waiting_for_lock(
             lambda: request_as(admin, scratch_path + "/", batch),
             lambda: admin.groups.add(board.groups.get()),
@@ -4982,6 +4982,106 @@ def test_native_staff_roster_edits_and_data_entry_scope():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_scratch_forms_and_lists_match_django(html_assets, subtests):
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    users = get_user_model().objects
+    admin = users.create_superuser(username="scratch-parity-admin")
+    other_admin = users.create_superuser(username="scratch-parity-other-admin")
+    reviewer = users.create_user(username="scratch-parity-review", is_staff=True)
+    reviewer.groups.add(Group.objects.create(name="MIT-TAB: Create and view scratches"))
+    submitter = users.create_user(username="scratch-parity-submit", is_staff=True)
+    submitter.groups.add(Group.objects.create(name="MIT-TAB: Add scratches"))
+    clients = {}
+    for user in (admin, other_admin, reviewer, submitter):
+        client = Client()
+        client.force_login(user)
+        client.cookies["csrftoken"] = "a" * 32
+        clients[user.username] = client
+
+    school = School.objects.create(name="Scratch Test School")
+    team = Team.objects.create(name="Straße & Team", seed=0, school=school)
+    empty = Team.objects.create(name="Stratt <Team>", seed=0, school=school)
+    judge = Judge.objects.create(name="Straße <Judge>", rank=5)
+    other_judge = Judge.objects.create(name="Stratt & Judge", rank=4)
+    free_judge = Judge.objects.create(name="Unused Judge", rank=3)
+    first = Scratch.objects.create(team=team, judge=judge, scratch_type=Scratch.TEAM_SCRATCH, created_by=submitter)
+    second = Scratch.objects.create(team=team, judge=other_judge, scratch_type=Scratch.TAB_SCRATCH)
+    AuditEvent.record(first, AuditEvent.CREATE, submitter, note="Added & verified")
+    AuditEvent.record(first, AuditEvent.EDIT, admin, changes={"fields": ["scratch_type", "judge"]},
+                      note="Staff <note>")
+    start, listing = "/enter_scratch/", "/scratches/view/"
+    team_page, judge_page = f"/team/{team.id}/scratches/view/", f"/judge/{judge.id}/scratches/view/"
+    team_batch, judge_batch = f"/team/{team.id}/scratches/add/2/", f"/judge/{judge.id}/scratches/add/2/"
+    empty_page = f"/team/{empty.id}/scratches/view/"
+    with rust_server(overrides=html_assets) as port:
+        for user in (reviewer, admin):
+            for path in (listing, team_page, judge_page, team_batch, judge_batch, empty_page):
+                with subtests.test(user=user.username, path=path):
+                    compare_admin_page(port, path, clients[user.username],
+                                       scratch_revision=user == admin and path in (team_page, judge_page, empty_page))
+        for user in (submitter, reviewer, admin):
+            with subtests.test(user=user.username, path=start):
+                compare_admin_page(port, start, clients[user.username])
+                compare_admin_page(port, start, clients[user.username],
+                                   {"team": "bad", "judge": "", "scratch_type": "2", "return_to": start})
+        valid_first = {"1-team": team.id, "1-judge": free_judge.id, "1-scratch_type": "1"}
+        invalid_second = {"2-team": empty.id, "2-judge": "unknown", "2-scratch_type": "0"}
+        compare_admin_page(port, team_batch, clients[reviewer.username],
+                           {**valid_first, **invalid_second, "return_to": team_batch})
+        compare_admin_page(port, team_page, clients[admin.username],
+                           {**valid_first, **invalid_second, "return_to": team_page}, scratch_revision=True)
+        assert not Scratch.objects.filter(judge=free_judge).exists()
+
+        def request_as(user, path, fields=None, *, notice=None):
+            session = clients[user.username].cookies["sessionid"].value
+            csrf = "a" * 32
+            headers = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+            if notice:
+                headers["Cookie"] += f"; mittab_roster_notice={notice}"
+            payload = {**fields, "csrfmiddlewaretoken": csrf} if fields is not None else None
+            return request(port, path, method="POST" if payload is not None else "GET", extra_headers=headers, form=payload)
+
+        reviewer_list = request_as(reviewer, listing)[2]
+        assert f'href="{team_page}"'.encode() in reviewer_list
+        assert b"<fieldset disabled>" in request_as(reviewer, team_page)[2]
+        token = scratch_proof(request_as(admin, team_page)[2])
+        payload = {**valid_first, "2-team": team.id, "2-judge": other_judge.id, "2-scratch_type": "1",
+                   "mittab_scratch_revision": token}
+        assert request_as(other_admin, team_page, payload)[0] == 409
+        assert request_as(admin, judge_page, payload)[0] == 409
+        Scratch.objects.filter(id=first.id).update(scratch_type=Scratch.TAB_SCRATCH)
+        stale = request_as(admin, team_page, payload)
+        assert stale[0] == 409 and b"The scratches changed." in stale[2]
+        first.refresh_from_db()
+        assert first.judge_id == judge.id and first.scratch_type == Scratch.TAB_SCRATCH
+
+        saved = request_as(admin, team_page, {**payload, "return_to": judge_page,
+                                              "mittab_scratch_revision": scratch_proof(stale[2])})
+        assert saved[0] == 302 and saved[1]["Location"] == judge_page
+        flash = load_cookies(saved[1])["mittab_roster_notice"].value
+        assert b"Scratches successfully modified" in request_as(admin, judge_page, notice=flash)[2]
+        assert b"Scratches successfully modified" not in request_as(reviewer, judge_page, notice=flash)[2]
+        first.refresh_from_db()
+        assert first.judge_id == free_judge.id and first.created_by == submitter
+        assert first.audit_events.first().changes == {"fields": ["scratch_type", "judge"]}
+        assert second.audit_events.first().changes == {"fields": ["scratch_type"]}
+
+        slashless = f"/team/{team.id}/scratches/delete/{first.id}"
+        assert request_as(admin, slashless)[1]["Location"] == slashless + "/"
+        assert Scratch.objects.filter(id=first.id).exists()
+        token = scratch_proof(request_as(admin, slashless + "/")[2])
+        Scratch.objects.filter(id=first.id).update(scratch_type=Scratch.TEAM_SCRATCH)
+        blocked = request_as(admin, slashless + "/", {"mittab_scratch_revision": token})
+        assert blocked[0] == 409 and Scratch.objects.filter(id=first.id).exists()
+        assert b"Remove the Discretionary Scratch" in blocked[2]
+        delete = request_as(admin, slashless + "/", {"mittab_scratch_revision": scratch_proof(blocked[2])})
+        assert delete[0] == 302 and delete[1]["Location"] == "/"
+        assert not Scratch.objects.filter(id=first.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_native_scratch_roles_keep_submission_blind_and_board_excluded():
     tab = legacy_tab_session("native-scratch-tab")
     board = legacy_tab_session("native-scratch-board")
@@ -5022,9 +5122,15 @@ def test_native_scratch_roles_keep_submission_blind_and_board_excluded():
         first = post(start, payload, submitter)
         second = post(start, payload, submitter)
         assert first[0] == second[0] == 302
-        assert first[1]["Location"] == second[1]["Location"] == f"{start}?submitted=1"
+        assert first[1]["Location"] == second[1]["Location"] == start
         assert first[2] == second[2]
-        assert request(port, start, cookie=submitter)[2] != b""
+        for response in (first, second):
+            notice = load_cookies(response[1])["mittab_roster_notice"].value
+            follow_up = request(port, start, extra_headers={
+                "Cookie": f"sessionid={submitter}; csrftoken={csrf}; mittab_roster_notice={notice}",
+            })[2]
+            assert b"Scratch submitted." in follow_up
+            assert b"Scratch created successfully" not in follow_up and b"already exists" not in follow_up
         scratch = Scratch.objects.get()
         assert scratch.created_by.username == "scratch-submitter"
         assert AuditEvent.objects.filter(content_type__model="scratch", object_id=scratch.id).count() == 1
@@ -5034,10 +5140,11 @@ def test_native_scratch_roles_keep_submission_blind_and_board_excluded():
         assert request(port, global_list, cookie=submitter)[1]["Location"] == "/403/"
         reviewer_response = request(port, edit, cookie=reviewer)
         assert reviewer_response[0] == 200 and b"Scratch Example Judge" in reviewer_response[2]
-        assert b"Delete Scratch" not in reviewer_response[2] and b"Save Scratches" not in reviewer_response[2]
+        assert b"<fieldset disabled>" in reviewer_response[2] and b'type="submit"' not in reviewer_response[2]
 
         changes = {"1-id": scratch.id, "1-team": team.id, "1-judge": other_judge.id,
-                   "1-scratch_type": Scratch.TEAM_SCRATCH}
+                   "1-scratch_type": Scratch.TEAM_SCRATCH,
+                   "mittab_scratch_revision": scratch_proof(request(port, edit, cookie=tab)[2])}
         assert post(edit, changes, reviewer)[1]["Location"] == "/403/"
         assert post(edit, changes)[1]["Location"] == edit
         scratch.refresh_from_db()
@@ -5046,22 +5153,24 @@ def test_native_scratch_roles_keep_submission_blind_and_board_excluded():
         assert post(start, {**payload, "judge": 999999})[0] == 422
 
         add = f"/judge/{judge.id}/scratches/add/2/"
-        invalid = {"1-team": team.id, "1-scratch_type": 0, "2-team": 999999, "2-scratch_type": 0}
-        assert post(add, invalid, reviewer)[0] == 422
+        invalid = {"1-team": team.id, "1-judge": judge.id, "1-scratch_type": 0,
+                   "2-team": 999999, "2-judge": judge.id, "2-scratch_type": 0}
+        assert b"Select a valid choice. 999999" in post(add, invalid, reviewer)[2]
         assert Scratch.objects.count() == 1
         assert post(add, {**invalid, "2-team": opponent.id}, reviewer)[0] == 302
         assert Scratch.objects.count() == 3
         delete = f"/team/{team.id}/scratches/delete/{scratch.id}/"
         assert post(delete, {}, reviewer)[1]["Location"] == "/403/"
         assert request(port, delete, cookie=tab)[0] == 200
+        confirmation = {"mittab_scratch_revision": scratch_proof(request(port, delete, cookie=tab)[2])}
         assert Scratch.objects.filter(id=scratch.id).exists()
         tab_user = get_user_model().objects.get(username="native-scratch-tab")
         board_role = Group.objects.get(name="APDA Board")
-        denied = roster_request_waiting_for_lock(lambda: post(delete, {}), lambda: tab_user.groups.add(board_role))
+        denied = roster_request_waiting_for_lock(lambda: post(delete, confirmation), lambda: tab_user.groups.add(board_role))
         assert denied[1]["Location"] == "/403/"
         assert Scratch.objects.filter(id=scratch.id).exists()
         tab_user.groups.remove(board_role)
-        assert post(delete, {})[1]["Location"] == edit
+        assert post(delete, confirmation)[1]["Location"] == "/"
         assert not Scratch.objects.filter(id=scratch.id).exists()
 
 
@@ -7361,10 +7470,14 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
                        registration_revision=False, configuration_revision=False, list_revision=False,
                        content_revision=False, motion_revision=False, staff_motion_revision=False,
                        email_log_revision=False, challenge_revision=False, roster_checkins=False, team_checkins=False,
-                       judge_checkins=False):
+                       judge_checkins=False, scratch_revision=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
+    if scratch_revision and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["mittab_scratch_revision"] = scratch_proof(previous)
     judge_editor = re.fullmatch(r"/judge/\d+/", path) is not None
     if judge_editor and form is not None:
         status, _, previous = request(port, path, cookie=session)
@@ -7483,7 +7596,14 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
         if judge_editor:
             body, removed = re.subn(rb'<input type="hidden" name="mittab_judge_edit_revision" value="[a-f0-9]{64}">', b"", body)
             assert removed == 1
+        if scratch_revision:
+            body, removed = re.subn(rb'<input type="hidden" name="mittab_scratch_revision" value="[a-f0-9]{64}">', b"", body)
+            assert removed == 1
         assert_html_bytes(body, reference.content)
+
+
+def scratch_proof(body):
+    return re.search(rb'name="mittab_scratch_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
 
 def judge_checkin_proof(body):

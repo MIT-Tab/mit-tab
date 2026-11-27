@@ -366,26 +366,23 @@ def add_scratch(request):
                 with transaction.atomic():
                     form.save(actor=request.user)
             except IntegrityError:
-                if not can_view_scratches:
-                    return redirect_and_flash_success(
-                        request,
-                        "Scratch submitted.",
-                        path=reverse("add_scratch"),
-                    )
-                return redirect_and_flash_error(request,
-                                                "This scratch already exists.")
-        success_path = reverse("add_scratch") if not can_view_scratches else None
-        return redirect_and_flash_success(
-            request,
-            "Scratch created successfully",
-            path=success_path,
-        )
+                if not Scratch.objects.filter(
+                    team_id=form.cleaned_data["team"], judge_id=form.cleaned_data["judge"],
+                ).exists():
+                    raise
+                if can_view_scratches:
+                    return redirect_and_flash_error(request, "This scratch already exists.")
+            return redirect_and_flash_success(
+                request,
+                "Scratch created successfully" if can_view_scratches else "Scratch submitted.",
+                path=None if can_view_scratches else reverse("add_scratch"),
+            )
     else:
         form = ScratchForm(initial={"scratch_type": 0})
     return render(request, "common/data_entry.html", {
         "title": "Adding Scratch",
         "form": form
-    })
+    }, status=422 if request.method == "POST" else 200)
 
 
 #### BEGIN SCHOOL ###
@@ -721,12 +718,13 @@ def delete_scratch(request, _item_id, scratch_id):
 def view_scratches(request):
     # Get a list of (id,school_name) tuples
     c_scratches = [(s.team_id, str(s), 0, "")
-                   for s in Scratch.objects.select_related("team", "judge")]
+                   for s in Scratch.objects.select_related("team", "judge").order_by("id")]
     return render(
         request, "common/list_data.html", {
             "item_type": "team",
             "title": "Viewing All Scratches for Teams",
-            "item_list": c_scratches
+            "item_list": c_scratches,
+            "scoped_scratch_links": not request.user.is_superuser,
         })
 
 def get_settings_from_yaml():

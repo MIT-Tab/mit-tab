@@ -56,7 +56,7 @@
 
     {% if forms and not read_only %}
     <input type="submit" class="btn btn-primary" value="Submit"/>
-    {% else %}
+    {% elif not forms %}
     <p class="text-center lead">No scratches</p>
     {% endif %}
   </form>

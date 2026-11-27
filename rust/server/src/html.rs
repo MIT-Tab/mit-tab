@@ -157,18 +157,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/staff_roster_delete.html"),
         ),
         (
-            "scratches_fields.html",
-            include_str!("../templates/scratches_fields.html"),
-        ),
-        (
-            "scratches_form.html",
-            include_str!("../templates/scratches_form.html"),
-        ),
-        (
-            "scratches_list.html",
-            include_str!("../templates/scratches_list.html"),
-        ),
-        (
             "scratches_delete.html",
             include_str!("../templates/scratches_delete.html"),
         ),

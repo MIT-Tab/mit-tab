@@ -1,10 +1,14 @@
-use std::{collections::BTreeSet, fmt::Write, num::IntErrorKind};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Write,
+    num::IntErrorKind,
+};
 
 use chrono::NaiveDateTime;
 use serde_json::Value as JsonValue;
 
 use minijinja::{Value, context};
-use sqlx::{AssertSqlSafe, MySqlConnection};
+use sqlx::{AssertSqlSafe, MySqlConnection, QueryBuilder};
 
 use crate::{
     admin_html::django_datetime,
@@ -340,35 +344,45 @@ pub async fn audit_history(
     kind: Kind,
     id: i32,
 ) -> Result<Vec<Value>, sqlx::Error> {
-    let rows = sqlx::query_as::<
-        _,
-        (
-            String,
-            String,
-            NaiveDateTime,
-            String,
-            String,
-        ),
-    >(
-        "SELECT e.event_type, COALESCE(u.username, 'Unknown'), e.created_at, e.note, CAST(e.changes AS CHAR)
+    Ok(audit_histories(db, kind.model(), &[id])
+        .await?
+        .remove(&id)
+        .unwrap_or_default())
+}
+
+pub async fn audit_histories(
+    db: &mut MySqlConnection,
+    model: &str,
+    ids: &[i32],
+) -> Result<BTreeMap<i32, Vec<Value>>, sqlx::Error> {
+    let mut histories: BTreeMap<i32, Vec<Value>> = BTreeMap::new();
+    if ids.is_empty() {
+        return Ok(histories);
+    }
+    let mut sql = QueryBuilder::new(
+        "SELECT CAST(e.object_id AS SIGNED), e.event_type, COALESCE(u.username, 'Unknown'),
+                e.created_at, e.note, CAST(e.changes AS CHAR)
          FROM tab_auditevent e JOIN django_content_type c ON e.content_type_id = c.id
          LEFT JOIN auth_user u ON e.user_id = u.id
-         WHERE c.app_label = 'tab' AND c.model = ? AND e.object_id = ?
-         ORDER BY e.created_at DESC, e.id DESC",
-    )
-    .bind(kind.model())
-    .bind(id)
-    .fetch_all(db)
-    .await?;
-    Ok(rows
-        .into_iter()
-        .map(|(event, user, date, note, changes)| {
-            let label = crate::admin_records::event_label(&event);
-            let label = if label == "-" { &event } else { label };
-            context! {
-                    label, user_display => user, created_at => django_datetime(date), note,
-                    changes => serde_json::from_str::<JsonValue>(&changes).unwrap_or_default(),
-            }
-        })
-        .collect())
+         WHERE c.app_label = 'tab' AND c.model = ",
+    );
+    sql.push_bind(model).push(" AND e.object_id IN (");
+    let mut id_list = sql.separated(", ");
+    for &id in ids {
+        id_list.push_bind(id);
+    }
+    id_list.push_unseparated(") ORDER BY e.created_at DESC, e.id DESC");
+    let rows = sql
+        .build_query_as::<(i64, String, String, NaiveDateTime, String, String)>()
+        .fetch_all(db)
+        .await?;
+    for (id, event, user, date, note, changes) in rows {
+        let label = crate::admin_records::event_label(&event);
+        let label = if label == "-" { &event } else { label };
+        histories.entry(id as i32).or_default().push(context! {
+            label, user_display => user, created_at => django_datetime(date), note,
+            changes => serde_json::from_str::<JsonValue>(&changes).unwrap_or_default(),
+        });
+    }
+    Ok(histories)
 }

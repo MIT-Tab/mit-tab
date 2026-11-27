@@ -2,9 +2,11 @@
 {% block content %}
 <div class="col-12">
   <h1 class="h3">{{ title }}</h1>
-  <p>Remove the scratch between <strong>{{ team }}</strong> and <strong>{{ judge }}</strong>?</p>
+  {% if stale %}<div class="alert alert-danger" role="alert">This scratch changed. Review it before deleting.</div>{% endif %}
+  <p>Remove the {{ scratch_type }} between <strong>{{ team }}</strong> and <strong>{{ judge }}</strong>?</p>
   <form method="post">
     <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <input type="hidden" name="mittab_scratch_revision" value="{{ proof }}">
     <button type="submit" class="btn btn-danger">Delete Scratch</button>
     <a class="btn btn-outline-secondary" href="{{ link }}">Cancel</a>
   </form>

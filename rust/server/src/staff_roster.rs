@@ -402,7 +402,7 @@ async fn edit(
     }
 }
 
-async fn submitted_fields(app: &App, request: Request) -> Result<Fields, Box<Response>> {
+pub(super) async fn submitted_fields(app: &App, request: Request) -> Result<Fields, Box<Response>> {
     let multipart = request
         .headers()
         .get(header::CONTENT_TYPE)
@@ -444,7 +444,7 @@ async fn submitted_fields(app: &App, request: Request) -> Result<Fields, Box<Res
     Ok(fields)
 }
 
-fn form_return_path(uri: &Uri, headers: &HeaderMap, fields: Option<&Fields>) -> String {
+pub(super) fn form_return_path(uri: &Uri, headers: &HeaderMap, fields: Option<&Fields>) -> String {
     let query: BTreeMap<_, _> =
         url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes()).collect();
     [

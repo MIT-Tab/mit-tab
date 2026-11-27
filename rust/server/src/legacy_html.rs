@@ -346,6 +346,10 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/common/data_entry.html"),
         ),
         (
+            "common/data_entry_multiple.html",
+            include_str!("../../../mittab/templates/common/data_entry_multiple.html"),
+        ),
+        (
             "common/_form.html",
             include_str!("../../../mittab/templates/common/_form.html"),
         ),
@@ -588,6 +592,9 @@ fn translate(name: &str, source: &str) -> String {
             ["url", "'edit_motion'", "motion.pk"] => output.push_str("/motions/{{ motion.id }}/edit/"),
             ["url", "'toggle_motion_published'", "motion.pk"] => output.push_str("/motions/{{ motion.id }}/toggle-published/"),
             ["url", "'delete_motion'", "motion.pk"] => output.push_str("/motions/{{ motion.id }}/delete/"),
+            ["return_to_input"] if name == "common/data_entry_multiple.html" => output.push_str(
+                "{% if scratch_revision %}<input type=\"hidden\" name=\"mittab_scratch_revision\" value=\"{{ scratch_revision }}\">{% endif %}{% with redirect_target=return_path|default(request.path) %}{% include 'common/_return_to_input.html' %}{% endwith %}",
+            ),
             ["return_to_input"] => output.push_str(
                 "{{ round_input|safe }}{% with redirect_target=return_path|default(request.path) %}{% include 'common/_return_to_input.html' %}{% endwith %}",
             ),
@@ -647,6 +654,7 @@ fn translate(name: &str, source: &str) -> String {
             ["outround_form", "form"] => output.push_str("{% include 'outrounds/_form.html' %}"),
             ["csrf_token"] => output.push_str("{{ csrf_input|safe }}"),
             ["widthratio", "num_rounds", "1", "72"] => output.push_str("{{ table_width }}"),
+            ["render_form", "form"] => output.push_str("{% include 'ui/form.html' %}"),
             ["render_form", "form", "files_last=True"] => output.push_str(
                 concat!(
                     "{% with files_last=true %}{% include 'ui/form.html' %}{% endwith %}",
@@ -764,6 +772,12 @@ fn translate(name: &str, source: &str) -> String {
             "event.changes.fields|join:\", \"",
             "event.changes.fields|join(\", \")",
         ),
+        "common/data_entry_multiple.html" => translated
+            .replace("event.changes.fields|join:\", \" ", "event.changes.fields|join(\", \") ")
+            .replace(
+                "{{ csrf_input|safe }}",
+                "{{ csrf_input|safe }}{% if scratch_error %}<div class=\"alert alert-danger\" role=\"alert\">{{ scratch_error }}</div>{% endif %}",
+            ),
         "tab/_email_preview.html" => translated.replace(
             "|default:email.to_address", "|django_default(email.to_address)",
         ).replace("{{ email.html_body }}", "{{ email.html_body|isolated_email_preview }}"),
