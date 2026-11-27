@@ -275,7 +275,7 @@ fn translate(source: &str) -> String {
         .replace("{{ block.super }}", "{{ super() }}")
         .replace(
             "{% csrf_token %}{% block form_top %}",
-            r#"{% csrf_token %}{% if pairing_revision %}<input type="hidden" name="mittab_pairing_revision" value="{{ pairing_revision }}">{% endif %}{% if registration_revision %}<input type="hidden" name="mittab_registration_revision" value="{{ registration_revision }}">{% endif %}{% if registration_delete_revision %}<input type="hidden" name="mittab_registration_delete_revision" value="{{ registration_delete_revision }}">{% endif %}{% block form_top %}"#,
+            r#"{% csrf_token %}{% if pairing_revision %}<input type="hidden" name="mittab_pairing_revision" value="{{ pairing_revision }}">{% endif %}{% if registration_revision %}<input type="hidden" name="mittab_registration_revision" value="{{ registration_revision }}">{% endif %}{% if registration_delete_revision %}<input type="hidden" name="mittab_registration_delete_revision" value="{{ registration_delete_revision }}">{% endif %}{% if configuration_revision %}<input type="hidden" name="mittab_configuration_revision" value="{{ configuration_revision }}">{% endif %}{% block form_top %}"#,
         )
         .replace(
             r#"<input type="hidden" name="post" value="yes">"#,

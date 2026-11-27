@@ -20,6 +20,7 @@ use crate::{
     admin_html::{self, Shell},
     admin_model_data::{BoundField, Form, Kind, MANAGED, Resource},
     admin_records::readonly,
+    admin_registration::{self, ListKind},
     admin_registration_inlines::Inlines,
     admin_repairs::{self, LATER_STAGE},
     admin_scores::score_audit,
@@ -85,6 +86,7 @@ struct Page<'a> {
     model_url: String,
     headers: &'a HeaderMap,
     user: i32,
+    actor: Actor,
     target: &'a str,
 }
 
@@ -189,6 +191,7 @@ async fn entry(
         query,
         model_url,
         user,
+        actor,
         headers: &headers,
         target: uri
             .path_and_query()
@@ -215,6 +218,10 @@ async fn change(
     if post.is_some() {
         lock_round_if_configured(&mut db).await?;
     }
+    let can_add = admin_registration::can_add(&mut db, resource.list.model.name).await?;
+    if id.is_none() && !can_add {
+        return Ok(crate::motions::forbidden(Extension(page.actor)).await);
+    }
     let (initial, original) = if let Some(id) = id {
         let Some(initial) = resource.load(&mut db, id, post.is_some()).await? else {
             return Ok(access::found("/admin/"));
@@ -227,9 +234,21 @@ async fn change(
         .as_ref()
         .filter(|_| resource.pairing())
         .and_then(|initial| AdminFormProof::for_session(&page, "admin pairing edit", initial));
-    let stale = post
+    let stale_pairing = post
         .zip(pairing_revision.as_ref())
         .is_some_and(|(post, proof)| !proof.verified(app, post.get("mittab_pairing_revision")));
+    let configuration_revision = initial
+        .as_ref()
+        .filter(|_| resource.registration_config())
+        .and_then(|initial| {
+            AdminFormProof::for_session(&page, "admin registration configuration edit", initial)
+        });
+    let stale_configuration =
+        post.zip(configuration_revision.as_ref())
+            .is_some_and(|(post, proof)| {
+                !proof.verified(app, post.get("mittab_configuration_revision"))
+            });
+    let stale = stale_pairing || stale_configuration;
     let mut inlines = if resource.registration() {
         Some(Inlines::load(&mut db, id, post.is_some()).await?)
     } else {
@@ -267,6 +286,10 @@ async fn change(
     let bound = post.filter(|_| !stale && !stale_registration);
     let mut form = Form::load(resource, &mut db, initial.as_deref(), bound, &page.query).await?;
     form.pairing_revision = pairing_revision.map(|revision| revision.token(app));
+    form.configuration_revision = configuration_revision.map(|revision| revision.token(app));
+    form.readonly =
+        admin_registration::readonly_fields(&mut db, resource.list.model.name, id).await?;
+    form.can_add = can_add;
     if let Some(inlines) = &mut inlines {
         inlines.token = registration_revision.map(|proof| proof.token(app));
         inlines.bind(bound, &mut db).await?;
@@ -275,6 +298,8 @@ async fn change(
     if stale || stale_registration {
         form.non_field_error = Some(if stale_registration {
             "This registration changed. Review the current values before saving."
+        } else if stale_configuration {
+            "This registration configuration changed. Review the current values before saving."
         } else {
             "This pairing changed. Review the current values before saving."
         });
@@ -295,7 +320,9 @@ async fn change(
         None
     };
     if let Some(post) = post
-        && let Some(values) = form.clean(resource, &mut db, id).await?
+        && let Some(values) = form
+            .clean(resource, &mut db, id, initial.as_deref())
+            .await?
         && form.inlines.as_ref().is_none_or(Inlines::valid)
     {
         let effects = match resource.list.model.name {
@@ -379,7 +406,7 @@ async fn change(
                 }
                 let (destination, notice) = if !post.all("_continue").is_empty() {
                     (page.add_or_change_url(Some(saved)), "continue")
-                } else if !post.all("_addanother").is_empty() {
+                } else if can_add && !post.all("_addanother").is_empty() {
                     (page.add_or_change_url(None), "another")
                 } else {
                     (page.list_url(), "save")
@@ -391,6 +418,14 @@ async fn change(
                     log_id,
                     notice,
                 ));
+            }
+            Err(sqlx::Error::Database(error))
+                if error.is_unique_violation()
+                    && id.is_none()
+                    && resource.list.model.name == "registrationconfig" =>
+            {
+                db.rollback().await?;
+                return Ok(crate::motions::forbidden(Extension(page.actor)).await);
             }
             Err(sqlx::Error::Database(error))
                 if error.is_unique_violation() && !resource.unique.is_empty() =>
@@ -653,6 +688,7 @@ fn render_form(
     let Ok(mut widgets) = widgets else {
         return unavailable();
     };
+    widgets.extend(form.readonly);
     widgets.extend(attribution.into_iter().flatten());
     let Ok(inline_admin_formsets) = form.inlines.as_ref().map(Inlines::markup).transpose() else {
         return unavailable();
@@ -681,11 +717,12 @@ fn render_form(
         object_url, form_url => &suffix, filter_suffix => &suffix,
         adminform => [context! { classes => "", lines => widgets }],
         pairing_revision => form.pairing_revision,
+        configuration_revision => form.configuration_revision,
         registration_revision => form.inlines.as_ref().and_then(|inlines| inlines.token.as_deref()),
         registration_delete_revision => form.inlines.as_ref().and_then(|inlines| inlines.removal_token.as_deref()),
         inline_admin_formsets,
         show_delete_link => !popup && !add, show_save => true,
-        show_save_and_add_another => !popup, show_save_and_continue => !popup,
+        show_save_and_add_another => !popup && form.can_add, show_save_and_continue => !popup,
         has_view_permission => true, can_change => true,
         errors => (0..errors).collect::<Vec<_>>(),
         non_field_errors => form.non_field_error.map(|message| error_list(message, true)).unwrap_or_default(),
@@ -719,6 +756,21 @@ fn changed_fields(
         .filter_map(|(field, (old, new))| {
             let equal = match field.kind {
                 Kind::Decimal => decimal_equal(old.as_deref(), new.as_deref()),
+                Kind::Json => {
+                    let json = |raw: &Option<String>| {
+                        raw.as_deref()
+                            .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+                    };
+                    json(old) == json(new)
+                }
+                Kind::EasternDateTime => {
+                    let time = |raw: &Option<String>| {
+                        raw.as_deref()
+                            .and_then(admin_registration::parse_db_date)
+                            .map(|date| date.and_utc().timestamp())
+                    };
+                    time(old) == time(new)
+                }
                 _ => old == new,
             };
             (!equal).then_some(field)
@@ -782,11 +834,30 @@ pub(super) fn render_widget(
             "<textarea name=\"{name}\" cols=\"40\" rows=\"10\" class=\"vLargeTextField\" id=\"id_{name}\">\n{}</textarea>",
             escape(bound.value.as_deref().unwrap_or_default()),
         ),
+        Kind::Json => {
+            let payload = escape(bound.value.as_deref().unwrap_or_default());
+            let initial = bound
+                .initial_json
+                .as_deref()
+                .filter(|raw| !raw.is_empty())
+                .map_or_else(String::new, |raw| format!(r#" value="{}""#, escape(raw)));
+            format!(
+                "<textarea name=\"{name}\" cols=\"40\" rows=\"10\" id=\"id_{name}\">\n{payload}</textarea><input type=\"hidden\" name=\"initial-{name}\"{initial} id=\"initial-id_{name}\">"
+            )
+        }
+        Kind::EasternDateTime => {
+            let value = if bound.value.as_deref() == Some("") {
+                r#" value="""#
+            } else {
+                &value
+            };
+            format!(r#"<input type="datetime-local" name="{name}"{value} id="id_{name}">"#)
+        }
         Kind::BallotCode => format!(
             r#"<input type="text" name="{name}"{value} class="vTextField" maxlength="255"{required} id="id_{name}">"#
         ),
-        Kind::Integer | Kind::Experience => {
-            let min = if matches!(field.kind, Kind::Experience) {
+        Kind::Integer | Kind::Experience | Kind::PositiveSmallInteger => {
+            let min = if matches!(field.kind, Kind::Experience | Kind::PositiveSmallInteger) {
                 r#" min="0""#
             } else {
                 ""
@@ -989,13 +1060,18 @@ impl AdminFormProof {
         cascade: &Cascade,
         pairings: &CascadePairings,
     ) -> Option<Self> {
-        if !page.resource.cascading_deletion() {
+        if !page.resource.cascading_deletion() && !page.resource.registration_config() {
             return None;
         }
         Self::for_session(
             page,
             "admin deletion preview",
-            (&records.rows, cascade.scope(), pairings.scope()),
+            (
+                &records.rows,
+                &records.config_updates,
+                cascade.scope(),
+                pairings.scope(),
+            ),
         )
     }
 
@@ -1164,8 +1240,10 @@ impl CascadePairings {
     }
 }
 
+#[derive(Default)]
 struct Removed {
     rows: Vec<(i32, String)>,
+    config_updates: Vec<Option<NaiveDateTime>>,
 }
 
 impl Removed {
@@ -1178,19 +1256,22 @@ impl Removed {
         lock: bool,
     ) -> Result<Self, sqlx::Error> {
         let list = &resource.list;
+        let config_update = if resource.registration_config() {
+            "t.updated_at"
+        } else {
+            "NULL"
+        };
         let mut sql = QueryBuilder::new(format!(
-            "SELECT t.id, {} FROM {} WHERE TRUE",
+            "SELECT t.id, {}, {config_update} FROM {} WHERE TRUE",
             list.label, list.source
         ));
         filter_ids(&mut sql, filter);
-        if resource.registration()
-            && let Some(query) = query
-        {
-            crate::admin_registration::search(&mut sql, query);
+        if let Some((kind, query)) = ListKind::find(resource.list.model.name).zip(query) {
+            kind.filter(&mut sql, query);
         }
         if let Some(ids) = selected {
             if ids.is_empty() {
-                return Ok(Self { rows: Vec::new() });
+                return Ok(Self::default());
             }
             sql.push(" AND t.id IN (");
             let mut selector = sql.separated(", ");
@@ -1203,8 +1284,18 @@ impl Removed {
         if lock {
             sql.push(" FOR UPDATE");
         }
-        let rows = sql.build_query_as().fetch_all(db).await?;
-        Ok(Self { rows })
+        let selected = sql
+            .build_query_as::<(i32, String, Option<NaiveDateTime>)>()
+            .fetch_all(db)
+            .await?;
+        let (rows, config_updates) = selected
+            .into_iter()
+            .map(|(id, label, update)| ((id, label), update))
+            .unzip();
+        Ok(Self {
+            rows,
+            config_updates,
+        })
     }
 
     async fn cascade(
@@ -1610,7 +1701,11 @@ async fn delete(
 }
 
 async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx::Error> {
-    let Some(filter) = page.query.record_ids(&[]) else {
+    let filter = match ListKind::find(page.resource.list.model.name) {
+        Some(kind) => kind.ids(&page.query),
+        None => page.query.record_ids(&[]),
+    };
+    let Some(filter) = filter else {
         return Ok(access::found(format!("{}?e=1", page.model_url)));
     };
     if post.get("action") != "delete_selected" {

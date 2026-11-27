@@ -6047,10 +6047,14 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
 
 
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
-                       registration_revision=False):
+                       registration_revision=False, configuration_revision=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
+    if configuration_revision and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["mittab_configuration_revision"] = registration_config_proof(previous)
     if registration_revision and form is not None:
         status, _, previous = request(port, path, cookie=session)
         assert status == 200
@@ -6086,7 +6090,16 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
                 rb'<input type="hidden" name="mittab_registration_delete_revision" value="[a-f0-9]{64}">', b"", body,
             )
             assert metadata == 1
+        if configuration_revision:
+            body, metadata = re.subn(
+                rb'<input type="hidden" name="mittab_configuration_revision" value="[a-f0-9]{64}">', b"", body,
+            )
+            assert metadata == 1
         assert_html_bytes(body, reference.content)
+
+
+def registration_config_proof(body):
+    return re.search(rb'name="mittab_configuration_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
 
 def registration_delete_proof(body):
@@ -6259,6 +6272,170 @@ def test_registration_admin_matches_django_and_saves_bound_inlines(html_assets, 
                         "mittab_registration_delete_revision": registration_delete_proof(created_page)}
         assert submit(port, created_path, created_form)[0] == 302
         assert not created.teams.exists() and Registration.objects.filter(pk=created.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_registration_admin_config_and_logs_match_django(html_assets, subtests):
+    from django.contrib.admin.models import LogEntry
+    from mittab.apps.registration.models import (
+        Registration, RegistrationChangeLog, RegistrationConfirmationEmailLog,
+    )
+
+    session = legacy_tab_session("registration-config-admin")
+    board = legacy_tab_session("registration-config-board")
+    get_user_model().objects.get(username="registration-config-board").groups.add(
+        Group.objects.create(name="APDA Board"),
+    )
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="A & B School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Gov", "Opp")]
+    Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+    registration = Registration.objects.create(school=school, email="fixture@example.org")
+    change = RegistrationChangeLog.objects.create(
+        registration=registration, registration_code=registration.herokunator_code, school_name=school.name,
+        email=registration.email, action="updated", summary="An edit.\nA second line <and tags>.",
+        changes={"a": [1, {"escaped": "café", "longer": True}]}, snapshot={"note": "☕"},
+    )
+    detached = RegistrationChangeLog.objects.create(
+        action="deleted", summary="Removed", registration_code="former-tournament",
+    )
+    sent = RegistrationConfirmationEmailLog.objects.create(
+        registration=registration, email="sent@example.org", successful=True,
+        email_payload={"z": "Résumé 💬", "subject": "Fixture", "body": ["Evidence"]},
+    )
+    failed = RegistrationConfirmationEmailLog.objects.create(
+        registration=registration, email="failed@example.org", successful=False,
+        error_message="Address excluded.\nCheck the recipient <configuration>.",
+    )
+    RegistrationConfig.objects.all().delete()
+    client = Client()
+    csrf = "a" * 32
+    client.cookies["sessionid"] = session
+    client.cookies["csrftoken"] = csrf
+    root = "/admin/registration/"
+    configs = root + "registrationconfig/"
+    changes = root + "registrationchangelog/"
+    emails = root + "registrationconfirmationemaillog/"
+    config_edit = configs + "1/change/"
+    change_edit = f"{changes}{change.id}/change/"
+    sent_edit = f"{emails}{sent.id}/change/"
+    failed_edit = f"{emails}{failed.id}/change/"
+
+    def submit(port, path, fields, sid=session):
+        return request(port, path, method="POST", form={**fields, "csrfmiddlewaretoken": csrf},
+                       extra_headers={"Cookie": f"sessionid={sid}; csrftoken={csrf}"})
+
+    schedule = {
+        "allow_new_registrations": "on", "allow_registration_edits": "on",
+        "new_registrations_open_at": "2026-01-17T09:15", "new_registrations_close_at": "",
+        "registration_edits_open_at": "2026-07-13T15:30", "registration_edits_close_at": "2026-07-14T23:00",
+        "team_name_changes_allowed": "on", "disc_scratch_quantity": 3, "_continue": "Save and continue editing",
+    }
+
+    with rust_server(overrides=html_assets) as port:
+        for path in (
+            configs, configs + "add/", changes, changes + "?q=Removed", changes + "?o=3",
+            change_edit, f"{changes}{detached.id}/change/", f"{changes}{detached.id}/delete/",
+            emails, emails + "?successful__exact=0", emails + "?q=excluded&o=-3",
+            sent_edit, failed_edit, f"{emails}{sent.id}/history/", f"{emails}{sent.id}/delete/",
+        ):
+            with subtests.test(path=path):
+                compare_admin_page(port, path, client)
+        for path in (changes + "add/", emails + "add/"):
+            assert request(port, path, cookie=session)[0] == client.get(path).status_code == 403
+            assert submit(port, path, {"email_payload": "{}"})[0] == 403
+        for path in (configs + "add/", change_edit, sent_edit):
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+            assert submit(port, path, schedule, sid=board)[1]["Location"] == "/403/"
+
+        for text in ("2026-03-08T02:30", "2026-11-01T01:30", "invalid"):
+            with subtests.test(eastern_time=text):
+                compare_admin_page(port, configs + "add/", client, {
+                    **schedule, "new_registrations_open_at": text,
+                })
+        compare_admin_page(port, configs + "add/", client, {**schedule, "disc_scratch_quantity": -1})
+        assert RegistrationConfig.get_active() is None
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = [executor.submit(submit, port, configs + "add/", schedule) for _ in range(2)]
+            assert sorted(future.result(timeout=15)[0] for future in results) == [302, 403]
+        config = RegistrationConfig.get_active()
+        assert config.pk == 1 and config.disc_scratch_quantity == 3
+        assert config.new_registrations_open_at == datetime.fromisoformat("2026-01-17T14:15:00+00:00")
+        assert config.registration_edits_open_at == datetime.fromisoformat("2026-07-13T19:30:00+00:00")
+        assert config.registration_edits_close_at == datetime.fromisoformat("2026-07-15T03:00:00+00:00")
+        assert request(port, configs + "add/", cookie=session)[0] == 403
+        config_delete = configs + "1/delete/"
+        for path in (configs, config_edit, configs + "1/history/", config_delete):
+            with subtests.test(path=path):
+                compare_admin_page(port, path, client, configuration_revision=path == config_edit,
+                                   deletion_scope=path == config_delete)
+
+        old_edit = registration_config_proof(request(port, config_edit, cookie=session)[2])
+        old_delete = re.search(rb'name="mittab_delete_scope" value="([a-f0-9]{64})"',
+                               request(port, config_delete, cookie=session)[2])[1].decode()
+        config.delete()
+        assert submit(port, configs + "add/", schedule)[0] == 302
+        config = RegistrationConfig.get_active()
+        assert submit(port, config_edit, {**schedule, "mittab_configuration_revision": old_edit})[0] == 409
+        assert submit(port, config_delete, {"post": "yes", "mittab_delete_scope": old_delete})[0] == 409
+        config_edit_proof = registration_config_proof(request(port, config_edit, cookie=session)[2])
+        assert submit(port, config_edit, {
+            **schedule, "crash_housing_enabled": "on", "disc_scratch_quantity": 4,
+            "mittab_configuration_revision": config_edit_proof,
+        })[0] == 302
+        config.refresh_from_db()
+        assert config.crash_housing_enabled and config.disc_scratch_quantity == 4
+        compare_admin_page(port, configs + "1/history/", client)
+        instant = datetime.fromisoformat("2026-11-01T06:15:47.432101+00:00")
+        RegistrationConfig.objects.filter(pk=1).update(registration_edits_open_at=instant, disc_scratch_quantity=65535)
+        precise = request(port, config_edit, cookie=session)[2]
+        assert b'value="2026-11-01T01:15"' in precise
+        assert submit(port, config_edit, {
+            **schedule, "registration_edits_open_at": "2026-11-01T01:15", "disc_scratch_quantity": 65535,
+            "mittab_configuration_revision": registration_config_proof(precise),
+        })[0] == 302
+        config.refresh_from_db()
+        assert config.registration_edits_open_at == instant and config.disc_scratch_quantity == 65535
+
+        previous_payload = sent.email_payload
+        assert submit(port, sent_edit, {"email": "spoofed@example.org", "_continue": "Save"})[0] == 302
+        sent.refresh_from_db()
+        assert sent.email_payload == previous_payload
+        compare_admin_page(port, failed_edit, client, {"email_payload": '{"unfinished":', "initial-email_payload": "{}"})
+        assert submit(port, sent_edit, {
+            "email_payload": '{"subject": "Edited note", "flag": true}',
+            "email": "spoofed@example.org", "registration": str(registration.id + 1),
+            "successful": "0", "sent_at": "1990-01-07", "error_message": "forged",
+        })[0] == 302
+        sent.refresh_from_db()
+        assert sent.email_payload == {"subject": "Edited note", "flag": True}
+        assert sent.email == "sent@example.org" and sent.registration_id == registration.id
+        assert sent.successful and sent.error_message == ""
+        compare_admin_page(port, f"{emails}{sent.id}/history/", client)
+
+        assert submit(port, change_edit, {"summary": "forged", "action": "deleted"})[0] == 302
+        change.refresh_from_db()
+        assert change.action == "updated" and "An edit." in change.summary
+        assert LogEntry.objects.filter(content_type__app_label="registration",
+                                       content_type__model="registrationchangelog", object_id=str(change.id)).exists()
+
+        filtered = emails + "?successful__exact=0"
+        compare_admin_page(port, filtered, client, {
+            "action": "delete_selected", "index": 0, "select_across": 1,
+            "_selected_action": [str(sent.id), str(failed.id)],
+        })
+        assert submit(port, filtered, {
+            "action": "delete_selected", "post": "yes", "_selected_action": [str(sent.id), str(failed.id)],
+        })[0] == 302
+        assert RegistrationConfirmationEmailLog.objects.filter(pk=sent.pk).exists()
+        assert not RegistrationConfirmationEmailLog.objects.filter(pk=failed.pk).exists()
+        assert Registration.objects.filter(pk=registration.pk).exists()
+        config_scope = re.search(rb'name="mittab_delete_scope" value="([a-f0-9]{64})"',
+                                 request(port, config_delete, cookie=session)[2])[1].decode()
+        assert submit(port, config_delete, {"post": "yes", "mittab_delete_scope": config_scope})[0] == 302
+        assert RegistrationConfig.get_active() is None
 
 
 @pytest.mark.django_db(transaction=True)

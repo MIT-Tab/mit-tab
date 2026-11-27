@@ -124,8 +124,9 @@ impl Record {
 pub(super) struct Column {
     pub(crate) name: &'static str,
     pub(crate) label: &'static str,
-    sql: &'static str,
-    nowrap: bool,
+    pub(super) sql: &'static str,
+    pub(super) nowrap: bool,
+    pub(super) sortable: bool,
 }
 
 impl Column {
@@ -140,7 +141,13 @@ impl Column {
             label,
             sql,
             nowrap,
+            sortable: true,
         }
+    }
+
+    pub(super) const fn unsortable(mut self) -> Self {
+        self.sortable = false;
+        self
     }
 }
 
@@ -185,6 +192,13 @@ pub(super) fn headings(
         .iter()
         .enumerate()
         .map(|(index, column)| {
+            if !column.sortable {
+                return context! {
+                    class_attrib => format!(r#" class="column-{}""#, column.name),
+                    text => column.label,
+                    sortable => false,
+                };
+            }
             let mut class = format!("sortable column-{}", column.name);
             let position = order.iter().position(|&(column, _)| column == index);
             let ascending = position.is_some_and(|position| order[position].1);
@@ -610,7 +624,7 @@ fn link(path: &str, id: i32, name: &str) -> String {
     format!(r#"<a href="{path}{id}/change/">{}</a>"#, escape(name))
 }
 
-fn linebreaks(raw: &str) -> String {
+pub(super) fn linebreaks(raw: &str) -> String {
     escape(raw)
         .replace("\r\n", "\n")
         .replace('\r', "\n")

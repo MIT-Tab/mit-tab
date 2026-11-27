@@ -88,11 +88,29 @@ pub(super) fn default_list(name: &str) -> Option<DefaultList> {
             "CONCAT(s.name, ' — ', t.email)",
             "t.id DESC",
         ),
+        "registrationconfig" => (
+            "registrationconfig",
+            "registration config",
+            "registration configs",
+            "registration_registrationconfig t",
+            "CONCAT('RegistrationConfig object (', t.id, ')')",
+            "t.id DESC",
+        ),
+        "registrationchangelog" => (
+            "registrationchangelog",
+            "registration change log",
+            "registration change logs",
+            "registration_registrationchangelog t",
+            "CONCAT(CASE t.action WHEN 'created' THEN 'Created' WHEN 'updated' THEN 'Updated'
+                WHEN 'deleted' THEN 'Deleted' ELSE t.action END, ' ', t.registration_code)",
+            "t.created_at DESC, t.id DESC",
+        ),
         "registrationconfirmationemaillog" => (
             "registrationconfirmationemaillog",
             "registration confirmation email log",
             "registration confirmation email logs",
-            "registration_registrationconfirmationemaillog t",
+            "registration_registrationconfirmationemaillog t
+                JOIN registration_registration r ON t.registration_id = r.id JOIN tab_school s ON r.school_id = s.id",
             "CONCAT('Registration confirmation ', IF(t.successful, 'sent', 'failed'), ': ', t.email)",
             "t.sent_at DESC, t.id DESC",
         ),
@@ -419,8 +437,11 @@ pub async fn get(
     model: &str,
     raw: Option<String>,
 ) -> Option<Response> {
-    if application == "registration" && model == "registration" {
-        return Some(crate::admin_registration::list(app, actor, headers, Query::new(raw)).await);
+    if application == "registration" {
+        let kind = crate::admin_registration::ListKind::find(model)?;
+        return Some(
+            crate::admin_registration::list(app, actor, headers, kind, Query::new(raw)).await,
+        );
     }
     if application != "tab" {
         return None;

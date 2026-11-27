@@ -392,6 +392,7 @@ impl Roster {
                     field,
                     selected: value.iter().cloned().collect(),
                     value,
+                    initial_json: None,
                     options,
                     error: None,
                 }

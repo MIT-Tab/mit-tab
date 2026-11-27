@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
 
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone};
+use chrono_tz::America::New_York;
 use sqlx::{AssertSqlSafe, MySql, MySqlConnection, QueryBuilder};
 
 use crate::{
@@ -27,6 +29,9 @@ pub const MANAGED: &[&str] = &[
     "judge",
     "tabsettings",
     "registration",
+    "registrationconfig",
+    "registrationchangelog",
+    "registrationconfirmationemaillog",
 ];
 
 pub struct Resource {
@@ -52,8 +57,11 @@ pub struct Field {
 pub enum Kind {
     Text(usize),
     Textarea,
+    Json,
+    EasternDateTime,
     Email(usize),
     Integer,
+    PositiveSmallInteger,
     Experience,
     BallotCode,
     Decimal,
@@ -365,6 +373,18 @@ impl Field {
     }
 }
 
+const fn eastern_date(name: &'static str, label: &'static str) -> Field {
+    Field::new(name, label, Kind::EasternDateTime)
+        .optional()
+        .help("Eastern time (EST/EDT).")
+}
+
+const fn checkbox(name: &'static str, label: &'static str, initial: &'static str) -> Field {
+    Field::new(name, label, Kind::Checkbox)
+        .optional()
+        .initial(initial)
+}
+
 const APDA_ID: Field = Field::new("apda_id", "Apda id", Kind::Integer)
     .optional()
     .initial("-1");
@@ -440,6 +460,37 @@ impl Resource {
                     error_field: Some(4),
                     message: "Registration with this Herokunator code already exists.",
                 }],
+            ),
+            "registrationconfig" => (
+                const {
+                    &[
+                        checkbox("allow_new_registrations", "Allow new registrations", "1"),
+                        checkbox("allow_registration_edits", "Allow registration edits", "1"),
+                        eastern_date("new_registrations_open_at", "New registrations open at"),
+                        eastern_date("new_registrations_close_at", "New registrations close at"),
+                        eastern_date("registration_edits_open_at", "Registration edits open at"),
+                        eastern_date("registration_edits_close_at", "Registration edits close at"),
+                        checkbox("crash_housing_enabled", "Crash housing enabled", "0"),
+                        checkbox(
+                            "team_name_changes_allowed",
+                            "Team name changes allowed",
+                            "0",
+                        ),
+                        checkbox("disc_scratches_open", "Disc scratches open", "0"),
+                        Field::new(
+                            "disc_scratch_quantity",
+                            "Disc scratch quantity",
+                            Kind::PositiveSmallInteger,
+                        )
+                        .initial("0"),
+                    ]
+                },
+                &[],
+            ),
+            "registrationchangelog" => (&[], &[]),
+            "registrationconfirmationemaillog" => (
+                const { &[Field::new("email_payload", "Email payload", Kind::Json).optional()] },
+                &[],
             ),
             "bye" => (
                 const {
@@ -790,6 +841,10 @@ impl Resource {
         self.list.model.name == "registration"
     }
 
+    pub fn registration_config(&self) -> bool {
+        self.list.model.name == "registrationconfig"
+    }
+
     pub fn pairing(&self) -> bool {
         matches!(self.list.model.name, "round" | "outround")
     }
@@ -838,6 +893,10 @@ impl Resource {
                 Kind::Multiple(_) => "NULL".into(),
                 _ => format!("CAST(`{}` AS CHAR)", field.column),
             })
+            .chain(
+                self.registration_config()
+                    .then(|| "CAST(updated_at AS CHAR)".into()),
+            )
             .collect::<Vec<_>>()
             .join(", ");
         let suffix = if lock { " FOR UPDATE" } else { "" };
@@ -891,6 +950,9 @@ impl Resource {
         user: i32,
         initial: Option<&[Option<String>]>,
     ) -> Result<i32, sqlx::Error> {
+        if self.fields.is_empty() {
+            return id.ok_or(sqlx::Error::RowNotFound);
+        }
         let mut sql = if id.is_some() {
             QueryBuilder::<MySql>::new(format!("UPDATE {} SET ", self.list.table()))
         } else {
@@ -953,6 +1015,12 @@ impl Resource {
                     .push_bind_unseparated(value);
             }
         }
+        if self.registration_config() {
+            columns.push("updated_at = UTC_TIMESTAMP(6)");
+            if id.is_none() {
+                columns.push("id = 1");
+            }
+        }
         if self.registration() {
             columns.push("updated_at = UTC_TIMESTAMP(6)");
             if id.is_none() {
@@ -991,6 +1059,7 @@ impl Resource {
         let result = sql.build().execute(&mut *db).await?;
         let saved = match id {
             Some(id) => id,
+            None if self.registration_config() => 1,
             None => i32::try_from(result.last_insert_id())
                 .map_err(|error| sqlx::Error::Decode(error.into()))?,
         };
@@ -1009,14 +1078,18 @@ fn join_ids(ids: BTreeSet<i32>) -> Option<String> {
 
 pub struct Form {
     pub fields: Vec<BoundField>,
+    pub readonly: Vec<minijinja::Value>,
+    pub can_add: bool,
     pub non_field_error: Option<&'static str>,
     pub pairing_revision: Option<String>,
+    pub configuration_revision: Option<String>,
     pub inlines: Option<crate::admin_registration_inlines::Inlines>,
 }
 
 pub struct BoundField {
     pub field: &'static Field,
     pub value: Option<String>,
+    pub initial_json: Option<String>,
     pub options: Vec<(i32, String)>,
     pub selected: Vec<String>,
     pub error: Option<String>,
@@ -1032,13 +1105,17 @@ impl Form {
     ) -> Result<Self, sqlx::Error> {
         let mut fields = Vec::new();
         for (index, field) in resource.fields.iter().enumerate() {
+            let stored = initial.and_then(|row| row[index].as_deref());
             let value = if let Some(post) = post {
                 match field.kind {
                     Kind::Checkbox => Some(if post.flag(field.name) { "1" } else { "0" }.into()),
                     _ => post.all(field.name).last().cloned(),
                 }
-            } else if let Some(initial) = initial {
-                initial[index].clone()
+            } else if initial.is_some() {
+                match field.kind {
+                    Kind::EasternDateTime => eastern_date_input(stored),
+                    _ => stored.map(str::to_owned),
+                }
             } else {
                 query.get(field.name).or(field.initial).map(str::to_owned)
             };
@@ -1059,9 +1136,19 @@ impl Form {
                     .collect(),
                 _ => value.iter().cloned().collect(),
             };
+            let initial_json = matches!(field.kind, Kind::Json)
+                .then(|| {
+                    if let Some(post) = post {
+                        post.all(&format!("initial-{}", field.name)).last().cloned()
+                    } else {
+                        stored.map(str::to_owned)
+                    }
+                })
+                .flatten();
             fields.push(BoundField {
                 field,
                 value,
+                initial_json,
                 options,
                 selected,
                 error: None,
@@ -1069,8 +1156,11 @@ impl Form {
         }
         Ok(Self {
             fields,
+            readonly: Vec::new(),
+            can_add: true,
             non_field_error: None,
             pairing_revision: None,
+            configuration_revision: None,
             inlines: None,
         })
     }
@@ -1080,8 +1170,23 @@ impl Form {
         resource: &Resource,
         db: &mut MySqlConnection,
         id: Option<i32>,
+        initial: Option<&[Option<String>]>,
     ) -> Result<Option<Vec<Option<String>>>, sqlx::Error> {
-        let values: Vec<_> = self.fields.iter_mut().map(BoundField::clean).collect();
+        let values: Vec<_> = self
+            .fields
+            .iter_mut()
+            .enumerate()
+            .map(|(index, field)| {
+                let stored = initial.and_then(|row| row[index].as_deref());
+                match field.field.kind {
+                    Kind::EasternDateTime if eastern_date_input(stored) == field.value => {
+                        stored.map(str::to_owned)
+                    }
+                    Kind::Json if field.value.is_none() => stored.map(str::to_owned),
+                    _ => field.clean(),
+                }
+            })
+            .collect();
         if resource.pairing()
             && let Some(chair) = resource.value("chair", &values)
             && self
@@ -1163,6 +1268,13 @@ impl BoundField {
                 Some(raw.into())
             };
         }
+        if matches!(self.field.kind, Kind::Json) {
+            return if serde_json::from_str::<serde_json::Value>(raw).is_ok() {
+                Some(raw.into())
+            } else {
+                invalid(&mut self.error, "Enter a valid JSON.")
+            };
+        }
         if raw.is_empty() {
             return if self.field.required {
                 invalid(&mut self.error, "This field is required.")
@@ -1203,7 +1315,11 @@ impl BoundField {
                 }
                 Some(raw.into())
             }
-            Kind::Integer | Kind::Experience => {
+            Kind::EasternDateTime => match eastern_datetime(raw) {
+                Ok(date) => Some(date.format("%Y-%m-%d %H:%M:%S%.6f").to_string()),
+                Err(message) => invalid(&mut self.error, &message),
+            },
+            Kind::Integer | Kind::Experience | Kind::PositiveSmallInteger => {
                 let integer = if let Some((number, fraction)) = raw.split_once('.')
                     && fraction.bytes().all(|digit| digit == b'0')
                 {
@@ -1212,7 +1328,12 @@ impl BoundField {
                     raw
                 };
                 match integer.parse::<i128>() {
-                    Ok(value) if matches!(self.field.kind, Kind::Experience) && value < 0 => {
+                    Ok(value)
+                        if matches!(
+                            self.field.kind,
+                            Kind::Experience | Kind::PositiveSmallInteger
+                        ) && value < 0 =>
+                    {
                         invalid(
                             &mut self.error,
                             "Ensure this value is greater than or equal to 0.",
@@ -1222,6 +1343,15 @@ impl BoundField {
                         invalid(
                             &mut self.error,
                             "Ensure this value is less than or equal to 10.",
+                        )
+                    }
+                    Ok(value)
+                        if matches!(self.field.kind, Kind::PositiveSmallInteger)
+                            && value > 65535 =>
+                    {
+                        invalid(
+                            &mut self.error,
+                            "Ensure this value is less than or equal to 65535.",
                         )
                     }
                     Ok(value) if value < i128::from(i32::MIN) => invalid(
@@ -1241,7 +1371,9 @@ impl BoundField {
                 Err(reason) => invalid(&mut self.error, reason),
             },
             Kind::Checkbox => Some(raw.into()),
-            Kind::Multiple(_) | Kind::Textarea => unreachable!("Field was cleaned above"),
+            Kind::Multiple(_) | Kind::Textarea | Kind::Json => {
+                unreachable!("Field was cleaned above")
+            }
             Kind::Relation(_) | Kind::Choice(_) => {
                 let id = raw.parse::<i32>().ok();
                 if self.options.iter().any(|&(option, _)| {
@@ -1266,6 +1398,40 @@ impl BoundField {
             }
         }
     }
+}
+
+fn eastern_date_input(stored: Option<&str>) -> Option<String> {
+    stored
+        .and_then(crate::admin_registration::parse_db_date)
+        .map(|date| {
+            New_York
+                .from_utc_datetime(&date)
+                .format("%Y-%m-%dT%H:%M")
+                .to_string()
+        })
+}
+
+fn eastern_datetime(raw: &str) -> Result<NaiveDateTime, String> {
+    if let Ok(date) = DateTime::parse_from_rfc3339(raw) {
+        return Ok(date.naive_utc());
+    }
+    let local = [
+        "%Y-%m-%dT%H:%M:%S%.f",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d %H:%M:%S%.f",
+        "%Y-%m-%d %H:%M",
+    ]
+    .into_iter()
+    .find_map(|format| NaiveDateTime::parse_from_str(raw, format).ok())
+    .or_else(|| {
+        NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+            .ok()?
+            .and_hms_opt(0, 0, 0)
+    })
+    .ok_or_else(|| "Enter a valid date/time.".to_owned())?;
+    New_York.from_local_datetime(&local).single().map(|date| date.naive_utc()).ok_or_else(|| {
+        format!("{local} couldn’t be interpreted in time zone America/New_York; it may be ambiguous or it may not exist.")
+    })
 }
 
 pub(super) fn valid_email(value: &str) -> bool {
