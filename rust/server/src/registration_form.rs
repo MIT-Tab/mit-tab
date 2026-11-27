@@ -10,11 +10,13 @@ pub const MAX_TEAMS: usize = 200;
 pub const MAX_JUDGES: usize = 1_000;
 
 pub fn integer_input(raw: &str) -> Result<i32, ParseIntError> {
-    let whole = raw
-        .rsplit_once('.')
+    whole_number(raw).parse()
+}
+
+pub(super) fn whole_number(raw: &str) -> &str {
+    raw.rsplit_once('.')
         .filter(|(_, digits)| digits.bytes().all(|digit| digit == b'0'))
-        .map_or(raw, |(whole, _)| whole);
-    whole.parse()
+        .map_or(raw, |(whole, _)| whole)
 }
 
 #[derive(Default)]

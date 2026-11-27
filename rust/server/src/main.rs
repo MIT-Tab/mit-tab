@@ -62,6 +62,7 @@ mod public_pairings;
 mod public_rankings;
 mod publication;
 mod registration_admin;
+mod registration_admin_page;
 mod registration_directory;
 mod registration_emails;
 mod registration_form;

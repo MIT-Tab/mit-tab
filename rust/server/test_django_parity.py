@@ -4012,7 +4012,11 @@ def test_native_registration_create_edit_privacy_and_delete():
         options.save(update_fields=["allow_registration_edits"])
         assert b"Registration updates are currently disabled." in request(port, edit)[2]
         assert post(edit, update.items())[0] == 422
-        assert post(manage, [("registration_id", registration.id)], session=tab)[1]["Location"] == f"{manage}?saved=2"
+        body = request(port, manage, cookie=tab)[2]
+        deletion = re.search(rb'name="registration_delete_revision" value="([^"]+)"', body).group(1).decode()
+        fields = [("registration_id", registration.id), ("registration_delete_revision", deletion)]
+        status, headers, _ = post(manage, fields, session=tab)
+        assert status == 302 and headers["Location"] == manage
         assert not Registration.objects.exists() and not Team.objects.exists() and not Judge.objects.exists()
         assert not Debater.objects.filter(id__in=(first.id, second.id)).exists()
         assert RegistrationChangeLog.objects.filter(action="deleted", registration_id=None).exists()
@@ -4104,24 +4108,27 @@ def test_native_registration_schedule_and_get_links():
     target = "/registration/manage/links/registration/"
     with rust_server(overrides={"MITTAB_SCHOOL_DIRECTORY_URL": ""}) as port:
         status, headers, body = request(port, manage, cookie=tab)
-        assert status == 200 and b"Eastern Time" in body
+        assert status == 200 and b"All schedule times use Eastern time" in body
         csrf = load_cookies(headers)["csrftoken"].value
 
         def post(url, form):
             return request(port, url, method="POST", extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
                            form={"csrfmiddlewaretoken": csrf, **form})
 
+        revision = re.search(rb'name="registration_settings_revision" value="([^"]+)"', body).group(1).decode()
         values = {
+            "registration_settings_revision": revision,
             "allow_new_registrations": "on", "allow_registration_edits": "on",
             "new_registrations_open_at": "2026-10-15T16:00", "new_registrations_close_at": "2026-11-15T10:00",
             "disc_scratches_open": "on", "disc_scratch_quantity": "3",
         }
-        assert post(manage, values)[0] == 422
+        assert post(manage, values)[0] == 200
         assert TabSettings.get("judges_public", use_cache=False) == 0
         for change in ({"new_registrations_open_at": "2026-11-01T01:30"},
                        {"new_registrations_close_at": "2026-09-15T12:00"}):
-            assert post(manage, {**values, **change, "confirm_judge_list_publication": "on"})[0] == 422
-        assert post(manage, {**values, "confirm_judge_list_publication": "on"})[0] == 302
+            assert post(manage, {**values, **change, "confirm_judge_list_publication": "on"})[0] == 200
+        assert post(manage, {**values, "new_registrations_close_at": "2026-11-15T10:00-05:00",
+                             "confirm_judge_list_publication": "on"})[0] == 302
         config = RegistrationConfig.objects.get()
         assert config.disc_scratch_quantity == 3 and config.disc_scratches_open
         assert config.new_registrations_open_at.isoformat() == "2026-10-15T20:00:00+00:00"
@@ -4130,14 +4137,238 @@ def test_native_registration_schedule_and_get_links():
         assert b'value="2026-10-15T16:00"' in request(port, manage, cookie=tab)[2]
         assert b"New registrations are currently closed" in request(port, "/registration/")[2]
         link = {"title": "Example Resource", "url": "https://example.test/link", "is_active": "on", "display_order": "1"}
-        assert post(target, {**link, "url": "javascript:alert(1)"})[1]["Location"] == f"{manage}?error=1"
+        rejected = post(target, {**link, "url": "javascript:alert(1)", "display_order": "-1"})
+        assert rejected[0] == 302 and rejected[1]["Location"] == manage
+        notice = load_cookies(rejected[1])["mittab_roster_notice"].value
+        rejected_body = request(port, manage, extra_headers={
+            "Cookie": f"sessionid={tab}; mittab_roster_notice={notice}",
+        })[2]
+        assert (b"Display order: Ensure this value is greater than or equal to 0. "
+                b"Url: Enter a valid URL. Url: Enter a valid URL.") in rejected_body
         assert not RegistrationLink.objects.exists()
-        assert post(target, link)[1]["Location"] == f"{manage}?saved=3"
+        assert post(target, {**link, "description": "hidden\0suffix"})[0] == 302
+        assert not RegistrationLink.objects.exists()
+        TabSettings.objects.filter(key="cur_round").delete()
+        assert post(target, link)[1]["Location"] == manage
+        TabSettings.set("cur_round", 1)
         row = RegistrationLink.objects.get()
-        assert post(f"{target}{row.id}/", {**link, "title": "Updated Resource"})[0] == 302
+        assert post(f"{target}{row.id}/", {**link, "title": " Updated Resource ", "display_order": "3.0"})[0] == 302
+        row.refresh_from_db()
+        assert row.title == "Updated Resource" and row.display_order == 3
         assert b"Updated Resource" in request(port, manage, cookie=tab)[2]
         assert post(f"{target}{row.id}/delete/", {})[0] == 302
         assert not RegistrationLink.objects.exists()
+        for missing_url in (f"{target}{row.id}/", f"{target}{row.id}/delete/"):
+            status, _, body = post(missing_url, link)
+            assert status == 404 and b"404: Not Found" in body
+
+
+
+
+@pytest.mark.django_db(transaction=True)
+def test_staff_registration_management_matches_django(html_assets):
+    from mittab.apps.registration.models import RegistrationChangeLog
+
+    staff_cookie = legacy_tab_session("staff-registration-html")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("judges_public", 0)
+    school = School.objects.create(name="East & South College")
+    other = School.objects.create(name="West <Campus>")
+    client = Client()
+    client.cookies["sessionid"] = staff_cookie
+    csrf = "a" * 32
+    client.cookies["csrftoken"] = csrf
+    cookies = {"Cookie": f"sessionid={staff_cookie}; csrftoken={csrf}"}
+    path = "/registration/manage/"
+
+    def clean(body):
+        return re.sub(rb'<input type="hidden" name="registration_(settings|delete)_revision" '
+                      rb'value="[a-f0-9]+" id="id_registration_\1_revision">', b"", body)
+
+    with rust_server(overrides=html_assets) as port:
+        def compare(fields=None):
+            if fields is None:
+                status, _, body = request(port, path, extra_headers=cookies)
+            else:
+                status, _, body = request(port, path, method="POST",
+                                          form={**fields, "csrfmiddlewaretoken": csrf}, extra_headers=cookies)
+            assert status == 200
+            mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+            with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask[1][:32].decode()):
+                reference = client.get(path) if fields is None else client.post(path, fields)
+            assert reference.status_code == 200
+            assert_html_bytes(clean(body), reference.content)
+            return body
+
+        assert b"No registrations have been submitted yet." in compare()
+        config = RegistrationConfig.get_or_create_active()
+        config.new_registrations_open_at = datetime.fromisoformat("2024-10-01T12:11:22+00:00")
+        config.registration_edits_close_at = datetime.fromisoformat("2025-11-01T13:00:00+00:00")
+        config.save()
+        stamp = datetime.fromisoformat("2025-09-07T04:05:00+00:00")
+        registration = Registration.objects.create(
+            school=school, email="fixture@example.test",
+            dietary_requests="Gluten-free <request>\nDinner only",
+            housing_requests="Two rooms & a quiet place",
+        )
+        Registration.objects.filter(id=registration.id).update(created_at=stamp, updated_at=stamp)
+        team = Team.objects.create(name="Three members", school=school, seed=0, registration=registration)
+        for name in ("Zulu", "Bravo", "Alpha"):
+            team.debaters.add(Debater.objects.create(
+                name=name, novice_status=Debater.VARSITY, email="omitted-member@example.test",
+                needs_crash_housing=name != "Alpha", requests_wgm_housing=name == "Zulu",
+            ))
+        judge = Judge.objects.create(name="With estimate", rank="7.00", reported_experience=0,
+                                     registration=registration, needs_crash_housing=True,
+                                     requests_wgm_housing=True)
+        judge.schools.add(school, other)
+        Judge.objects.create(name="Without estimate", rank="5.25", registration=registration)
+        RegistrationLink.objects.create(title="Welcome & Go", url="https://example.test/forms",
+                                        description="Follow-up <details>", is_active=True, display_order=2)
+        RegistrationLink.objects.create(title="Inactive", url="https://example.test/next", is_active=False)
+        for i, action in enumerate(("created", "updated", "updated", "updated", "deleted")):
+            log = RegistrationChangeLog.objects.create(
+                registration=None if action == "deleted" else registration, action=action,
+                registration_code=registration.herokunator_code, school_name=school.name,
+                email=registration.email, summary=f"Summary <{i}>",
+                changes={"private": "omitted-change-json"}, snapshot={"private": "omitted-snapshot"},
+            )
+            RegistrationChangeLog.objects.filter(id=log.id).update(created_at=stamp + timedelta(minutes=i))
+        body = compare()
+        assert b"Reported 0/10" in body and b"Calibration 7.00" in body and b"Calibration 5.25" in body
+        assert b"Sep 7, 2025, 04:05" in body and b"Sep 7, 04:09" in body
+        assert b"omitted-member" not in body and b"omitted-change-json" not in body and b"omitted-snapshot" not in body
+        revision = re.search(rb'name="registration_settings_revision" value="([^"]+)"', body).group(1).decode()
+        rejected = compare({
+            "registration_settings_revision": revision,
+            "allow_new_registrations": "on",
+            "new_registrations_open_at": "2026-11-01T01:30",
+            "new_registrations_close_at": "malformed",
+            "registration_edits_open_at": "2026-09-01T15:00",
+            "registration_edits_close_at": "2026-08-31T15:00",
+            "disc_scratches_open": "on",
+            "disc_scratch_quantity": "-1",
+        })
+        assert b"may be ambiguous" in rejected and b"Closing time must be after the opening time." in rejected
+        assert b"Confirm publication of the judge list" in rejected
+
+
+@pytest.mark.django_db(transaction=True)
+def test_staff_registration_rejects_stale_and_paired_deletions():
+    from mittab.apps.registration.models import RegistrationChangeLog
+
+    staff_cookie = legacy_tab_session("staff-registration-revisions")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Revisions College")
+    registration = Registration.objects.create(school=school, email="fixture-private@example.test")
+    team = Team.objects.create(name="Fixture Registry", school=school, seed=0, registration=registration)
+    judge = Judge.objects.create(name="Fixture Chair", rank=4, registration=registration)
+    config = RegistrationConfig.get_or_create_active()
+    stamp = datetime.fromisoformat("2024-10-01T12:11:22+00:00")
+    config.new_registrations_open_at = stamp
+    config.save(update_fields=["new_registrations_open_at"])
+    board_group = Group.objects.create(name="APDA Board")
+    queued = get_user_model().objects.get(username="staff-registration-revisions")
+
+    csrf = "a" * 32
+    cookies = {"Cookie": f"sessionid={staff_cookie}; csrftoken={csrf}"}
+    path = "/registration/manage/"
+    with rust_server() as port:
+        def token(name):
+            status, _, body = request(port, path, extra_headers=cookies)
+            assert status == 200
+            pattern = rb'name="' + name.encode() + rb'" value="([^"]+)"'
+            return re.search(pattern, body).group(1).decode()
+
+        def post(fields):
+            return request(port, path, method="POST", extra_headers=cookies,
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        def follow(headers):
+            notice = load_cookies(headers)["mittab_roster_notice"].value
+            return request(port, path, extra_headers={
+                "Cookie": cookies["Cookie"] + f"; mittab_roster_notice={notice}",
+            })[2]
+
+        revision = token("registration_settings_revision")
+        config.team_name_changes_allowed = True
+        config.save(update_fields=["team_name_changes_allowed"])
+        data = {
+            "registration_settings_revision": revision, "allow_new_registrations": "on",
+            "allow_registration_edits": "on", "new_registrations_open_at": "2024-10-01T08:11",
+            "disc_scratch_quantity": "3.0",
+        }
+        status, _, body = post(data)
+        assert status == 422 and b"Registration settings changed" in body
+        config.refresh_from_db()
+        assert config.team_name_changes_allowed
+        data["registration_settings_revision"] = token("registration_settings_revision")
+        status, headers, _ = post(data)
+        assert status == 302 and headers["Location"] == path
+        assert b"Registration settings updated!" in follow(headers)
+        config.refresh_from_db()
+        assert config.new_registrations_open_at == stamp and config.disc_scratch_quantity == 3
+
+        deletion = {"registration_id": registration.id,
+                    "registration_delete_revision": token("registration_delete_revision")}
+        team.name = "Updated roster"
+        team.save(update_fields=["name"])
+        status, headers, _ = post(deletion)
+        assert status == 302 and b"This registration changed" in follow(headers)
+        assert Registration.objects.filter(pk=registration.pk).exists()
+        deletion["registration_delete_revision"] = token("registration_delete_revision")
+        a, b = (Team.objects.create(name=name, school=school, seed=0) for name in ("Other A", "Other B"))
+        pairing = Round.objects.create(round_number=1, gov_team=a, opp_team=b, victor=Round.GOV, chair=judge)
+        pairing.judges.add(judge)
+        status, headers, _ = post(deletion)
+        assert status == 302 and b"teams or judges in a pairing" in follow(headers)
+        assert Round.objects.filter(pk=pairing.pk).exists()
+        assert Registration.objects.filter(pk=registration.pk).exists()
+        assert not RegistrationChangeLog.objects.filter(action="deleted").exists()
+        pairing.delete()
+
+        bye = Bye.objects.create(bye_team=team, round_number=1)
+        status, headers, _ = post(deletion)
+        assert status == 302 and b"pairing or tournament results" in follow(headers)
+        assert Bye.objects.filter(pk=bye.pk).exists()
+        assert Registration.objects.filter(pk=registration.pk).exists()
+        assert not RegistrationChangeLog.objects.filter(action="deleted").exists()
+        bye.delete()
+
+        speaker = Debater.objects.create(name="Moved speaker", school=school, novice_status=Debater.VARSITY)
+        team.debaters.add(speaker)
+        history = Round.objects.create(round_number=1, gov_team=a, opp_team=b, victor=Round.GOV)
+        score = RoundStats.objects.create(round=history, debater=speaker, speaks=29, ranks=1)
+        deletion["registration_delete_revision"] = token("registration_delete_revision")
+        status, headers, _ = post(deletion)
+        assert status == 302 and b"pairing or tournament results" in follow(headers)
+        assert RoundStats.objects.filter(pk=score.pk).exists()
+        assert Registration.objects.filter(pk=registration.pk).exists()
+        assert not RegistrationChangeLog.objects.filter(action="deleted").exists()
+        history.delete()
+
+        from time import monotonic, sleep
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with transaction.atomic():
+                TabSettings.objects.select_for_update().get(key="cur_round")
+                pending = executor.submit(post, deletion)
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE" in row[7]
+                                      for row in cursor.fetchall())
+                    if waiting:
+                        break
+                    sleep(0.025)
+                assert waiting, "The registration delete did not reach the tournament lock"
+                queued.groups.add(board_group)
+            status, _, body = pending.result(timeout=6)
+        assert status == 403 and b"fixture-private" not in body
+        assert Registration.objects.filter(pk=registration.pk).exists()
+        assert not RegistrationChangeLog.objects.filter(action="deleted").exists()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -9056,7 +9287,12 @@ def test_registration_and_public_information_admin_link_parity(html_assets, subt
                 status, headers, _ = submit(port, staff_form, {
                     **add_form, "title": staff_title, "display_order": 4294967295,
                 })
-                assert status == 302 and headers["Location"].endswith("?saved=3")
+                assert status == 302
+                if model is RegistrationLink:
+                    assert headers["Location"] == "/registration/manage/"
+                    assert "mittab_roster_notice" in load_cookies(headers)
+                else:
+                    assert headers["Location"] == "/settings/public-homepage/?saved=3"
                 added.refresh_from_db()
                 assert added.title == staff_title and added.display_order == 4294967295
                 add_form["title"] = staff_title

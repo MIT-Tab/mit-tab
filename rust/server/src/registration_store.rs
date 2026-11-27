@@ -4,7 +4,7 @@ use axum::{http::HeaderMap, response::Response};
 use chrono::NaiveDateTime;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
-use sqlx::{MySqlConnection, MySqlPool, Row};
+use sqlx::{MySqlConnection, Row};
 
 use crate::{
     App, access,
@@ -910,13 +910,10 @@ async fn log_roster(
     Ok(())
 }
 
-pub async fn delete(pool: &MySqlPool, id: i32) -> Result<(), Error> {
-    let mut tx = pool.begin().await?;
-    lock_round(&mut tx).await?;
-    lock_config(&mut tx).await?;
-    let before = entry(&mut tx, id).await?.ok_or(Error::NotFound)?.snapshot;
+pub(super) async fn delete(tx: &mut MySqlConnection, id: i32) -> Result<(), Error> {
+    let before = entry(&mut *tx, id).await?.ok_or(Error::NotFound)?.snapshot;
     log_change(
-        &mut tx,
+        &mut *tx,
         None,
         "deleted",
         json!({"deleted": before}),
@@ -927,10 +924,10 @@ pub async fn delete(pool: &MySqlPool, id: i32) -> Result<(), Error> {
     let mut members = BTreeSet::new();
     for (id, team) in items(&before, "teams") {
         members.extend(items(team, "debaters").into_keys());
-        entity_store::delete_team(&mut tx, id).await?;
+        entity_store::delete_team(&mut *tx, id).await?;
     }
     for id in items(&before, "judges").into_keys() {
-        entity_store::delete_judge(&mut tx, id).await?;
+        entity_store::delete_judge(&mut *tx, id).await?;
     }
     for id in members {
         let linked: bool = sqlx::query_scalar(
@@ -940,7 +937,7 @@ pub async fn delete(pool: &MySqlPool, id: i32) -> Result<(), Error> {
         .fetch_one(&mut *tx)
         .await?;
         if !linked {
-            entity_store::delete_debater(&mut tx, id).await?;
+            entity_store::delete_debater(&mut *tx, id).await?;
         }
     }
     sqlx::query("UPDATE registration_registrationchangelog SET registration_id = NULL WHERE registration_id = ?")
@@ -955,9 +952,8 @@ pub async fn delete(pool: &MySqlPool, id: i32) -> Result<(), Error> {
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    if roster_log::enabled(&mut tx).await? {
-        log_roster(&mut tx, &before, &Value::Null).await?;
+    if roster_log::enabled(&mut *tx).await? {
+        log_roster(&mut *tx, &before, &Value::Null).await?;
     }
-    tx.commit().await?;
     Ok(())
 }

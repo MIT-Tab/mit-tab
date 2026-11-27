@@ -289,6 +289,18 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/emails/team_portal.html"),
         ),
         (
+            "registration/_tournament_link_table.html",
+            include_str!("../../../mittab/templates/registration/_tournament_link_table.html"),
+        ),
+        (
+            "registration/_tournament_link_form.html",
+            include_str!("../../../mittab/templates/registration/_tournament_link_form.html"),
+        ),
+        (
+            "registration/admin_list.html",
+            include_str!("../../../mittab/templates/registration/admin_list.html"),
+        ),
+        (
             "registration/portal.html",
             include_str!("../../../mittab/templates/registration/portal.html"),
         ),
@@ -731,6 +743,18 @@ fn translate(name: &str, source: &str) -> String {
             ["url", "'view_team'", "row.team.id"] => output.push_str("/team/{{ row.team.id }}/"),
             ["url", "'judge_portal'", "ballot_code"] => output.push_str("{{ portal_url }}"),
             ["url", "'enter_e_ballot'", "ballot_code"] => output.push_str("{{ current_ballot_url }}"),
+            ["url", "'registration_portal_edit'", "registration.herokunator_code"] => {
+                output.push_str("{{ registration.edit_url }}");
+            }
+            ["url", "'tournament_link_create'", "link_kind=link_kind"] => {
+                output.push_str("/registration/manage/links/{{ link_kind }}/");
+            }
+            ["url", "'tournament_link_update'", "link_kind=link_kind", "link_id=link.pk"] => {
+                output.push_str("/registration/manage/links/{{ link_kind }}/{{ link.pk }}/");
+            }
+            ["url", "'tournament_link_delete'", "link_kind=link_kind", "link_id=link.pk"] => {
+                output.push_str("/registration/manage/links/{{ link_kind }}/{{ link.pk }}/delete/");
+            }
             ["url", "'registration_portal_edit'", "summary.herokunator_code"] => {
                 output.push_str("/registration/{{ summary.herokunator_code }}/");
             }
@@ -967,6 +991,33 @@ fn translate(name: &str, source: &str) -> String {
         "ballots/ballot_submitted.html" => translated
             .replace("<form method=\"post\" action=\"\">", "<form method=\"post\" action=\"{{ rfd_action }}\">")
             .replace("|default:\"No written RFD has been entered.\"", "|django_default(\"No written RFD has been entered.\")"),
+        "registration/admin_list.html" => {
+            let mut translated = translated
+                .replace("form.judge_list_is_public|yesno:'true,false'", "form.judge_list_is_public|django_yesno('true,false')")
+                .replace("registration.teams.all", "registration.teams")
+                .replace("registration.judges.all", "registration.judges")
+                .replace("team.debaters.all", "team.debaters")
+                .replace("judge.schools.all", "judge.schools")
+                .replace("registration.change_logs.all", "registration.change_logs")
+                .replace("logs|slice:\":3\"", "logs")
+                .replace("log.created_at|date:\"M j, H:i\"", "log.created_display")
+                .replace("registration.created_at|date:\"M j, Y, H:i\"", "registration.created_display")
+                .replace("registration.updated_at|date:\"M j, Y, H:i\"", "registration.updated_display")
+                .replacen("{{ csrf_input|safe }}", "{{ csrf_input|safe }}{{ settings_revision|safe }}", 1)
+                .replace(
+                    "<input type=\"hidden\" name=\"registration_id\" value=\"{{ registration.id }}\">",
+                    "<input type=\"hidden\" name=\"registration_id\" value=\"{{ registration.id }}\">{{ registration.delete_field }}",
+                );
+            for key in [
+                "confirm_judge_list_publication", "allow_new_registrations", "allow_registration_edits",
+                "new_registrations_open_at", "new_registrations_close_at", "registration_edits_open_at",
+                "registration_edits_close_at", "crash_housing_enabled", "team_name_changes_allowed",
+                "disc_scratches_open", "disc_scratch_quantity",
+            ] {
+                translated = translated.replace(&format!("{{{{ form.{key} }}}}"), &format!("{{{{ form.{key}.input }}}}"));
+            }
+            translated
+        }
         "registration/portal.html" => translated
             .replace("{{ csrf_input|safe }}", "{{ csrf_input|safe }}{{ revision_input|safe }}")
             .replace("summary.teams.all", "summary.teams")

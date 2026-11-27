@@ -371,6 +371,7 @@ pub enum PortalAccessError {
     Board,
     Session(SessionError),
     Denied,
+    Database,
 }
 
 impl PortalAccessError {
@@ -379,6 +380,7 @@ impl PortalAccessError {
             Self::Board => board_restricted(app, headers).await,
             Self::Session(error) => error.response(),
             Self::Denied => access_denied(),
+            Self::Database => unavailable(),
         }
     }
 }
@@ -400,6 +402,29 @@ pub async fn code_portal_actor(
         (Actor::Anonymous, _) => Ok(current),
         (Actor::User { id, .. }, Actor::User { id: current_id, .. }) if id == current_id => {
             Ok(current)
+        }
+        _ => Err(PortalAccessError::Denied),
+    }
+}
+
+pub(super) async fn settings_actor(
+    db: &mut MySqlConnection,
+    app: &App,
+    original: Actor,
+    headers: &HeaderMap,
+) -> Result<Actor, PortalAccessError> {
+    let actor = code_portal_actor(db, app, original, headers).await?;
+    match actor {
+        Actor::User {
+            superuser: true, ..
+        } => Ok(actor),
+        Actor::User {
+            id, staff: false, ..
+        } if user_permission(db, id, "tab_settings.can_change")
+            .await
+            .map_err(|_| PortalAccessError::Database)? =>
+        {
+            Ok(actor)
         }
         _ => Err(PortalAccessError::Denied),
     }

@@ -49,6 +49,7 @@
   "public_rankings_control": "/rankings/public-control/",
   "rank_debaters_ajax": "/debater/ranking/",
   "rank_teams_ajax": "/team/ranking/",
+  "registration_portal": "/registration/",
   "registration_code_lookup": "/registration/edit/",
   "registration_admin": "/registration/manage/",
   "round_stats": "/pairings/round_stats/",

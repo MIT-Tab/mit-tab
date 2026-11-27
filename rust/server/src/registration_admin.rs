@@ -1,46 +1,38 @@
 use axum::{
     Extension,
     body::Bytes,
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::Response,
 };
-use chrono::{NaiveDateTime, TimeZone};
+use chrono::{DateTime, NaiveDateTime, TimeZone};
 use chrono_tz::America::New_York;
 use minijinja::context;
 use serde::Serialize;
-use sqlx::{AssertSqlSafe, MySqlConnection, Row};
+use sqlx::{AssertSqlSafe, MySqlConnection};
 
 use crate::{
     App, access,
-    html::{self, Navigation},
+    admin_model_forms::AdminFormProof,
+    administration, legacy_html,
     legacy_session::Actor,
-    login, private,
-    registration_form::{Fields, length},
+    login::{self, TemplateCsrf},
+    private,
+    registration_admin_page::{self as view, FLAGS, Problems, Schedule, TIMES},
+    registration_form::{Fields, integer_input, length, whole_number},
     registration_store::{self as store, Error},
-    settings::{self, SettingValue, Settings},
-    staff_pairing::lock_round,
-    unavailable,
+    settings::{self, SettingValue},
+    staff_pairing::{lock_round, lock_round_if_configured},
+    staff_roster_notice, unavailable,
 };
 
 const MANAGE: &str = "/registration/manage/";
 const HOMEPAGE: &str = "/settings/public-homepage/";
 const FORMAT: &str = "%Y-%m-%dT%H:%M";
-const FLAGS: &[(&str, &str)] = &[
-    ("allow_new_registrations", "Allow new registrations"),
-    ("allow_registration_edits", "Allow registration updates"),
-    ("crash_housing_enabled", "Ask about crash housing"),
-    ("team_name_changes_allowed", "Allow team name changes"),
-    ("disc_scratches_open", "Disc scratches open"),
-];
-const TIMES: &[(&str, &str)] = &[
-    ("new_registrations_open_at", "New registrations open"),
-    ("new_registrations_close_at", "New registrations close"),
-    ("registration_edits_open_at", "Registration updates open"),
-    ("registration_edits_close_at", "Registration updates close"),
-];
+const SETTINGS_PROOF: &str = "registration settings edit";
+const DELETE_PROOF: &str = "staff registration deletion";
 
-fn date_input(value: Option<NaiveDateTime>) -> String {
+pub(super) fn date_input(value: Option<NaiveDateTime>) -> String {
     value
         .map(|value| {
             New_York
@@ -51,135 +43,95 @@ fn date_input(value: Option<NaiveDateTime>) -> String {
         .unwrap_or_default()
 }
 
-fn parse_date(value: &str) -> Result<Option<NaiveDateTime>, Error> {
+fn parse_date(value: &str) -> Result<Option<NaiveDateTime>, String> {
     if value.is_empty() {
         return Ok(None);
     }
-    let local = NaiveDateTime::parse_from_str(value, FORMAT)
-        .ok()
-        .and_then(|value| New_York.from_local_datetime(&value).single())
-        .ok_or(Error::Invalid(
-            "Enter an unambiguous Eastern date and time.",
-        ))?;
-    Ok(Some(local.naive_utc()))
-}
-
-#[derive(serde::Deserialize)]
-pub struct Feedback {
-    saved: Option<u8>,
-    error: Option<u8>,
+    if let Ok(value) = DateTime::parse_from_rfc3339(value) {
+        return Ok(Some(value.naive_utc()));
+    }
+    for format in ["%Y-%m-%dT%H:%M%:z", "%Y-%m-%d %H:%M%:z"] {
+        if let Ok(value) = DateTime::parse_from_str(value, format) {
+            return Ok(Some(value.naive_utc()));
+        }
+    }
+    let local = [
+        FORMAT,
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%dT%H:%M:%S%.f",
+        "%Y-%m-%d %H:%M:%S%.f",
+    ]
+    .iter()
+    .find_map(|pattern| NaiveDateTime::parse_from_str(value, pattern).ok())
+    .ok_or_else(|| "Enter a valid date/time.".to_owned())?;
+    New_York.from_local_datetime(&local).single().map(|value| Some(value.naive_utc())).ok_or_else(|| {
+        format!("{local} couldn’t be interpreted in time zone America/New_York; it may be ambiguous or it may not exist.")
+    })
 }
 
 pub async fn page(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
-    Query(feedback): Query<Feedback>,
 ) -> Response {
-    let message = if feedback.saved == Some(1) {
-        Some(("Registration settings updated.", false))
-    } else if feedback.saved == Some(2) {
-        Some(("Registration and all associated data deleted.", false))
-    } else if feedback.saved == Some(3) {
-        Some(("Registration link updated.", false))
-    } else if feedback.error.is_some() {
-        Some((
-            "Enter a title, a valid HTTP(S) link and a display order.",
-            true,
-        ))
-    } else {
-        None
-    };
-    admin_page(&app, actor, &headers, message, None).await
+    admin_page(&app, actor, &headers, None, &Problems::new()).await
 }
 
 async fn admin_page(
     app: &App,
     actor: Actor,
     headers: &HeaderMap,
-    feedback: Option<(&str, bool)>,
     posted: Option<&Fields>,
+    problems: &Problems,
 ) -> Response {
-    let Ok(csrf) = html::page_csrf(headers) else {
+    let Ok(csrf) = TemplateCsrf::new(headers) else {
         return unavailable();
     };
-    match render(app, actor, &csrf, feedback, posted).await {
-        Ok(response) => html::form_response(response, headers, &csrf),
-        Err(_) => unavailable(),
-    }
-}
-
-async fn render(
-    app: &App,
-    actor: Actor,
-    csrf: &str,
-    feedback: Option<(&str, bool)>,
-    posted: Option<&Fields>,
-) -> Result<Response, sqlx::Error> {
-    let mut db = app.db.acquire().await?;
-    let config = sqlx::query("SELECT * FROM registration_registrationconfig WHERE id = 1")
-        .fetch_optional(&mut *db)
-        .await?;
-    let mut flags = Vec::new();
-    for &(key, label) in FLAGS {
-        let stored: bool = if let Some(config) = &config {
-            config.try_get(key)?
-        } else {
-            matches!(key, "allow_new_registrations" | "allow_registration_edits")
-        };
-        flags.push((key, label, posted.map_or(stored, |fields| fields.flag(key))));
-    }
-    let mut dates = Vec::new();
-    for &(key, label) in TIMES {
-        let stored = config
-            .as_ref()
-            .map(|row| row.try_get::<Option<NaiveDateTime>, _>(key))
-            .transpose()?
-            .flatten();
-        dates.push((
-            key,
-            label,
-            posted.map_or_else(|| date_input(stored), |fields| fields.get(key).into()),
-        ));
-    }
-    let limit: u16 = config
-        .as_ref()
-        .map(|row| row.try_get("disc_scratch_quantity"))
-        .transpose()?
-        .unwrap_or_default();
-    let limit = posted.map_or_else(
-        || limit.to_string(),
-        |fields| fields.get("disc_scratch_quantity").to_string(),
-    );
-    let judges_public = Settings::load(&mut db, &["judges_public"])
-        .await?
-        .flag("judges_public", false);
-
-    let registrations = sqlx::query_as::<_, (i32, String, String, String, i64, i64)>(
-        "SELECT r.id, r.herokunator_code, s.name, r.email,
-           (SELECT COUNT(*) FROM tab_team t WHERE t.registration_id = r.id),
-           (SELECT COUNT(*) FROM tab_judge j WHERE j.registration_id = r.id)
-         FROM registration_registration r JOIN tab_school s ON r.school_id = s.id ORDER BY r.created_at DESC, r.id DESC",
-    ).fetch_all(&mut *db).await?;
-    let audits = sqlx::query_as::<_, (String, String, String, String, String, String)>(
-        "SELECT school_name, registration_code, action, summary, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i UTC'),
-          CAST(changes AS CHAR) FROM registration_registrationchangelog ORDER BY created_at DESC, id DESC LIMIT 25",
-    ).fetch_all(&mut *db).await?;
-    let links = resources(&mut db, Resource::RegistrationLink).await?;
-    let (message, has_error) =
-        feedback.map_or((None, false), |(message, error)| (Some(message), error));
-    Ok(html::render(
-        "registration_admin.html",
-        context! {
-            title => "Registration Management", nav => Navigation::new(actor, true), csrf, flags, dates, limit,
-            registrations, audits, links, judges_public, message, has_error,
-        },
-        if has_error {
-            StatusCode::UNPROCESSABLE_ENTITY
-        } else {
-            StatusCode::OK
-        },
-    ))
+    let Ok(mut db) = app.db.begin().await else {
+        return unavailable();
+    };
+    let actor = match access::settings_actor(&mut db, app, actor, headers).await {
+        Ok(actor) => actor,
+        Err(error) => {
+            drop(db);
+            return error.response(app, headers).await;
+        }
+    };
+    let result = async {
+        let schedule = view::schedule(&mut db).await?;
+        let registrations = view::registrations(&mut db, None).await?;
+        let (recent_changes, attached) = view::activities(&mut db).await?;
+        let registration_links: Vec<_> = resources(&mut db, Resource::RegistrationLink).await?
+            .into_iter().map(|link| context! { pk => link.id, is_active => link.active, ..minijinja::Value::from_serialize(link) })
+            .collect();
+        let shell = legacy_html::shell(&mut db, actor, MANAGE).await?;
+        db.commit().await?;
+        let registrations: Vec<_> = registrations.into_iter().map(|row| {
+            let proof = AdminFormProof::for_target(headers, DELETE_PROOF, MANAGE, &row)
+                .map(|proof| proof.token(app)).unwrap_or_default();
+            row.context(view::hidden("registration_delete_revision", &proof), attached.get(&row.id).map_or(&[], Vec::as_slice))
+        }).collect();
+        let form = view::settings_form(&schedule, posted, problems);
+        let revision = posted.map_or_else(
+            || AdminFormProof::for_target(headers, SETTINGS_PROOF, MANAGE, &schedule)
+                .map(|proof| proof.token(app)).unwrap_or_default(),
+            |fields| fields.get("registration_settings_revision").to_owned(),
+        );
+        let messages = problems.get("__all__").map(|text| [context! { text, tags => "error", level => 40 }]);
+        let status = if messages.is_some() { StatusCode::UNPROCESSABLE_ENTITY } else { StatusCode::OK };
+        let mut response = staff_roster_notice::render(
+            app, headers, MANAGE, "registration/admin_list.html", shell,
+            context! {
+                csrf_input => csrf.input(), form, registrations, recent_changes, registration_links, messages,
+                config => schedule.context(),
+                settings_revision => view::hidden("registration_settings_revision", &revision),
+            },
+            status,
+        );
+        csrf.set_cookie(&mut response, headers);
+        Ok::<_, sqlx::Error>(response)
+    }.await;
+    result.unwrap_or_else(|_| unavailable())
 }
 
 pub async fn update(
@@ -192,62 +144,132 @@ pub async fn update(
     if !login::valid_csrf(&headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
-    let (result, saved) = if fields.get("registration_id").is_empty() {
-        (update_settings(&app, &fields).await, 1)
-    } else {
-        let Ok(id) = fields.get("registration_id").parse::<i32>() else {
-            return missing();
+    if !fields.get("registration_id").is_empty() {
+        let result = match fields.get("registration_id").parse::<i32>() {
+            Ok(id) => {
+                delete_registration(
+                    &app,
+                    actor,
+                    &headers,
+                    id,
+                    fields.get("registration_delete_revision"),
+                )
+                .await
+            }
+            Err(_) => Err(Error::NotFound),
         };
-        (store::delete(&app.db, id).await, 2)
-    };
-    match result {
-        Ok(()) => access::found(format!("{MANAGE}?saved={saved}")),
-        Err(Error::Invalid(message)) => {
-            admin_page(&app, actor, &headers, Some((message, true)), Some(&fields)).await
+        return match result {
+            Ok(()) => staff_roster_notice::saved(
+                &app,
+                &headers,
+                MANAGE,
+                "Registration and all associated data deleted.",
+            ),
+            Err(Error::NotFound) => {
+                staff_roster_notice::failed(&app, &headers, MANAGE, "Registration not found.")
+            }
+            Err(Error::Invalid(message)) => {
+                staff_roster_notice::failed(&app, &headers, MANAGE, message)
+            }
+            Err(Error::Access(response)) => *response,
+            Err(_) => unavailable(),
+        };
+    }
+    match update_settings(&app, actor, &headers, &fields).await {
+        Ok(None) => {
+            staff_roster_notice::saved(&app, &headers, MANAGE, "Registration settings updated!")
         }
-        Err(Error::NotFound) => missing(),
+        Ok(Some(problems)) => admin_page(&app, actor, &headers, Some(&fields), &problems).await,
+        Err(Error::Access(response)) => *response,
         Err(_) => unavailable(),
     }
 }
 
-async fn update_settings(app: &App, fields: &Fields) -> Result<(), Error> {
-    let new_open = parse_date(fields.get("new_registrations_open_at"))?;
-    let new_close = parse_date(fields.get("new_registrations_close_at"))?;
-    let edits_open = parse_date(fields.get("registration_edits_open_at"))?;
-    let edits_close = parse_date(fields.get("registration_edits_close_at"))?;
-    if [(new_open, new_close), (edits_open, edits_close)]
-        .into_iter()
-        .any(|(opens, closes)| {
-            opens
-                .zip(closes)
-                .is_some_and(|(opens, closes)| opens >= closes)
+fn validate_settings(
+    fields: &Fields,
+    stored: &Schedule,
+) -> Result<([Option<NaiveDateTime>; 4], u16), Problems> {
+    let mut problems = Problems::new();
+    let dates = std::array::from_fn(|index| {
+        let key = TIMES[index];
+        let posted = fields.get(key);
+        let old = stored.dates[index];
+        if posted == date_input(old) {
+            return old;
+        }
+        parse_date(posted).unwrap_or_else(|error| {
+            problems.insert(key, error);
+            None
         })
-    {
-        return Err(Error::Invalid(
-            "Closing time must be after the opening time.",
-        ));
+    });
+    for close in [1, 3] {
+        if dates[close - 1]
+            .zip(dates[close])
+            .is_some_and(|(opens, closes)| opens >= closes)
+        {
+            problems.insert(
+                TIMES[close],
+                "Closing time must be after the opening time.".into(),
+            );
+        }
     }
-    let quantity = fields.get("disc_scratch_quantity");
+    let key = "disc_scratch_quantity";
+    let quantity = fields.get(key);
     let limit = if quantity.is_empty() {
         0
     } else {
-        quantity
-            .parse::<u16>()
-            .map_err(|_| Error::Invalid("Enter a valid disc scratch quantity."))?
+        integer_input(quantity)
+            .ok()
+            .and_then(|number| u16::try_from(number).ok())
+            .unwrap_or_else(|| {
+                problems.insert(key, "Enter a valid disc scratch quantity.".into());
+                0
+            })
     };
-    let disc_open = fields.flag("disc_scratches_open");
+    if fields.flag("disc_scratches_open")
+        && !stored.judges_public
+        && !fields.flag("confirm_judge_list_publication")
+    {
+        problems.insert(
+            "disc_scratches_open",
+            "Confirm publication of the judge list to open disc scratches.".into(),
+        );
+    }
+    if problems.is_empty() {
+        Ok((dates, limit))
+    } else {
+        Err(problems)
+    }
+}
+
+async fn update_settings(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    fields: &Fields,
+) -> Result<Option<Problems>, Error> {
     let mut tx = app.db.begin().await?;
     lock_round(&mut tx).await?;
     store::lock_config(&mut tx).await?;
-    let judges_public = Settings::load(&mut tx, &["judges_public"])
-        .await?
-        .flag("judges_public", false);
-    if disc_open && !judges_public {
-        if !fields.flag("confirm_judge_list_publication") {
-            return Err(Error::Invalid(
-                "Confirm publication of the judge list to open disc scratches.",
-            ));
-        }
+    if let Err(error) = access::settings_actor(&mut tx, app, actor, headers).await {
+        tx.rollback().await?;
+        return Err(Error::Access(Box::new(error.response(app, headers).await)));
+    }
+    let stored = view::schedule(&mut tx).await?;
+    let verified = AdminFormProof::for_target(headers, SETTINGS_PROOF, MANAGE, &stored)
+        .is_some_and(|proof| proof.verified(app, fields.get("registration_settings_revision")));
+    if !verified {
+        return Ok(Some(Problems::from([(
+            "__all__",
+            "Registration settings changed. Reload the page before saving.".into(),
+        )])));
+    }
+    let (dates, limit) = match validate_settings(fields, &stored) {
+        Ok(parsed) => parsed,
+        Err(problems) => return Ok(Some(problems)),
+    };
+    let flags = FLAGS.map(|key| fields.flag(key));
+    if flags[4] && !stored.judges_public {
         settings::put(&mut tx, "judges_public", SettingValue::Number(1)).await?;
     }
     sqlx::query(
@@ -255,10 +277,85 @@ async fn update_settings(app: &App, fields: &Fields) -> Result<(), Error> {
           new_registrations_open_at = ?, new_registrations_close_at = ?, registration_edits_open_at = ?,
           registration_edits_close_at = ?, crash_housing_enabled = ?, team_name_changes_allowed = ?,
           disc_scratches_open = ?, disc_scratch_quantity = ?, updated_at = UTC_TIMESTAMP(6) WHERE id = 1",
-    ).bind(fields.flag("allow_new_registrations")).bind(fields.flag("allow_registration_edits"))
-        .bind(new_open).bind(new_close).bind(edits_open).bind(edits_close)
-        .bind(fields.flag("crash_housing_enabled")).bind(fields.flag("team_name_changes_allowed"))
-        .bind(disc_open).bind(limit).execute(&mut *tx).await?;
+    ).bind(flags[0]).bind(flags[1]).bind(dates[0]).bind(dates[1]).bind(dates[2]).bind(dates[3])
+        .bind(flags[2]).bind(flags[3]).bind(flags[4]).bind(limit).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(None)
+}
+
+async fn delete_registration(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    id: i32,
+    revision: &str,
+) -> Result<(), Error> {
+    let mut tx = app.db.begin().await?;
+    lock_round(&mut tx).await?;
+    store::lock_config(&mut tx).await?;
+    if let Err(error) = access::settings_actor(&mut tx, app, actor, headers).await {
+        tx.rollback().await?;
+        return Err(Error::Access(Box::new(error.response(app, headers).await)));
+    }
+    let row = view::registrations(&mut tx, Some(id))
+        .await?
+        .pop()
+        .ok_or(Error::NotFound)?;
+    let verified = AdminFormProof::for_target(headers, DELETE_PROOF, MANAGE, &row)
+        .is_some_and(|proof| proof.verified(app, revision));
+    if !verified {
+        return Err(Error::Invalid(
+            "This registration changed. Reload the page before deleting it.",
+        ));
+    }
+    let has_results = sqlx::query_scalar::<_, bool>(
+        "WITH teams AS (SELECT id FROM tab_team WHERE registration_id = ?),
+              judges AS (SELECT id FROM tab_judge WHERE registration_id = ?)
+         SELECT EXISTS(
+             SELECT 1 FROM tab_round
+             WHERE gov_team_id IN (SELECT id FROM teams) OR opp_team_id IN (SELECT id FROM teams)
+                OR chair_id IN (SELECT id FROM judges)
+             UNION ALL
+             SELECT 1 FROM tab_outround
+             WHERE gov_team_id IN (SELECT id FROM teams) OR opp_team_id IN (SELECT id FROM teams)
+                OR chair_id IN (SELECT id FROM judges)
+             UNION ALL
+             SELECT 1 FROM tab_round_judges WHERE judge_id IN (SELECT id FROM judges)
+             UNION ALL
+             SELECT 1 FROM tab_outround_judges WHERE judge_id IN (SELECT id FROM judges)
+             UNION ALL
+             SELECT 1 FROM tab_bye WHERE bye_team_id IN (SELECT id FROM teams)
+             UNION ALL
+             SELECT 1 FROM tab_noshow WHERE no_show_team_id IN (SELECT id FROM teams)
+             UNION ALL
+             SELECT 1 FROM tab_breakingteam WHERE team_id IN (SELECT id FROM teams)
+             UNION ALL
+             SELECT 1 FROM tab_outroundchallenge
+             WHERE challenger_id IN (SELECT id FROM teams) OR challenged_id IN (SELECT id FROM teams)
+             UNION ALL
+             SELECT 1 FROM tab_publishedteamplacement WHERE team_id IN (SELECT id FROM teams)
+             UNION ALL
+             SELECT 1 FROM tab_manualjudgeassignment WHERE judge_id IN (SELECT id FROM judges)
+             UNION ALL
+             SELECT 1 FROM tab_roundstats stats
+             WHERE EXISTS(SELECT 1 FROM tab_team_debaters membership
+                          WHERE membership.debater_id = stats.debater_id
+                            AND membership.team_id IN (SELECT id FROM teams))
+               AND NOT EXISTS(SELECT 1 FROM tab_team_debaters membership
+                              WHERE membership.debater_id = stats.debater_id
+                                AND membership.team_id NOT IN (SELECT id FROM teams))
+         )",
+    )
+    .bind(id)
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if has_results {
+        return Err(Error::Invalid(
+            "This registration has teams or judges in a pairing or tournament results. Review its dependencies in the admin interface.",
+        ));
+    }
+    store::delete(&mut tx, id).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -436,64 +533,149 @@ pub async fn resources(
 
 pub async fn link_add(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     Path(kind): Path<String>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
     let Some(kind) = Resource::link(&kind) else {
-        return missing();
+        return administration::not_found(State(app), Extension(actor)).await;
     };
-    save_resource(&app, &headers, &body, kind, None, false).await
+    save_resource(&app, actor, &headers, &body, kind, None, false).await
 }
 
 pub async fn link_edit(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     Path((kind, id)): Path<(String, i32)>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
     let Some(kind) = Resource::link(&kind) else {
-        return missing();
+        return administration::not_found(State(app), Extension(actor)).await;
     };
-    save_resource(&app, &headers, &body, kind, Some(id), false).await
+    save_resource(&app, actor, &headers, &body, kind, Some(id), false).await
 }
 
 pub async fn link_delete(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     Path((kind, id)): Path<(String, i32)>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
     let Some(kind) = Resource::link(&kind) else {
-        return missing();
+        return administration::not_found(State(app), Extension(actor)).await;
     };
-    save_resource(&app, &headers, &body, kind, Some(id), true).await
+    save_resource(&app, actor, &headers, &body, kind, Some(id), true).await
 }
 
-pub async fn text_add(State(app): State<App>, headers: HeaderMap, body: Bytes) -> Response {
-    save_resource(&app, &headers, &body, Resource::InfoText, None, false).await
+pub async fn text_add(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    save_resource(
+        &app,
+        actor,
+        &headers,
+        &body,
+        Resource::InfoText,
+        None,
+        false,
+    )
+    .await
 }
 
 pub async fn text_edit(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     Path(id): Path<i32>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    save_resource(&app, &headers, &body, Resource::InfoText, Some(id), false).await
+    save_resource(
+        &app,
+        actor,
+        &headers,
+        &body,
+        Resource::InfoText,
+        Some(id),
+        false,
+    )
+    .await
 }
 
 pub async fn text_delete(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     Path(id): Path<i32>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    save_resource(&app, &headers, &body, Resource::InfoText, Some(id), true).await
+    save_resource(
+        &app,
+        actor,
+        &headers,
+        &body,
+        Resource::InfoText,
+        Some(id),
+        true,
+    )
+    .await
+}
+
+fn registration_link_order(
+    title: &str,
+    address: &str,
+    description: &str,
+    order: &str,
+) -> Result<u32, String> {
+    let mut errors = Vec::new();
+    for (label, value, limit, required) in [
+        ("Title", title, 80, true),
+        ("Url", address, 500, true),
+        ("Description", description, 160, false),
+    ] {
+        let count = value.chars().count();
+        if count == 0 && required {
+            errors.push(format!("{label}: This field is required."));
+        } else if count > limit {
+            errors.push(format!(
+                "{label}: Ensure this value has at most {limit} characters (it has {count})."
+            ));
+        }
+        if value.contains('\0') {
+            errors.push(format!("{label}: Null characters are not allowed."));
+        }
+    }
+    let parsed = match whole_number(order).parse::<i128>() {
+        _ if order.is_empty() => Err("This field is required."),
+        Err(_) => Err("Enter a whole number."),
+        Ok(value) if value < 0 => Err("Ensure this value is greater than or equal to 0."),
+        Ok(value) => u32::try_from(value)
+            .map_err(|_| "Ensure this value is less than or equal to 4294967295."),
+    };
+    if let Err(message) = parsed {
+        errors.push(format!("Display order: {message}"));
+    }
+    if !address.is_empty()
+        && !address.contains('\0')
+        && length(address, 500)
+        && !valid_http_url(address)
+    {
+        errors.push("Url: Enter a valid URL. Url: Enter a valid URL.".into());
+    }
+    if errors.is_empty() {
+        return parsed.map_err(str::to_owned);
+    }
+    Err(errors.join(" "))
 }
 
 async fn save_resource(
     app: &App,
+    actor: Actor,
     headers: &HeaderMap,
     body: &[u8],
     kind: Resource,
@@ -504,50 +686,112 @@ async fn save_resource(
     if !login::valid_csrf(headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
+    let saved = |message: &str| {
+        if matches!(kind, Resource::RegistrationLink) {
+            staff_roster_notice::saved(app, headers, MANAGE, message)
+        } else {
+            access::found(kind.next(true))
+        }
+    };
+    let failed = |message: &str| {
+        if matches!(kind, Resource::RegistrationLink) {
+            staff_roster_notice::failed(app, headers, MANAGE, message)
+        } else {
+            access::found(kind.next(false))
+        }
+    };
+    let Ok(mut tx) = app.db.begin().await else {
+        return unavailable();
+    };
+    if lock_round_if_configured(&mut tx).await.is_err() {
+        return unavailable();
+    }
+    let actor = match access::settings_actor(&mut tx, app, actor, headers).await {
+        Ok(actor) => actor,
+        Err(error) => {
+            drop(tx);
+            return error.response(app, headers).await;
+        }
+    };
+    let registration_link = matches!(kind, Resource::RegistrationLink);
     if delete {
         let deleted = sqlx::query(AssertSqlSafe(format!(
             "DELETE FROM {} WHERE id = ?",
             kind.table()
         )))
         .bind(id)
-        .execute(&app.db)
+        .execute(&mut *tx)
         .await;
         return match deleted {
-            Ok(result) if result.rows_affected() > 0 => access::found(kind.next(true)),
+            Ok(result) if result.rows_affected() > 0 => match tx.commit().await {
+                Ok(()) => saved("Registration link removed."),
+                Err(_) => unavailable(),
+            },
+            Ok(_) if registration_link => {
+                drop(tx);
+                administration::not_found(State(app.clone()), Extension(actor)).await
+            }
             Ok(_) => missing(),
             Err(_) => unavailable(),
         };
     }
-    let title = fields.get("title");
-    let address = fields.get("url");
-    let text = fields.get(if kind.is_text() {
-        "text"
-    } else {
-        "description"
-    });
+    let (title, address, text) = (
+        fields.get("title"),
+        fields.get("url"),
+        fields.get(if kind.is_text() {
+            "text"
+        } else {
+            "description"
+        }),
+    );
     let order = fields.get("display_order");
-    let source = if order.is_empty() {
-        Some(0)
+    let (title, address, text, order) = if registration_link {
+        if let Some(id) = id {
+            match sqlx::query_scalar::<_, i32>(
+                "SELECT id FROM registration_registrationlink WHERE id = ? FOR UPDATE",
+            )
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await
+            {
+                Ok(Some(_)) => (),
+                Ok(None) => {
+                    drop(tx);
+                    return administration::not_found(State(app.clone()), Extension(actor)).await;
+                }
+                Err(_) => return unavailable(),
+            }
+        }
+        let (title, address, text) = (title.trim(), address.trim(), text.trim());
+        match registration_link_order(title, address, text, order.trim()) {
+            Ok(order) => (title, address, text, order),
+            Err(message) => return failed(&message),
+        }
     } else {
-        order.parse::<u32>().ok()
+        let order = if order.is_empty() {
+            0
+        } else {
+            let Ok(order) = order.parse::<u32>() else {
+                return failed("Display order: Enter a nonnegative whole number.");
+            };
+            order
+        };
+        let content_ok = if kind.is_text() {
+            !text.is_empty() && length(text, 500)
+        } else {
+            length(text, 160)
+                && length(address, 500)
+                && url::Url::parse(address).is_ok_and(|url| {
+                    matches!(url.scheme(), "http" | "https")
+                        && url.host().is_some()
+                        && url.username().is_empty()
+                })
+        };
+        if title.is_empty() || !length(title, 80) || !content_ok {
+            return failed("");
+        }
+        (title, address, text, order)
     };
-    let Some(order) = source else {
-        return access::found(kind.next(false));
-    };
-    let content_ok = if kind.is_text() {
-        !text.is_empty() && length(text, 500)
-    } else {
-        length(text, 160)
-            && length(address, 500)
-            && url::Url::parse(address).is_ok_and(|url| {
-                matches!(url.scheme(), "http" | "https")
-                    && url.host().is_some()
-                    && url.username().is_empty()
-            })
-    };
-    if title.is_empty() || !length(title, 80) || !content_ok {
-        return access::found(kind.next(false));
-    }
     let active = fields.flag("is_active");
     let columns = if kind.is_text() {
         "text = ?"
@@ -574,9 +818,18 @@ async fn save_resource(
     if let Some(id) = id {
         query = query.bind(id);
     }
-    match query.execute(&app.db).await {
-        Ok(result) if result.rows_affected() == 0 && id.is_some() => missing(),
-        Ok(_) => access::found(kind.next(true)),
+    match query.execute(&mut *tx).await {
+        Ok(result) if result.rows_affected() == 0 && id.is_some() && !registration_link => {
+            missing()
+        }
+        Ok(_) => match tx.commit().await {
+            Ok(()) => saved(if id.is_some() {
+                "Registration link updated."
+            } else {
+                "Registration link added."
+            }),
+            Err(_) => unavailable(),
+        },
         Err(_) => unavailable(),
     }
 }
