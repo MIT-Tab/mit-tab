@@ -3,7 +3,7 @@ use std::{ffi::OsString, path::PathBuf, time::UNIX_EPOCH};
 use axum::{
     Extension,
     extract::State,
-    http::{HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use minijinja::context;
@@ -430,27 +430,33 @@ fn asset(content_type: &'static str, body: impl IntoResponse) -> Response {
     response
 }
 
-pub async fn index(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
+pub async fn index(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+) -> Response {
     match actor {
         Actor::Anonymous => access::found("/public/"),
         Actor::User { board: true, .. } => access::found("/apda-board/"),
         Actor::User {
             superuser: true, ..
         } => match access::wizard_complete(&app).await {
-            Ok(true) => staff_roster::dashboard(&app, actor).await,
+            Ok(true) => staff_roster::dashboard(&app, actor, &headers).await,
             Ok(false) => access::found("/setup/start-tournament/"),
             Err(_) => unavailable(),
         },
         Actor::User {
             id, staff: true, ..
         } => match crate::staff_roles::preset(&app.db, id).await {
-            Ok(Some(preset)) if preset.data_entry() => staff_roster::dashboard(&app, actor).await,
+            Ok(Some(preset)) if preset.data_entry() => {
+                staff_roster::dashboard(&app, actor, &headers).await
+            }
             Ok(Some(preset)) => access::found(preset.landing()),
             Ok(None) => access::access_denied(),
             Err(_) => unavailable(),
         },
         Actor::User { id, .. } => match access::legacy_entry_user(&app.db, id).await {
-            Ok(true) => staff_roster::dashboard(&app, actor).await,
+            Ok(true) => staff_roster::dashboard(&app, actor, &headers).await,
             Ok(false) => access::found("/public/"),
             Err(_) => unavailable(),
         },

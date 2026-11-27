@@ -4030,6 +4030,114 @@ def test_staff_roster_lists_match_django_html(html_assets, subtests):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_school_roster_create_and_detail_match_django(html_assets, subtests):
+    from django.contrib.messages import SUCCESS
+    from django.contrib.messages.storage.session import SessionStorage
+    from django.http import HttpResponse
+    from django.test import RequestFactory
+
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 4)
+    school = School.objects.create(name="School & <College>", apda_id=None)
+    other_school = School.objects.create(name="Second College", apda_id=121)
+    empty_school = School.objects.create(name="Empty School")
+    local = Team.objects.create(name="Home & Away Team", school=school, seed=0)
+    hybrid = Team.objects.create(name="Hybrid <Tournament> Team", school=other_school, hybrid_school=school, seed=0)
+    for name in ("Z Debater", "A Debater <Partner>"):
+        debater = Debater.objects.create(name=name, novice_status=0, school=school)
+        local.debaters.add(debater)
+        hybrid.debaters.add(debater)
+    judge = Judge.objects.create(name="School & Judge", rank="3.75")
+    judge.schools.add(school, other_school)
+    Round.objects.create(round_number=4, gov_team=local, opp_team=hybrid, victor=Round.GOV)
+
+    users = get_user_model().objects
+    admin = users.create_superuser(username="school-form-admin")
+    helper = users.create_user(username="school-form-helper", is_staff=True)
+    helper.groups.add(Group.objects.create(name="MIT-TAB: Data entry helper"))
+    board = users.create_superuser(username="school-form-board")
+    board.groups.add(Group.objects.create(name="APDA Board"))
+    entry = users.create_user(username="entry")
+
+    def reference(user):
+        client = Client()
+        client.force_login(user)
+        client.cookies["csrftoken"] = "a" * 32
+        return client
+
+    create = "/enter_school/"
+    detail = f"/school/{school.id}/"
+    with rust_server(overrides=html_assets) as port:
+        for user in (admin, helper, entry):
+            client = reference(user)
+            for path in (create, detail, f"/school/{empty_school.id}/", create + "?next=/view_schools/"):
+                with subtests.test(user=user.username, path=path):
+                    compare_admin_page(port, path, client)
+        client = reference(helper)
+        for values in ({"name": "", "apda_id": "invalid"},
+                       {"name": school.name, "apda_id": "-1"},
+                       {"name": school.name, "apda_id": "invalid"},
+                       {"name": "Out of range", "apda_id": "2147483648"},
+                       {"name": "a" * 51, "apda_id": ""}):
+            with subtests.test(invalid=values):
+                compare_admin_page(port, create, client, values)
+
+        session = client.cookies["sessionid"].value
+        boundary = "mittab-school-fixture"
+        headers = {"Cookie": f"sessionid={session}; csrftoken=" + "a" * 32,
+                   "Content-Type": f"multipart/form-data; boundary={boundary}"}
+
+        def submit(path, *, name, apda_id, token="a" * 32, return_to="/view_schools/", session_headers=headers):
+            fields = {"csrfmiddlewaretoken": token, "name": name, "apda_id": apda_id, "return_to": return_to}
+            body = "".join(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
+                           for name, value in fields.items()) + f"--{boundary}--\r\n"
+            return request(port, path, method="POST", extra_headers=session_headers, raw_body=body.encode())
+
+        def expect_success(response, path, text):
+            status, reply_headers, _ = response
+            assert status == 302 and reply_headers["Location"] == path
+            notice = load_cookies(reply_headers)["mittab_roster_notice"].value
+            valid_cookie = f"sessionid={session}; mittab_roster_notice={notice}"
+            status, rendered_headers, body = request(port, path, extra_headers={"Cookie": valid_cookie})
+            assert status == 200 and rendered_headers["Cache-Control"] == "private, no-store"
+            assert load_cookies(rendered_headers)["mittab_roster_notice"]["max-age"] == "0"
+            reference_request = RequestFactory().get(path)
+            reference_request.session = client.session
+            messages = SessionStorage(reference_request)
+            messages.add(SUCCESS, text)
+            messages.update(HttpResponse())
+            reference_request.session.save()
+            assert_html_bytes(body, client.get(path).content)
+            other_session = reference(admin).cookies["sessionid"].value
+            invalid_cookie = f"sessionid={other_session}; mittab_roster_notice={notice}"
+            for path_to_check, cookie in ((path, invalid_cookie), ("/view_debaters/", valid_cookie)):
+                _, _, body = request(port, path_to_check, extra_headers={"Cookie": cookie})
+                assert b'alert-success' not in body
+
+        assert submit(create, name="New & School", apda_id="451", token="bad")[0] == 403
+        board_session = reference(board).cookies["sessionid"].value
+        board_headers = {**headers, "Cookie": f"sessionid={board_session}; csrftoken=" + "a" * 32}
+        for path in (create, detail):
+            assert request(port, path, cookie=board_session)[1]["Location"] == "/403/"
+            assert submit(path, name="Rejected School", apda_id="888", session_headers=board_headers)[1]["Location"] == "/403/"
+        assert not School.objects.filter(name="Rejected School").exists()
+        expect_success(submit(create, name="New & School", apda_id="451.0"), "/",
+                       "School New & School created successfully")
+        added = School.objects.get(name="New & School")
+        assert added.apda_id == 451
+        expect_success(submit(detail, name="Updated & School", apda_id="452"), "/view_schools/",
+                       "School Updated & School updated successfully")
+        absolute_return = f"http://127.0.0.1:{port}/view_schools/?archive=1"
+        assert submit(detail, name="Updated & School", apda_id="452", return_to=absolute_return)[1]["Location"] == "/view_schools/?archive=1"
+        assert submit(detail, name="Updated & School", apda_id="", return_to="//example.invalid")[1]["Location"] == detail
+        school.refresh_from_db()
+        assert school.name == "Updated & School" and school.apda_id is None
+        assert request(port, f"/school/{added.id}/delete/", cookie=session)[0] == 200
+        assert School.objects.filter(pk=added.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_native_staff_roster_edits_and_data_entry_scope():
     from time import monotonic, sleep
 
@@ -4088,7 +4196,7 @@ def test_native_staff_roster_edits_and_data_entry_scope():
         assert response[0] == 302, response
         school = School.objects.get(name="Roster School")
         assert school.apda_id == 445
-        assert post("/enter_school/", fields.items())[0] == 422
+        assert post("/enter_school/", fields.items())[0] == 200
         assert request(port, "/", cookie=helper)[0] == 200
         assert request(port, "/view_schools/", cookie=helper)[0] == 200
         assert request(port, "/registration/manage/", cookie=helper)[1]["Location"] == "/403/"

@@ -251,7 +251,7 @@ impl Field {
                 original != SettingValue::Number(1) && !form.contains_key(&self.form_name())
             }
             (Kind::Integer, SettingValue::Text(original), Value::Number(number)) => {
-                integer_input(original) == Some(*number)
+                crate::registration_form::integer_input(original).ok() == Some(*number)
             }
             (Kind::Choice, SettingValue::Text(original), Value::Number(number)) => {
                 original == number.to_string()
@@ -275,14 +275,6 @@ type FormErrors = BTreeMap<&'static str, String>;
 
 fn checked_input(value: Option<&String>) -> bool {
     value.is_some_and(|value| truthy(value))
-}
-
-fn integer_input(raw: &str) -> Option<i32> {
-    let whole = raw
-        .rsplit_once('.')
-        .filter(|(_, digits)| digits.bytes().all(|digit| digit == b'0'))
-        .map_or(raw, |(whole, _)| whole);
-    whole.parse().ok()
 }
 
 async fn current(db: &mut MySqlConnection) -> Result<(Settings, bool), sqlx::Error> {
@@ -417,7 +409,8 @@ fn submitted(field: &Field, form: &FormValues) -> Result<Value, String> {
                 format!("Select a valid choice. {raw} is not one of the available choices.")
             });
     }
-    let value = integer_input(raw).ok_or_else(|| "Enter a whole number.".to_string())?;
+    let value = crate::registration_form::integer_input(raw)
+        .map_err(|_| "Enter a whole number.".to_string())?;
     let minimum = if field.name == "tot_rounds" {
         Some(1)
     } else {

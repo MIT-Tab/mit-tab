@@ -34,9 +34,5 @@
       {% if id and admin and key == "team" %}<a href="/team/card/{{ id }}/" class="btn btn-outline-primary">Tab Card</a>{% endif %}
     </div>
   </form>
-  {% if links %}
-  <h2 class="h5">Affiliations</h2>
-  <ul>{% for category, path, id, name in links %}<li><a href="/{{ path }}/{{ id }}/">{{ name }}</a> · {{ category }}</li>{% endfor %}</ul>
-  {% endif %}
 </div>
 {% endblock %}

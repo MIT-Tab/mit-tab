@@ -342,6 +342,22 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/common/list_data.html"),
         ),
         (
+            "common/data_entry.html",
+            include_str!("../../../mittab/templates/common/data_entry.html"),
+        ),
+        (
+            "common/_form.html",
+            include_str!("../../../mittab/templates/common/_form.html"),
+        ),
+        (
+            "tab/school_detail.html",
+            include_str!("../../../mittab/templates/tab/school_detail.html"),
+        ),
+        (
+            "ui/form.html",
+            include_str!("../../../mittab/templates/ui/form.html"),
+        ),
+        (
             "common/index.html",
             include_str!("../../../mittab/templates/common/index.html"),
         ),
@@ -611,6 +627,12 @@ fn translate(name: &str, source: &str) -> String {
             ["outround_form", "form"] => output.push_str("{% include 'outrounds/_form.html' %}"),
             ["csrf_token"] => output.push_str("{{ csrf_input|safe }}"),
             ["widthratio", "num_rounds", "1", "72"] => output.push_str("{{ table_width }}"),
+            ["render_form", "form", "files_last=True"] => output.push_str(
+                "{% with files_last=true %}{% include 'ui/form.html' %}{% endwith %}",
+            ),
+            ["render_field", "field"] if name == "ui/form.html" => output.push_str(
+                "{% with checkbox=field.checkbox, choices=field.choices, widget_html=field.input|safe, help_id=field.help_id, error_id=field.error_id %}{% include 'ui/field.html' %}{% endwith %}",
+            ),
             ["render_field", field, ..] => {
                 let field = field.strip_prefix("form.").unwrap_or(field);
                 output.push_str(&format!(
@@ -691,6 +713,10 @@ fn translate(name: &str, source: &str) -> String {
         "tab/settings_form.html" => translated
             .replace("{{ field }}", "{{ field.html|safe }}")
             .replace("{{ field.errors }}", "{{ field.errors|safe }}"),
+        "ui/form.html" => translated
+            .replace("field|uses_file_input", "field.is_file")
+            .replace("{{ field }}", "{{ field.input|safe }}"),
+        "tab/school_detail.html" => translated.replace("team.debaters.all", "team.debaters"),
         "tab/_email_preview.html" => translated.replace(
             "|default:email.to_address", "|django_default(email.to_address)",
         ).replace("{{ email.html_body }}", "{{ email.html_body|isolated_email_preview }}"),

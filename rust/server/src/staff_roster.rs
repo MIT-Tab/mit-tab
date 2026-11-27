@@ -3,9 +3,9 @@ use std::collections::{BTreeMap, HashSet};
 use axum::{
     Extension, Router,
     body::Bytes,
-    extract::{MatchedPath, Path, State},
-    http::{HeaderMap, StatusCode, Uri},
-    response::Response,
+    extract::{FromRequest, MatchedPath, Multipart, Path, Request, State},
+    http::{HeaderMap, StatusCode, Uri, header},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use minijinja::{Value as TemplateValue, context};
@@ -24,7 +24,7 @@ use crate::{
     staff_pairing::lock_round,
     staff_rankings, staff_roles,
     staff_roster_data::{self as data, Edit, Error, Kind},
-    unavailable,
+    staff_roster_notice, staff_school, unavailable,
 };
 
 pub fn routes() -> Router<App> {
@@ -76,7 +76,7 @@ pub fn toolbar() -> Vec<(String, String)> {
         .collect()
 }
 
-pub async fn dashboard(app: &App, actor: Actor) -> Response {
+pub async fn dashboard(app: &App, actor: Actor, headers: &HeaderMap) -> Response {
     let result = async {
         let mut db = app.db.begin().await?;
         let school_rows = sqlx::query_as::<_, (i32, String, bool)>(
@@ -104,7 +104,8 @@ pub async fn dashboard(app: &App, actor: Actor) -> Response {
         let debaters_missing_apda_ids: Vec<_> = debater_rows.iter().filter_map(|(id, _, missing)| missing.then_some(*id)).collect();
         let school_list: Vec<_> = school_rows.into_iter().map(|(id, name, _)| (id, name)).collect();
         let debater_list: Vec<_> = debater_rows.into_iter().map(|(id, name, _)| (id, name)).collect();
-        Ok::<_, sqlx::Error>(legacy_html::render(
+        Ok::<_, sqlx::Error>(staff_roster_notice::render(
+            app, headers, "/",
             "common/index.html",
             shell,
             context! {
@@ -126,17 +127,23 @@ pub async fn list(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     path: MatchedPath,
+    headers: HeaderMap,
 ) -> Response {
     let Some(kind) = Kind::parse(path.as_str()) else {
         return missing();
     };
-    match listing(&app, kind, actor).await {
+    match listing(&app, kind, actor, &headers).await {
         Ok(response) => response,
         Err(_) => unavailable(),
     }
 }
 
-async fn listing(app: &App, kind: Kind, actor: Actor) -> Result<Response, sqlx::Error> {
+async fn listing(
+    app: &App,
+    kind: Kind,
+    actor: Actor,
+    headers: &HeaderMap,
+) -> Result<Response, sqlx::Error> {
     let mut db = app.db.begin().await?;
     let item_type = kind.model();
     let path = format!("/view_{item_type}s/");
@@ -236,7 +243,10 @@ async fn listing(app: &App, kind: Kind, actor: Actor) -> Result<Response, sqlx::
         }
     };
     db.commit().await?;
-    Ok(legacy_html::render(
+    Ok(staff_roster_notice::render(
+        app,
+        headers,
+        &path,
         "common/list_data.html",
         shell,
         context! {
@@ -321,6 +331,7 @@ pub async fn enter(
     Extension(actor): Extension<Actor>,
     path: MatchedPath,
     headers: HeaderMap,
+    uri: Uri,
 ) -> Response {
     show(
         &app,
@@ -328,6 +339,7 @@ pub async fn enter(
         &headers,
         Kind::parse(path.as_str()),
         None,
+        &form_return_path(&uri, &headers, None),
         None,
     )
     .await
@@ -339,6 +351,7 @@ pub async fn view(
     path: MatchedPath,
     Path(id): Path<i32>,
     headers: HeaderMap,
+    uri: Uri,
 ) -> Response {
     show(
         &app,
@@ -346,6 +359,7 @@ pub async fn view(
         &headers,
         Kind::parse(path.as_str()),
         Some(id),
+        &form_return_path(&uri, &headers, None),
         None,
     )
     .await
@@ -355,18 +369,9 @@ pub async fn create(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     path: MatchedPath,
-    headers: HeaderMap,
-    body: Bytes,
+    request: Request,
 ) -> Response {
-    edit(
-        &app,
-        actor,
-        &headers,
-        Kind::parse(path.as_str()),
-        None,
-        &body,
-    )
-    .await
+    edit(&app, actor, Kind::parse(path.as_str()), None, request).await
 }
 
 pub async fn update(
@@ -374,27 +379,17 @@ pub async fn update(
     Extension(actor): Extension<Actor>,
     path: MatchedPath,
     Path(id): Path<i32>,
-    headers: HeaderMap,
-    body: Bytes,
+    request: Request,
 ) -> Response {
-    edit(
-        &app,
-        actor,
-        &headers,
-        Kind::parse(path.as_str()),
-        Some(id),
-        &body,
-    )
-    .await
+    edit(&app, actor, Kind::parse(path.as_str()), Some(id), request).await
 }
 
 async fn edit(
     app: &App,
     actor: Actor,
-    headers: &HeaderMap,
     kind: Option<Kind>,
     id: Option<i32>,
-    body: &[u8],
+    request: Request,
 ) -> Response {
     let Some(kind) = kind else {
         return missing();
@@ -402,15 +397,98 @@ async fn edit(
     let Actor::User { id: user, .. } = actor else {
         return access::access_denied();
     };
-    let fields = Fields::parse(body);
-    if !login::valid_csrf(headers, fields.get("csrfmiddlewaretoken")) {
+    let headers = request.headers().clone();
+    let uri = request.uri().clone();
+    let fields = match submitted_fields(app, request).await {
+        Ok(fields) => fields,
+        Err(response) => return *response,
+    };
+    if !login::valid_csrf(&headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
-    match save_edit(app, headers, kind, id, user, &fields).await {
+    let return_path = form_return_path(&uri, &headers, Some(&fields));
+    match save_edit(app, &headers, kind, id, user, &fields, &return_path).await {
         Ok(response) => response,
         Err(Error::Missing) => missing(),
         Err(_) => unavailable(),
     }
+}
+
+async fn submitted_fields(app: &App, request: Request) -> Result<Fields, Box<Response>> {
+    let multipart = request
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("multipart/form-data"));
+    if !multipart {
+        let bytes = Bytes::from_request(request, app)
+            .await
+            .map_err(|error| Box::new(error.into_response()))?;
+        return Ok(Fields::parse(&bytes));
+    }
+    let mut parts = Multipart::from_request(request, app)
+        .await
+        .map_err(|error| Box::new(error.into_response()))?;
+    let mut fields = Fields::default();
+    while let Some(part) = parts
+        .next_field()
+        .await
+        .map_err(|error| Box::new(error.into_response()))?
+    {
+        let Some(name) = part
+            .name()
+            .filter(|_| part.file_name().is_none())
+            .map(str::to_owned)
+        else {
+            return Err(Box::new(private((
+                StatusCode::BAD_REQUEST,
+                "Expected a named form field.",
+            ))));
+        };
+        fields.push(
+            name,
+            part.text()
+                .await
+                .map_err(|error| Box::new(error.into_response()))?,
+        );
+    }
+    Ok(fields)
+}
+
+fn form_return_path(uri: &Uri, headers: &HeaderMap, fields: Option<&Fields>) -> String {
+    let query: BTreeMap<_, _> =
+        url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes()).collect();
+    [
+        fields.map(|fields| fields.get("return_to")),
+        query.get("return_to").map(|target| target.as_ref()),
+        query.get("next").map(|target| target.as_ref()),
+        headers
+            .get(header::REFERER)
+            .and_then(|value| value.to_str().ok()),
+        uri.path_and_query().map(|value| value.as_str()),
+    ]
+    .into_iter()
+    .flatten()
+    .find_map(|target| local_form_target(headers, target))
+    .unwrap_or_else(|| "/".into())
+}
+
+fn local_form_target(headers: &HeaderMap, target: &str) -> Option<String> {
+    let path = login::local_next(target);
+    if !path.is_empty() {
+        return Some(path.into());
+    }
+    let uri = target.parse::<Uri>().ok()?;
+    let host = headers.get(header::HOST)?.to_str().ok()?;
+    if uri.authority()?.as_str() != host
+        || !(uri.scheme_str() == Some("https")
+            || uri.scheme_str() == Some("http") && !login::secure_request(headers))
+    {
+        return None;
+    }
+    let path = login::local_next(uri.path_and_query().map_or("/", |value| value.as_str()));
+    (!path.is_empty()).then(|| path.into())
 }
 
 async fn save_edit(
@@ -420,6 +498,7 @@ async fn save_edit(
     id: Option<i32>,
     user: i32,
     fields: &Fields,
+    return_path: &str,
 ) -> Result<Response, Error> {
     let Some(session) = legacy_session::cookie(headers, "sessionid") else {
         return Ok(access::access_denied());
@@ -466,13 +545,32 @@ async fn save_edit(
     )
     .await;
     match result {
-        Ok(id) => {
+        Ok(saved) => {
             db.commit().await?;
-            Ok(access::found(format!("/{}/{id}/", kind.model())))
+            if kind == Kind::School {
+                Ok(staff_roster_notice::school_saved(
+                    app,
+                    headers,
+                    if id.is_some() { return_path } else { "/" },
+                    id.is_some(),
+                    fields.get("name"),
+                ))
+            } else {
+                Ok(access::found(format!("/{}/{saved}/", kind.model())))
+            }
         }
         Err(Error::Invalid(error)) => {
             db.rollback().await?;
-            Ok(show(app, current, headers, Some(kind), id, Some((fields, error))).await)
+            Ok(show(
+                app,
+                current,
+                headers,
+                Some(kind),
+                id,
+                return_path,
+                Some((fields, error)),
+            )
+            .await)
         }
         Err(error) => Err(error),
     }
@@ -484,11 +582,19 @@ async fn show(
     headers: &HeaderMap,
     kind: Option<Kind>,
     id: Option<i32>,
+    return_path: &str,
     posted: Option<(&Fields, &str)>,
 ) -> Response {
     let Some(kind) = kind else {
         return missing();
     };
+    if kind == Kind::School {
+        return match staff_school::show(app, actor, headers, id, return_path, posted).await {
+            Ok(response) => response,
+            Err(Error::Missing) => missing(),
+            Err(_) => unavailable(),
+        };
+    }
     let Ok(csrf) = html::page_csrf(headers) else {
         return unavailable();
     };
@@ -587,20 +693,11 @@ async fn edit_page(
         .and_then(|name| name.first())
         .map(|name| format!("{subject} · {name}"))
         .unwrap_or_else(|| format!("Create {subject}"));
-    let links = if kind == Kind::School {
-        if let Some(id) = id {
-            school_links(&mut db, id).await?
-        } else {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
     let error = posted.map(|(_, error)| error);
     Ok(html::render(
         "staff_roster_edit.html",
         context! {
-            title, key, id, fields, links, nav => Navigation::new(actor, true), toolbar => toolbar(), csrf, error,
+            title, key, id, fields, nav => Navigation::new(actor, true), toolbar => toolbar(), csrf, error,
             checkin_fields, admin => is_tab(actor),
         },
         if error.is_some() {
@@ -859,18 +956,6 @@ async fn current(
         }
     }
     Ok(values)
-}
-
-async fn school_links(
-    db: &mut MySqlConnection,
-    id: i32,
-) -> Result<Vec<(String, String, i32, String)>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT 'Teams' category, 'team' kind, id, name FROM tab_team WHERE school_id = ?
-         UNION ALL SELECT 'Hybrid teams', 'team', id, name FROM tab_team WHERE hybrid_school_id = ?
-         UNION ALL SELECT 'Affiliated judges', 'judge', j.id, j.name FROM tab_judge j JOIN tab_judge_schools s ON s.judge_id = j.id WHERE s.school_id = ?
-         ORDER BY category, name, id",
-    ).bind(id).bind(id).bind(id).fetch_all(db).await
 }
 
 pub async fn confirm_delete(

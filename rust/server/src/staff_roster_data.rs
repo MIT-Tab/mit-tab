@@ -6,7 +6,7 @@ use sqlx::{AssertSqlSafe, MySqlConnection, MySqlPool, QueryBuilder};
 use crate::{
     codes::{self, Credential},
     entity_store, judge_portal,
-    registration_form::{Fields, length, valid_email},
+    registration_form::{Fields, integer_input, length, valid_email},
     roster_log,
     settings::Settings,
     staff_pairing::lock_round,
@@ -314,7 +314,12 @@ pub async fn save_on(db: &mut MySqlConnection, kind: Kind, edit: Edit<'_>) -> Re
 }
 
 async fn save_school(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Result<i32, Error> {
-    let apda_id = integer(edit.fields, "apda_id")?;
+    let apda_id = edit.fields.get("apda_id");
+    let apda_id = if apda_id.is_empty() {
+        None
+    } else {
+        Some(integer_input(apda_id).map_err(|_| Error::Invalid("Enter a valid number."))?)
+    };
     if let Some(id) = edit.id {
         sqlx::query("UPDATE tab_school SET name = ?, apda_id = ? WHERE id = ?")
             .bind(name)

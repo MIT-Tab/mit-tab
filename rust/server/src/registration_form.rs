@@ -1,10 +1,21 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    num::ParseIntError,
+};
 
 use serde::Serialize;
 use url::form_urlencoded;
 
 pub const MAX_TEAMS: usize = 200;
 const MAX_JUDGES: usize = 1_000;
+
+pub fn integer_input(raw: &str) -> Result<i32, ParseIntError> {
+    let whole = raw
+        .rsplit_once('.')
+        .filter(|(_, digits)| digits.bytes().all(|digit| digit == b'0'))
+        .map_or(raw, |(whole, _)| whole);
+    whole.parse()
+}
 
 #[derive(Default)]
 pub struct Fields(BTreeMap<String, Vec<String>>);
