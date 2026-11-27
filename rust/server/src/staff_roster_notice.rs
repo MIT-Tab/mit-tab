@@ -12,39 +12,78 @@ use crate::{App, access, legacy_html, legacy_session::cookie, login};
 
 const COOKIE: &str = "mittab_roster_notice";
 const TEAM_COOKIE: &str = "mittab_team_portal_notice";
+const JUDGE_COOKIE: &str = "mittab_judge_portal_notice";
 const LIFETIME: u32 = 60;
 const ERROR_PREFIX: &str = "error.";
 
 pub fn saved(app: &App, headers: &HeaderMap, target: &str, text: &str) -> Response {
-    redirect(app, headers, target, text, "", COOKIE)
-}
-
-pub fn failed(app: &App, headers: &HeaderMap, target: &str, text: &str) -> Response {
-    redirect(app, headers, target, text, ERROR_PREFIX, COOKIE)
-}
-
-pub fn team_redirect(
-    app: &App,
-    headers: &HeaderMap,
-    target: &str,
-    text: &str,
-    error: bool,
-) -> Response {
     redirect(
         app,
         headers,
         target,
         text,
-        if error { ERROR_PREFIX } else { "" },
-        TEAM_COOKIE,
+        "",
+        COOKIE,
+        identity(headers, COOKIE),
     )
 }
 
+pub fn failed(app: &App, headers: &HeaderMap, target: &str, text: &str) -> Response {
+    redirect(
+        app,
+        headers,
+        target,
+        text,
+        ERROR_PREFIX,
+        COOKIE,
+        identity(headers, COOKIE),
+    )
+}
+
+#[derive(Clone, Copy)]
+pub enum Portal {
+    Team,
+    Judge,
+}
+
+impl Portal {
+    fn cookie(self) -> &'static str {
+        match self {
+            Self::Team => TEAM_COOKIE,
+            Self::Judge => JUDGE_COOKIE,
+        }
+    }
+}
+
+pub fn portal_redirect(
+    app: &App,
+    headers: &HeaderMap,
+    portal: Portal,
+    target: &str,
+    text: &str,
+    error: bool,
+) -> Response {
+    let Ok(csrf) = login::TemplateCsrf::new(headers) else {
+        return crate::unavailable();
+    };
+    let mut response = redirect(
+        app,
+        headers,
+        target,
+        text,
+        if error { ERROR_PREFIX } else { "" },
+        portal.cookie(),
+        Some(csrf.secret()),
+    );
+    csrf.set_cookie(&mut response, headers);
+    response
+}
+
 fn identity<'a>(headers: &'a HeaderMap, channel: &str) -> Option<&'a str> {
-    if channel == TEAM_COOKIE {
-        cookie(headers, "csrftoken").filter(|value| login::valid_csrf_token(value))
-    } else {
+    if channel == COOKIE {
         cookie(headers, "sessionid")
+    } else {
+        cookie(headers, "csrftoken").filter(|value| login::valid_csrf_token(value))
     }
 }
 
@@ -55,9 +94,10 @@ fn redirect(
     text: &str,
     prefix: &str,
     channel: &str,
+    session: Option<&str>,
 ) -> Response {
     let mut response = access::found(target);
-    if let Some(session) = identity(headers, channel) {
+    if let Some(session) = session {
         let message = URL_SAFE_NO_PAD.encode(text);
         let expires = Utc::now().timestamp() + i64::from(LIFETIME);
         let body = format!("{expires}.{prefix}{message}");
@@ -80,10 +120,10 @@ fn redirect(
 }
 
 fn signed_data(channel: &str, session: &str, path: &str, body: &str) -> Vec<u8> {
-    let purpose = if channel == TEAM_COOKIE {
-        "team portal"
-    } else {
-        "staff roster"
+    let purpose = match channel {
+        TEAM_COOKIE => "team portal",
+        JUDGE_COOKIE => "judge portal",
+        _ => "staff roster",
     };
     format!("mit-tab {purpose} notice v1\0{session}\0{path}\0{body}").into_bytes()
 }
@@ -134,15 +174,17 @@ pub fn render(
     render_notice(headers, template, shell, page, status, notice)
 }
 
-pub fn render_team(
+pub fn render_portal(
     app: &App,
     headers: &HeaderMap,
+    portal: Portal,
     path: &str,
     template: &str,
     shell: Value,
     page: Value,
 ) -> Response {
-    let notice = read(app, headers, path, TEAM_COOKIE).map(|notice| (TEAM_COOKIE, notice));
+    let channel = portal.cookie();
+    let notice = read(app, headers, path, channel).map(|notice| (channel, notice));
     render_notice(headers, template, shell, page, StatusCode::OK, notice)
 }
 

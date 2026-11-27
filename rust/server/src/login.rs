@@ -297,6 +297,10 @@ impl TemplateCsrf {
         )
     }
 
+    pub(super) fn secret(&self) -> &str {
+        &self.secret
+    }
+
     pub fn set_cookie(&self, response: &mut Response, headers: &HeaderMap) {
         if cookie(headers, "csrftoken") != Some(self.secret.as_str()) {
             set_cookie(

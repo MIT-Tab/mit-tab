@@ -10,7 +10,7 @@ use sqlx::MySqlConnection;
 use crate::{
     App,
     admin_model_forms::AdminFormProof,
-    legacy_session::{Actor, SessionError, actor, cookie},
+    legacy_session::{self, Actor, SessionError, actor, cookie},
     login, private,
     settings::Settings,
     unavailable,
@@ -364,6 +364,44 @@ pub async fn board_restricted(app: &App, headers: &HeaderMap) -> Response {
         Ok(true) => board_denied(app, headers),
         Ok(false) => board_closed(),
         Err(_) => unavailable(),
+    }
+}
+
+pub enum PortalAccessError {
+    Board,
+    Session(SessionError),
+    Denied,
+}
+
+impl PortalAccessError {
+    pub async fn response(self, app: &App, headers: &HeaderMap) -> Response {
+        match self {
+            Self::Board => board_restricted(app, headers).await,
+            Self::Session(error) => error.response(),
+            Self::Denied => access_denied(),
+        }
+    }
+}
+
+pub async fn code_portal_actor(
+    db: &mut MySqlConnection,
+    app: &App,
+    original: Actor,
+    headers: &HeaderMap,
+) -> Result<Actor, PortalAccessError> {
+    let current = match cookie(headers, "sessionid") {
+        Some(key) => legacy_session::actor_on(db, key, app.django_secret.as_deref())
+            .await
+            .map_err(PortalAccessError::Session)?,
+        None => Actor::Anonymous,
+    };
+    match (original, current) {
+        (_, Actor::User { board: true, .. }) => Err(PortalAccessError::Board),
+        (Actor::Anonymous, _) => Ok(current),
+        (Actor::User { id, .. }, Actor::User { id: current_id, .. }) if id == current_id => {
+            Ok(current)
+        }
+        _ => Err(PortalAccessError::Denied),
     }
 }
 

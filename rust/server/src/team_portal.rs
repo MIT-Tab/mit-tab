@@ -14,12 +14,13 @@ use crate::{
     App, access,
     ballot_entry::Submitted,
     legacy_html,
-    legacy_session::{self, Actor, SessionError},
+    legacy_session::Actor,
     login::{self, TemplateCsrf},
     settings::Settings,
     staff_pairing::lock_round_if_configured,
     staff_roster_fields::{self, Choices},
-    staff_roster_notice, unavailable,
+    staff_roster_notice::{self, Portal},
+    unavailable,
 };
 
 const SEARCH: &str = "/team_portal/";
@@ -111,9 +112,10 @@ fn render(
     let Ok(csrf) = TemplateCsrf::new(headers) else {
         return unavailable();
     };
-    let mut response = staff_roster_notice::render_team(
+    let mut response = staff_roster_notice::render_portal(
         app,
         headers,
+        Portal::Team,
         path,
         template,
         shell,
@@ -130,7 +132,7 @@ pub async fn search(
 ) -> Response {
     let result = async {
         let mut db = app.db.begin().await?;
-        let actor = authorized_actor(&mut db, &app, actor, &headers).await?;
+        let actor = access::code_portal_actor(&mut db, &app, actor, &headers).await?;
         let shell = legacy_html::shell(&mut db, actor, SEARCH).await?;
         db.commit().await?;
         Ok(render(
@@ -158,7 +160,7 @@ pub async fn lookup(
     let code = fields.get("team_code").map_or("", |code| code.trim());
     let result = async {
         let mut db = app.db.acquire().await?;
-        authorized_actor(&mut db, &app, actor, &headers).await?;
+        access::code_portal_actor(&mut db, &app, actor, &headers).await?;
         if valid_code(code)
             && let Some(team) = find(&mut db, code, false).await?
         {
@@ -169,8 +171,13 @@ pub async fn lookup(
         } else {
             "We couldn't find a team for that code. Double-check and try again."
         };
-        Ok(staff_roster_notice::team_redirect(
-            &app, &headers, SEARCH, message, true,
+        Ok(staff_roster_notice::portal_redirect(
+            &app,
+            &headers,
+            Portal::Team,
+            SEARCH,
+            message,
+            true,
         ))
     }
     .await;
@@ -434,7 +441,7 @@ async fn view(
 ) -> Response {
     let result = async {
         let mut db = app.db.begin().await?;
-        let actor = authorized_actor(&mut db, app, actor, headers).await?;
+        let actor = access::code_portal_actor(&mut db, app, actor, headers).await?;
         let shell = legacy_html::shell(&mut db, actor, path).await?;
         let team = if valid_code(code) { find(&mut db, code, false).await? } else { None };
         let Some(team) = team else {
@@ -504,9 +511,7 @@ enum UpdateError {
     Storage,
     NotFound,
     Form(Feedback),
-    Board,
-    Session(SessionError),
-    Denied,
+    Access(access::PortalAccessError),
 }
 
 impl From<sqlx::Error> for UpdateError {
@@ -515,25 +520,9 @@ impl From<sqlx::Error> for UpdateError {
     }
 }
 
-async fn authorized_actor(
-    db: &mut MySqlConnection,
-    app: &App,
-    original: Actor,
-    headers: &HeaderMap,
-) -> Result<Actor, UpdateError> {
-    let Some(key) = legacy_session::cookie(headers, "sessionid") else {
-        return Ok(Actor::Anonymous);
-    };
-    let current = legacy_session::actor_on(db, key, app.django_secret.as_deref())
-        .await
-        .map_err(UpdateError::Session)?;
-    match (original, current) {
-        (_, Actor::User { board: true, .. }) => Err(UpdateError::Board),
-        (Actor::Anonymous, _) => Ok(current),
-        (Actor::User { id, .. }, Actor::User { id: current_id, .. }) if id == current_id => {
-            Ok(current)
-        }
-        _ => Err(UpdateError::Denied),
+impl From<access::PortalAccessError> for UpdateError {
+    fn from(error: access::PortalAccessError) -> Self {
+        Self::Access(error)
     }
 }
 
@@ -544,9 +533,7 @@ async fn portal_result(
 ) -> Response {
     match result {
         Ok(response) => response,
-        Err(UpdateError::Board) => access::board_restricted(app, headers).await,
-        Err(UpdateError::Denied) => access::access_denied(),
-        Err(UpdateError::Session(error)) => error.response(),
+        Err(UpdateError::Access(error)) => error.response(app, headers).await,
         Err(_) => unavailable(),
     }
 }
@@ -566,9 +553,14 @@ pub async fn update(
         return view(&app, actor, &headers, uri.path(), &code, None).await;
     }
     match save(&app, actor, &headers, &code, &fields).await {
-        Ok((code, message)) => {
-            staff_roster_notice::team_redirect(&app, &headers, &target(&code), message, false)
-        }
+        Ok((code, message)) => staff_roster_notice::portal_redirect(
+            &app,
+            &headers,
+            Portal::Team,
+            &target(&code),
+            message,
+            false,
+        ),
         Err(UpdateError::NotFound) => view(&app, actor, &headers, uri.path(), &code, None).await,
         Err(UpdateError::Form(feedback)) => {
             view(
@@ -598,7 +590,7 @@ async fn save(
         .fetch_optional(&mut *db)
         .await?;
     let team = find(&mut db, code, true).await?;
-    authorized_actor(&mut db, app, actor, headers).await?;
+    access::code_portal_actor(&mut db, app, actor, headers).await?;
     let team = team.ok_or(UpdateError::NotFound)?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
     let locked = settings.integer("cur_round", 1) > 1;

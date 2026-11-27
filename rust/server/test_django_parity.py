@@ -1878,7 +1878,10 @@ def test_native_judge_portal_availability_current_previous_and_reason_edits():
     JudgeExpectedCheckIn.objects.create(judge=chair, round_number=1)
     JudgeExpectedCheckIn.objects.create(judge=other, round_number=2)
     board = legacy_tab_session("portal-board")
-    get_user_model().objects.get(username="portal-board").groups.add(Group.objects.create(name="APDA Board"))
+    board_group = Group.objects.create(name="APDA Board")
+    get_user_model().objects.get(username="portal-board").groups.add(board_group)
+    actor = legacy_tab_session("portal-queued-staff")
+    queued_user = get_user_model().objects.get(username="portal-queued-staff")
     TabSettings.set("cur_round", 2)
     TabSettings.set("tot_rounds", 1)
     TabSettings.set("decimal_speaks", 3)
@@ -1886,6 +1889,7 @@ def test_native_judge_portal_availability_current_previous_and_reason_edits():
     TabSettings.set("written_rfd_deadline", "2099-01-01T19:00")
     TabSettings.set("open_speaks", 1)
     TabSettings.set("open_ranks", 2)
+    TabSettings.set("teams_public", 1)
     school = School.objects.create(name="Portal School")
     teams = [Team.objects.create(name=f"Portal Team {i}", school=school, seed=Team.UNSEEDED) for i in range(2)]
     speakers = [Debater.objects.create(name=f"Portal Speaker {i}", novice_status=Debater.VARSITY) for i in range(4)]
@@ -1918,14 +1922,61 @@ def test_native_judge_portal_availability_current_previous_and_reason_edits():
             return request(port, url, method="POST", extra_headers=extra,
                            form={"csrfmiddlewaretoken": token, **fields})
 
+        def post_during_board_change(url, fields):
+            from time import monotonic, sleep
+
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                with transaction.atomic():
+                    TabSettings.objects.select_for_update().get(key="cur_round")
+                    pending = executor.submit(post, url, fields, session=actor)
+                    deadline = monotonic() + 3
+                    while monotonic() < deadline:
+                        with connection.cursor() as cursor:
+                            cursor.execute("SHOW FULL PROCESSLIST")
+                            waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                          and "`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE" in row[7]
+                                          for row in cursor.fetchall())
+                        if waiting:
+                            break
+                        sleep(0.025)
+                    assert waiting, "The judge portal write did not reach the tournament lock"
+                    queued_user.groups.add(board_group)
+                status, headers, response = pending.result(timeout=6)
+            queued_user.groups.remove(board_group)
+            assert b"Portal Chair" not in response and chair_code.encode() not in response
+            return status, headers
+
         assert post(path, {"ballot_code": chair_code})[1]["Location"] == chair_portal
         assert post(path, {"ballot_code": "unexpected/path"})[0] == 422
+        status, headers, _ = post(path, {"ballot_code": ""})
+        assert status == 302 and headers["Location"] == path
+        notice = load_cookies(headers)["mittab_judge_portal_notice"].value
+        notice_cookie = f"csrftoken={csrf}; mittab_judge_portal_notice={notice}"
+        assert b"Please enter the judge code provided by tab." in request(port, path, extra_headers={
+            "Cookie": notice_cookie,
+        })[2]
         assert request(port, chair_portal, cookie=board)[0] == 403
         page = request(port, chair_portal)[2]
         assert b"Portal Chair" in page and b'for="availability_round_1"' in page
         assert post(chair_portal, {"availability_outround": "on"}, token="bad")[0] == 403
         assert set(chair.expected_checkins.values_list("round_number", flat=True)) == {1}
-        assert post(chair_portal, {"availability_outround": "on", "availability_round_99": "on"})[0] == 302
+        status, headers, _ = post(chair_portal, {"availability_outround": "on", "availability_round_99": "on"})
+        assert status == 302 and headers["Location"] == chair_portal
+        notice = load_cookies(headers)["mittab_judge_portal_notice"].value
+        assert chair_code not in notice
+        notice_cookie = f"csrftoken={csrf}; mittab_judge_portal_notice={notice}"
+        _, rendered_headers, rendered = request(port, chair_portal, extra_headers={"Cookie": notice_cookie})
+        assert b"Availability saved." in rendered
+        assert load_cookies(rendered_headers)["mittab_judge_portal_notice"]["max-age"] == "0"
+        assert b"Availability saved." not in request(port, f"{path}{other_code}/", extra_headers={
+            "Cookie": notice_cookie,
+        })[2]
+        assert b"Availability saved." not in request(port, chair_portal, extra_headers={
+            "Cookie": f"csrftoken={'b' * 32}; mittab_judge_portal_notice={notice}",
+        })[2]
+        log = list(PublicRosterChange.objects.values_list("id", "message"))
+        assert post_during_board_change(chair_portal, {"availability_round_1": "on"})[0] == 403
+        assert list(PublicRosterChange.objects.values_list("id", "message")) == log
         assert set(chair.expected_checkins.values_list("round_number", flat=True)) == {0}
         assert set(other.expected_checkins.values_list("round_number", flat=True)) == {2}
 
@@ -1936,6 +1987,8 @@ def test_native_judge_portal_availability_current_previous_and_reason_edits():
         assert post(chair_current, data)[1]["Location"] == chair_previous
         assert not debate.roundstats_set.exists()
         TabSettings.set("pairing_released", 1)
+        assert post_during_board_change(chair_current, data)[0] == 403
+        assert not debate.roundstats_set.exists()
         status, _, page = request(port, chair_current)
         assert status == 200 and b"Portal Speaker 0" in page
         assert b"Government by forfeit" not in page
@@ -1961,6 +2014,10 @@ def test_native_judge_portal_availability_current_previous_and_reason_edits():
         assert request(port, wing_specific)[0] == 200
         assert request(port, other_specific)[1]["Location"] == f"{path}{other_code}/previous/"
         assert post(wing_specific, {"rfd": "Forbidden change"})[0] == 403
+        _, blocked_headers = post_during_board_change(chair_specific, {"rfd": "Queued change"})
+        assert blocked_headers["Location"] == "/403/"
+        debate.refresh_from_db()
+        assert debate.rfd == "First reason"
         assert post(chair_specific, {"rfd": "Updated reason"})[0] == 302
         debate.refresh_from_db()
         assert debate.rfd == "Updated reason"
@@ -1979,6 +2036,81 @@ def test_native_judge_portal_availability_current_previous_and_reason_edits():
         assert post(chair_specific, {"rfd": "Late edit"})[0] == 403
         debate.refresh_from_db()
         assert debate.rfd == "Updated reason"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_judge_portal_and_history_html_matches_django(html_assets):
+    search = "/public/e-ballots/"
+    code = "Fixture-Judge-632"
+    path = f"{search}{code}/"
+    previous = path + "previous/"
+    TabSettings.set("cur_round", 4)
+    TabSettings.set("tot_rounds", 4)
+    TabSettings.set("written_rfd_first_round", 2)
+    judge = Judge.objects.create(name="Judge & <Table>", rank=5, ballot_code=code)
+    chair = Judge.objects.create(name="Another Chair", rank=5)
+    imported = Judge.objects.create(name="Imported Invalid Credential", rank=4)
+    Judge.objects.filter(pk=imported.pk).update(ballot_code="Fíxture-Other-632")
+    CheckIn.objects.create(judge=judge, round_number=2)
+    for round_number in (0, 2):
+        JudgeExpectedCheckIn.objects.create(judge=judge, round_number=round_number)
+    school = School.objects.create(name="Judge Portal School")
+    a, b, c = [Team.objects.create(name=name, school=school, seed=0)
+               for name in ("Alpha & Gov", "Beta <Opp>", "Zulu Gov")]
+    speaker = Debater.objects.create(name="Judge Portal Speaker", novice_status=0)
+    client = Client()
+    client.cookies["csrftoken"] = "a" * 32
+
+    def saved(round_number, gov, opp, winner, rfd="", *, assigned=True, scored=True):
+        debate = Round.objects.create(round_number=round_number, gov_team=gov, opp_team=opp,
+                                      victor=winner, chair=chair if assigned else judge, rfd=rfd)
+        if assigned:
+            debate.judges.add(chair, judge)
+        if scored:
+            RoundStats.objects.create(round=debate, debater=speaker, speaks=27, ranks=1, debater_role="pm")
+        return debate
+
+    with rust_server(overrides=html_assets) as port:
+        def compare(url):
+            status, headers, body = request(port, url, extra_headers={"Cookie": "csrftoken=" + "a" * 32})
+            token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+            mask = token[1][:32].decode() if token else "a" * 32
+            with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
+                reference = client.get(url)
+            assert status == reference.status_code == 200
+            assert headers["Cache-Control"] == "private, no-store"
+            assert headers["Referrer-Policy"] == "same-origin"
+            assert_html_bytes(body, reference.content)
+            return body
+
+        compare(search)
+        compare(path)
+        compare(f"{search}{code.lower()}/")
+        compare(previous)
+        cutoff = saved(4, a, b, Round.GOV)
+        legacy = saved(2, a, c, Round.OPP, assigned=False)
+        no_scores = saved(2, b, a, Round.GOV, scored=False)
+        early = saved(1, a, c, Round.UNKNOWN)
+        alpha = saved(3, a, b, Round.ALL_WIN, "\t\n  ")
+        zulu = saved(3, c, b, Round.ALL_DROP, "Private fixture RFD")
+        body = compare(previous)
+        for item in (cutoff, legacy, no_scores):
+            assert f"/submitted/{item.id}/".encode() not in body
+        for item in (early, alpha, zulu):
+            assert f"/submitted/{item.id}/".encode() in body
+        for expected in (b"ALL WIN", b"ALL DROP", b"UNKNOWN", b"Blank", b"Written", b"Not required"):
+            assert expected in body
+        assert b"Private fixture RFD" not in body
+        assert request(port, f"{search}Fixture-Other-632/")[1]["Location"] == search
+        for url in (f"{search}No-Such-Judge/", f"{search}No-Such-Judge/previous/"):
+            status, headers, _ = request(port, url)
+            assert status == 302 and headers["Location"] == search
+            cookies = load_cookies(headers)
+            notice_cookie = "mittab_judge_portal_notice"
+            assert "No-Such-Judge" not in cookies[notice_cookie].value
+            cookie = f"csrftoken={cookies['csrftoken'].value}; {notice_cookie}={cookies[notice_cookie].value}"
+            page = request(port, search, extra_headers={"Cookie": cookie})[2]
+            assert b"No judge was found for that code." in page and b"No-Such-Judge" not in page
 
 
 @pytest.mark.django_db(transaction=True)

@@ -284,6 +284,18 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/registration/team_portal_search.html"),
         ),
         (
+            "public/e_ballot_search.html",
+            include_str!("../../../mittab/templates/public/e_ballot_search.html"),
+        ),
+        (
+            "public/judge_portal.html",
+            include_str!("../../../mittab/templates/public/judge_portal.html"),
+        ),
+        (
+            "ballots/previous_ballots.html",
+            include_str!("../../../mittab/templates/ballots/previous_ballots.html"),
+        ),
+        (
             "emails/judge_ballot_code.html",
             include_str!("../../../mittab/templates/emails/judge_ballot_code.html"),
         ),
@@ -660,6 +672,8 @@ fn translate(name: &str, source: &str) -> String {
             }
             ["url", "'view_judge'", "judge.id"] => output.push_str("/judge/{{ judge.id }}/"),
             ["url", "'view_team'", "row.team.id"] => output.push_str("/team/{{ row.team.id }}/"),
+            ["url", "'judge_portal'", "ballot_code"] => output.push_str("{{ portal_url }}"),
+            ["url", "'enter_e_ballot'", "ballot_code"] => output.push_str("{{ current_ballot_url }}"),
             ["url", "'registration_portal_edit'", "row.registration.herokunator_code"] => {
                 output.push_str("{{ row.registration.url }}");
             }
@@ -868,6 +882,11 @@ fn translate(name: &str, source: &str) -> String {
             .replace("team.3", "team[3]")
             .replace("team.4", "team[4]"),
         "tab/_rank_debaters_table.html" => translated.replace("debaters.0.", "debaters[0]."),
+        "ballots/previous_ballots.html" => translated
+            .replace("row.round.round_number", "row.number")
+            .replace("row.round.gov_team.display", "row.government")
+            .replace("row.round.opp_team.display", "row.opposition")
+            .replace("{% if row.winner %}{{ row.winner.display }}{% else %}{{ row.round.get_victor_display }}{% endif %}", "{{ row.outcome }}"),
         "registration/team_portal.html" => translated
             .replace("team.debaters.all", "team.debaters")
             .replace("r.opponent.debaters.all", "r.opponent.debaters")

@@ -3,10 +3,10 @@ use std::collections::HashSet;
 use axum::{
     Extension, Form,
     extract::{Path, State},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderValue, StatusCode, Uri, header},
     response::Response,
 };
-use minijinja::context;
+use minijinja::{Value, context};
 use mittab_tabulation::ballot_entry::{ROLE_NAMES, ROLES};
 use serde::Serialize;
 use sqlx::MySqlConnection;
@@ -15,10 +15,13 @@ use crate::{
     App, access,
     ballot_entry::{self, Submitted, WriteBallot},
     html::{self, Navigation},
+    legacy_html,
     legacy_session::Actor,
-    login, private,
+    login::{self, TemplateCsrf},
+    private,
     settings::Settings,
-    staff_pairing::lock_round,
+    staff_pairing::{lock_round, lock_round_if_configured},
+    staff_roster_notice::{self, Portal},
     unavailable,
 };
 
@@ -83,30 +86,80 @@ fn csrf_error() -> Response {
     private((StatusCode::FORBIDDEN, "CSRF verification failed."))
 }
 
-pub async fn search(Extension(actor): Extension<Actor>, headers: HeaderMap) -> Response {
-    search_page(actor, &headers, None)
+pub async fn search(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+) -> Response {
+    search_page(&app, actor, &headers, None).await
 }
 
-fn search_page(actor: Actor, headers: &HeaderMap, message: Option<&'static str>) -> Response {
-    let Ok(csrf) = html::page_csrf(headers) else {
+async fn search_page(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    message: Option<&str>,
+) -> Response {
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let actor = access::code_portal_actor(&mut db, app, actor, headers).await?;
+        let shell = legacy_html::shell(&mut db, actor, SEARCH).await?;
+        db.commit().await?;
+        let messages = message.map(|text| [context! { text, tags => "error", level => 40 }]);
+        let mut response = form_page(
+            app,
+            headers,
+            SEARCH,
+            "public/e_ballot_search.html",
+            shell,
+            context! { messages },
+        );
+        if message.is_some() && response.status().is_success() {
+            *response.status_mut() = StatusCode::UNPROCESSABLE_ENTITY;
+        }
+        Ok(response)
+    }
+    .await;
+    portal_response(app, headers, result).await
+}
+
+fn form_page(
+    app: &App,
+    headers: &HeaderMap,
+    path: &str,
+    template: &str,
+    shell: Value,
+    page: Value,
+) -> Response {
+    let Ok(csrf) = TemplateCsrf::new(headers) else {
         return unavailable();
     };
-    let response = html::render(
-        "judge_search.html",
-        context! {
-            title => "Judge Portal and Ballots", csrf, message, has_error => message.is_some(),
-            nav => Navigation::new(actor, true),
-        },
-        if message.is_some() {
-            StatusCode::UNPROCESSABLE_ENTITY
-        } else {
-            StatusCode::OK
-        },
+    let mut response = staff_roster_notice::render_portal(
+        app,
+        headers,
+        Portal::Judge,
+        path,
+        template,
+        shell,
+        context! { csrf_input => csrf.input(), ..page },
     );
-    html::form_response(response, headers, &csrf)
+    csrf.set_cookie(&mut response, headers);
+    response
+}
+
+fn missing_judge(app: &App, headers: &HeaderMap) -> Response {
+    staff_roster_notice::portal_redirect(
+        app,
+        headers,
+        Portal::Judge,
+        SEARCH,
+        "No judge was found for that code. Try submitting again, or go to tab to resolve the issue.",
+        true,
+    )
 }
 
 pub async fn search_submit(
+    State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
     Form(form): Form<Submitted>,
@@ -115,12 +168,24 @@ pub async fn search_submit(
         return csrf_error();
     }
     let code = form.get("ballot_code").map_or("", |code| code.trim());
+    if code.is_empty() {
+        return staff_roster_notice::portal_redirect(
+            &app,
+            &headers,
+            Portal::Judge,
+            SEARCH,
+            "Please enter the judge code provided by tab.",
+            true,
+        );
+    }
     if !valid_code(code) {
         return search_page(
+            &app,
             actor,
             &headers,
             Some("Enter the judge code provided by tab."),
-        );
+        )
+        .await;
     }
     access::found(target(code, ""))
 }
@@ -131,16 +196,22 @@ async fn judge(
     lock: bool,
 ) -> Result<Option<(i32, String)>, sqlx::Error> {
     let sql = if lock {
-        "SELECT id, name FROM tab_judge WHERE ballot_code = ? FOR UPDATE"
+        "SELECT id, name, ballot_code FROM tab_judge WHERE ballot_code = ? FOR UPDATE"
     } else {
-        "SELECT id, name FROM tab_judge WHERE ballot_code = ?"
+        "SELECT id, name, ballot_code FROM tab_judge WHERE ballot_code = ?"
     };
-    sqlx::query_as(sql).bind(code).fetch_optional(db).await
+    let row = sqlx::query_as::<_, (i32, String, String)>(sql)
+        .bind(code)
+        .fetch_optional(db)
+        .await?;
+    Ok(row
+        .filter(|(_, _, stored)| valid_code(stored) && stored.eq_ignore_ascii_case(code))
+        .map(|(id, name, _)| (id, name)))
 }
 
 #[derive(Serialize)]
 struct Availability {
-    field: String,
+    field_name: String,
     label: String,
     checked: bool,
 }
@@ -157,21 +228,20 @@ pub async fn portal(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
+    uri: Uri,
     Path(code): Path<String>,
 ) -> Response {
     if !valid_code(&code) {
-        return access::found(SEARCH);
+        return missing_judge(&app, &headers);
     }
     let result = async {
         let mut db = app.db.begin().await?;
+        let actor = access::code_portal_actor(&mut db, &app, actor, &headers).await?;
         let Some((id, name)) = judge(&mut db, &code, false).await? else {
-            return Ok(search_page(
-                actor,
-                &headers,
-                Some("No judge was found for that code."),
-            ));
+            return Ok(missing_judge(&app, &headers));
         };
-        let settings = Settings::load(&mut db, PORTAL_SETTINGS).await?;
+        let settings = Settings::load(&mut db, &["tot_rounds"]).await?;
+        let shell = legacy_html::shell(&mut db, actor, uri.path()).await?;
         let expected: HashSet<_> = sqlx::query_scalar::<_, i32>(
             "SELECT round_number FROM tab_judgeexpectedcheckin WHERE judge_id = ?",
         )
@@ -183,7 +253,7 @@ pub async fn portal(
         db.commit().await?;
         let rows: Vec<_> = (0..=settings.integer("tot_rounds", 0).max(0))
             .map(|round| Availability {
-                field: field(round),
+                field_name: field(round),
                 label: if round == 0 {
                     "Outrounds".into()
                 } else {
@@ -192,25 +262,28 @@ pub async fn portal(
                 checked: expected.contains(&round),
             })
             .collect();
-        let Ok(csrf) = html::page_csrf(&headers) else {
-            return Ok(unavailable());
-        };
-        let response = html::render(
-            "judge_portal.html",
+        Ok(form_page(
+            &app,
+            &headers,
+            uri.path(),
+            "public/judge_portal.html",
+            shell,
             context! {
-                title => "Judge Portal and Ballots", name, code, csrf, rows,
-                nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
+                judge => context! { name },
+                ballot_code => &code,
+                availability_rows => rows,
+                current_ballot_url => target(&code, "current/"),
+                previous_ballots_url => target(&code, "previous/"),
             },
-            StatusCode::OK,
-        );
-        Ok::<_, sqlx::Error>(html::form_response(response, &headers, &csrf))
+        ))
     }
     .await;
-    result.unwrap_or_else(|_| unavailable())
+    portal_response(&app, &headers, result).await
 }
 
 pub async fn availability(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     headers: HeaderMap,
     Path(code): Path<String>,
     Form(form): Form<Submitted>,
@@ -219,14 +292,17 @@ pub async fn availability(
         return csrf_error();
     }
     if !valid_code(&code) {
-        return access::found(SEARCH);
+        return missing_judge(&app, &headers);
     }
     let result = async {
         let mut db = app.db.begin().await?;
-        let Some((id, name)) = judge(&mut db, &code, true).await? else {
-            return Ok(access::found(SEARCH));
+        lock_round_if_configured(&mut db).await?;
+        let row = judge(&mut db, &code, true).await?;
+        access::code_portal_actor(&mut db, &app, actor, &headers).await?;
+        let Some((id, name)) = row else {
+            return Ok(missing_judge(&app, &headers));
         };
-        let settings = Settings::load(&mut db, PORTAL_SETTINGS).await?;
+        let settings = Settings::load(&mut db, &["tot_rounds"]).await?;
         let rounds = settings.integer("tot_rounds", 0).max(0);
         let existing: HashSet<_> = sqlx::query_scalar::<_, i32>(
             "SELECT round_number FROM tab_judgeexpectedcheckin WHERE judge_id = ?",
@@ -246,18 +322,6 @@ pub async fn availability(
         let removed: std::collections::BTreeSet<_> =
             existing.difference(&desired).copied().collect();
         let added: std::collections::BTreeSet<_> = desired.difference(&existing).copied().collect();
-        for round in removed {
-            sqlx::query(
-                "DELETE FROM tab_judgeexpectedcheckin WHERE judge_id = ? AND round_number = ?",
-            )
-            .bind(id)
-            .bind(round)
-            .execute(&mut *db)
-            .await?;
-            if log_changes {
-                crate::roster_log::availability(&mut db, &name, round, false).await?;
-            }
-        }
         for round in added {
             sqlx::query(
                 "INSERT INTO tab_judgeexpectedcheckin (judge_id, round_number) VALUES (?, ?)",
@@ -270,15 +334,59 @@ pub async fn availability(
                 crate::roster_log::availability(&mut db, &name, round, true).await?;
             }
         }
+        for round in removed {
+            sqlx::query(
+                "DELETE FROM tab_judgeexpectedcheckin WHERE judge_id = ? AND round_number = ?",
+            )
+            .bind(id)
+            .bind(round)
+            .execute(&mut *db)
+            .await?;
+            if log_changes {
+                crate::roster_log::availability(&mut db, &name, round, false).await?;
+            }
+        }
         db.commit().await?;
-        Ok::<_, sqlx::Error>(access::found(target(&code, "")))
+        Ok(staff_roster_notice::portal_redirect(
+            &app,
+            &headers,
+            Portal::Judge,
+            &target(&code, ""),
+            "Availability saved.",
+            false,
+        ))
     }
     .await;
-    result.unwrap_or_else(|_| unavailable())
+    portal_response(&app, &headers, result).await
 }
 
 type Assignment = (i32, i32, Option<i32>, bool);
-type PortalResult = Result<Response, sqlx::Error>;
+type PortalResult = Result<Response, PortalError>;
+
+enum PortalError {
+    Storage,
+    Access(access::PortalAccessError),
+}
+
+impl From<sqlx::Error> for PortalError {
+    fn from(_: sqlx::Error) -> Self {
+        Self::Storage
+    }
+}
+
+impl From<access::PortalAccessError> for PortalError {
+    fn from(error: access::PortalAccessError) -> Self {
+        Self::Access(error)
+    }
+}
+
+async fn portal_response(app: &App, headers: &HeaderMap, result: PortalResult) -> Response {
+    match result {
+        Ok(response) => response,
+        Err(PortalError::Access(error)) => error.response(app, headers).await,
+        Err(PortalError::Storage) => unavailable(),
+    }
+}
 
 async fn assignments(
     db: &mut MySqlConnection,
@@ -336,7 +444,9 @@ async fn current_response(
         if form.is_some() {
             lock_round(&mut db).await?;
         }
-        let Some((judge_id, _)) = judge(&mut db, code, form.is_some()).await? else {
+        let row = judge(&mut db, code, form.is_some()).await?;
+        let actor = access::code_portal_actor(&mut db, app, actor, headers).await?;
+        let Some((judge_id, _)) = row else {
             return Ok(access::found(SEARCH));
         };
         let options = Settings::load(&mut db, PORTAL_SETTINGS).await?;
@@ -423,7 +533,7 @@ async fn current_response(
         Ok(access::found(target(code, "submitted/")))
     }
     .await;
-    result.unwrap_or_else(|_| unavailable())
+    portal_response(app, headers, result).await
 }
 
 #[derive(Serialize)]
@@ -432,6 +542,7 @@ struct Previous {
     government: String,
     opposition: String,
     outcome: String,
+    rfd_enabled: bool,
     rfd_status: &'static str,
     url: String,
 }
@@ -439,21 +550,25 @@ struct Previous {
 pub async fn previous(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+    uri: Uri,
     Path(code): Path<String>,
 ) -> Response {
     if !valid_code(&code) {
-        return access::found(SEARCH);
+        return missing_judge(&app, &headers);
     }
     let result: PortalResult = async {
         let mut db = app.db.begin().await?;
+        let actor = access::code_portal_actor(&mut db, &app, actor, &headers).await?;
         let Some((judge_id, name)) = judge(&mut db, &code, false).await? else {
-            return Ok(access::found(SEARCH));
+            return Ok(missing_judge(&app, &headers));
         };
-        let settings = Settings::load(&mut db, PORTAL_SETTINGS).await?;
+        let shell = legacy_html::shell(&mut db, actor, uri.path()).await?;
+        let settings = Settings::load(&mut db, &["cur_round", "written_rfd_first_round"]).await?;
         let number = settings.integer("cur_round", 1).saturating_sub(1);
         let rfd_first = settings.integer("written_rfd_first_round", -1);
-        let rows: Vec<_> = sqlx::query_as::<_, (i32, i32, String, String, i32, bool)>(
-            "SELECT r.id, r.round_number, g.name, o.name, r.victor, CHAR_LENGTH(TRIM(r.rfd)) > 0
+        let rows: Vec<_> = sqlx::query_as::<_, (i32, i32, String, String, i32, String)>(
+            "SELECT r.id, r.round_number, g.name, o.name, r.victor, r.rfd
              FROM tab_round r JOIN tab_round_judges j ON j.round_id = r.id
              JOIN tab_team g ON g.id = r.gov_team_id JOIN tab_team o ON o.id = r.opp_team_id
              WHERE j.judge_id = ? AND r.round_number <= ?
@@ -465,41 +580,49 @@ pub async fn previous(
         .fetch_all(&mut *db)
         .await?
         .into_iter()
-        .map(|(id, number, government, opposition, winner, written)| {
+        .map(|(id, number, government, opposition, winner, rfd)| {
             let outcome = match winner {
                 1 | 3 => government.clone(),
                 2 | 4 => opposition.clone(),
-                _ => outcome(winner).into(),
+                0 => "UNKNOWN".into(),
+                5 => "ALL DROP".into(),
+                6 => "ALL WIN".into(),
+                _ => winner.to_string(),
             };
-            let rfd_status = if rfd_first < 1 || number < rfd_first {
-                "Not required"
-            } else if written {
-                "Written"
-            } else {
+            let rfd_status = if rfd
+                .trim_matches(|c: char| c.is_whitespace() || ('\u{1c}'..='\u{1f}').contains(&c))
+                .is_empty()
+            {
                 "Blank"
+            } else {
+                "Written"
             };
             Previous {
                 number,
                 government,
                 opposition,
                 outcome,
+                rfd_enabled: rfd_first >= 1 && number >= rfd_first,
                 rfd_status,
                 url: target(&code, &format!("submitted/{id}/")),
             }
         })
         .collect();
         db.commit().await?;
-        Ok(html::render(
-            "judge_previous.html",
+        Ok(legacy_html::render(
+            "ballots/previous_ballots.html",
+            shell,
             context! {
-                title => "Previous Ballots", name, code, rows,
-                nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
+                judge => context! { name },
+                ballot_rows => rows,
+                portal_url => target(&code, ""),
+                current_ballot_url => target(&code, "current/"),
             },
             StatusCode::OK,
         ))
     }
     .await;
-    result.unwrap_or_else(|_| unavailable())
+    portal_response(&app, &headers, result).await
 }
 
 fn outcome(victor: i32) -> &'static str {
@@ -576,7 +699,9 @@ async fn frozen(
         if form.is_some() {
             lock_round(&mut db).await?;
         }
-        let Some((judge_id, _)) = judge(&mut db, code, form.is_some()).await? else {
+        let row = judge(&mut db, code, form.is_some()).await?;
+        let actor = access::code_portal_actor(&mut db, app, actor, headers).await?;
+        let Some((judge_id, _)) = row else {
             return Ok(access::found(SEARCH));
         };
         let options = Settings::load(&mut db, PORTAL_SETTINGS).await?;
@@ -626,7 +751,7 @@ async fn frozen(
         }, StatusCode::OK);
         Ok(html::form_response(response, headers, &csrf))
     }.await;
-    result.unwrap_or_else(|_| unavailable())
+    portal_response(app, headers, result).await
 }
 
 async fn save_reason(db: &mut MySqlConnection, id: i32, reason: &str) -> Result<(), sqlx::Error> {
