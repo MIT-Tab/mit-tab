@@ -30,11 +30,7 @@ impl Model {
     }
 
     pub fn application(&self) -> &'static str {
-        if matches!(self.name, "user" | "group") {
-            "auth"
-        } else {
-            "tab"
-        }
+        application(self.name)
     }
 
     pub fn opts(&self) -> Value {
@@ -44,8 +40,26 @@ impl Model {
             model_name => self.name,
             verbose_name => self.singular,
             verbose_name_plural => self.plural,
-            app_config => context! { verbose_name => if app == "auth" { "Authentication and Authorization" } else { "MIT Tab" } },
+            app_config => context! { verbose_name => match app {
+                "auth" => "Authentication and Authorization",
+                "registration" => "Registration",
+                _ => "MIT Tab",
+            } },
         }
+    }
+}
+
+pub(super) fn application(model: &str) -> &'static str {
+    match model {
+        "user" | "group" => "auth",
+        "registration"
+        | "registrationconfig"
+        | "registrationchangelog"
+        | "registrationconfirmationemaillog"
+        | "infolink"
+        | "infotext"
+        | "registrationlink" => "registration",
+        _ => "tab",
     }
 }
 
@@ -66,6 +80,22 @@ impl DefaultList {
 
 pub(super) fn default_list(name: &str) -> Option<DefaultList> {
     let (name, singular, plural, source, label, ordering) = match name {
+        "registration" => (
+            "registration",
+            "registration",
+            "registrations",
+            "registration_registration t JOIN tab_school s ON s.id = t.school_id",
+            "CONCAT(s.name, ' — ', t.email)",
+            "t.id DESC",
+        ),
+        "registrationconfirmationemaillog" => (
+            "registrationconfirmationemaillog",
+            "registration confirmation email log",
+            "registration confirmation email logs",
+            "registration_registrationconfirmationemaillog t",
+            "CONCAT('Registration confirmation ', IF(t.successful, 'sent', 'failed'), ': ', t.email)",
+            "t.sent_at DESC, t.id DESC",
+        ),
         "school" => (
             "school",
             "school",
@@ -389,6 +419,9 @@ pub async fn get(
     model: &str,
     raw: Option<String>,
 ) -> Option<Response> {
+    if application == "registration" && model == "registration" {
+        return Some(crate::admin_registration::list(app, actor, headers, Query::new(raw)).await);
+    }
     if application != "tab" {
         return None;
     }

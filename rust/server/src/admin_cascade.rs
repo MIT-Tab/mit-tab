@@ -112,6 +112,14 @@ const MANUAL_ASSIGNMENT: Model = Model::other(
 
 fn children(table: &str) -> &'static [(Model, &'static str)] {
     match table {
+        "registration_registration" => &[
+            (Registered("team"), "registration_id"),
+            (Registered("judge"), "registration_id"),
+            (
+                Registered("registrationconfirmationemaillog"),
+                "registration_id",
+            ),
+        ],
         "auth_user" => {
             const {
                 &[
@@ -298,6 +306,7 @@ pub struct Cascade {
     related: Vec<RelatedModel>,
     objects: BTreeMap<Key, String>,
     edges: BTreeMap<Key, Vec<Key>>,
+    registration_log_links: Vec<(i32, i32)>,
 }
 
 impl Cascade {
@@ -307,8 +316,32 @@ impl Cascade {
         ids: &[i32],
         locked: bool,
     ) -> Result<Self, sqlx::Error> {
+        Self::read_roots(db, &[(table, ids)], locked).await
+    }
+
+    pub async fn read_roots(
+        db: &mut MySqlConnection,
+        roots: &[(&'static str, &[i32])],
+        locked: bool,
+    ) -> Result<Self, sqlx::Error> {
         let mut result = Self::default();
-        result.collect(db, table, ids, locked, 1).await?;
+        for &(table, ids) in roots {
+            result.collect(db, table, ids, locked, 1).await?;
+            if table == "registration_registration" && !ids.is_empty() {
+                let mut sql = QueryBuilder::new(
+                    "SELECT id, registration_id FROM registration_registrationchangelog WHERE registration_id IN (",
+                );
+                let mut selected = sql.separated(", ");
+                for id in ids {
+                    selected.push_bind(*id);
+                }
+                sql.push(") ORDER BY id");
+                if locked {
+                    sql.push(" FOR UPDATE");
+                }
+                result.registration_log_links = sql.build_query_as().fetch_all(&mut *db).await?;
+            }
+        }
         Ok(result)
     }
 
@@ -342,6 +375,10 @@ impl Cascade {
                 | ("tab_room_tags", "room_id")
                 | ("tab_judge_required_room_tags", "judge_id") => Some("roomtag_id"),
                 ("tab_judge_schools", "judge_id") => Some("school_id"),
+                ("tab_judge", "registration_id") => Some("name"),
+                ("registration_registrationconfirmationemaillog", "registration_id") => {
+                    Some("sent_at DESC")
+                }
                 ("tab_round_judges", "round_id") | ("tab_outround_judges", "outround_id") => {
                     Some("judge_id")
                 }
@@ -452,6 +489,7 @@ impl Cascade {
         (
             self.objects.iter().collect::<Vec<_>>(),
             self.edges.iter().collect::<Vec<_>>(),
+            &self.registration_log_links,
         )
     }
 
@@ -496,6 +534,16 @@ impl Cascade {
     }
 
     pub async fn delete(self, db: &mut MySqlConnection) -> Result<(), sqlx::Error> {
+        for (id, parent) in self.registration_log_links {
+            sqlx::query(
+                "UPDATE registration_registrationchangelog
+                SET registration_id = NULL WHERE id = ? AND registration_id = ?",
+            )
+            .bind(id)
+            .bind(parent)
+            .execute(&mut *db)
+            .await?;
+        }
         let mut related = self.related;
         related.sort_by_key(|model| std::cmp::Reverse(model.depth));
         for model in related {

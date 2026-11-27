@@ -26,6 +26,7 @@ pub const MANAGED: &[&str] = &[
     "team",
     "judge",
     "tabsettings",
+    "registration",
 ];
 
 pub struct Resource {
@@ -189,7 +190,7 @@ const USER: Relation = Relation {
     sql: "SELECT id, username FROM auth_user ORDER BY username",
 };
 
-const SCHOOL: Relation = Relation {
+pub(super) const SCHOOL: Relation = Relation {
     model: "school",
     admin_url: "/admin/tab/school/",
     sql: "SELECT id, name FROM tab_school ORDER BY name",
@@ -294,7 +295,7 @@ const GROUP_DEBATERS: Multiple = Multiple {
 };
 
 impl Field {
-    const fn new(name: &'static str, label: &'static str, kind: Kind) -> Self {
+    pub(super) const fn new(name: &'static str, label: &'static str, kind: Kind) -> Self {
         Self {
             name,
             column: name,
@@ -309,7 +310,7 @@ impl Field {
         }
     }
 
-    const fn relation(
+    pub(super) const fn relation(
         name: &'static str,
         column: &'static str,
         label: &'static str,
@@ -321,7 +322,7 @@ impl Field {
         }
     }
 
-    const fn optional(self) -> Self {
+    pub(super) const fn optional(self) -> Self {
         Self {
             required: false,
             ..self
@@ -335,7 +336,7 @@ impl Field {
         }
     }
 
-    const fn allow_related_delete(self) -> Self {
+    pub(super) const fn allow_related_delete(self) -> Self {
         Self {
             can_delete_related: true,
             ..self
@@ -421,6 +422,25 @@ const TYPE: Field = Field::new(
 impl Resource {
     pub fn find(name: &str) -> Option<Self> {
         let (fields, unique): (&'static [Field], &'static [Unique]) = match name {
+            "registration" => (
+                const {
+                    &[
+                        Field::relation("school", "school_id", "School", SCHOOL),
+                        Field::new("email", "Email", Kind::Email(254)),
+                        Field::new("dietary_requests", "Dietary requests", Kind::Textarea)
+                            .optional(),
+                        Field::new("housing_requests", "Housing requests", Kind::Textarea)
+                            .optional(),
+                        Field::new("herokunator_code", "Herokunator code", Kind::Text(255))
+                            .optional(),
+                    ]
+                },
+                &[Unique {
+                    fields: &[4],
+                    error_field: Some(4),
+                    message: "Registration with this Herokunator code already exists.",
+                }],
+            ),
             "bye" => (
                 const {
                     &[
@@ -766,12 +786,18 @@ impl Resource {
             .and_then(|(_, value)| value.as_deref())
     }
 
+    pub fn registration(&self) -> bool {
+        self.list.model.name == "registration"
+    }
+
     pub fn pairing(&self) -> bool {
         matches!(self.list.model.name, "round" | "outround")
     }
 
     pub fn cascading_deletion(&self) -> bool {
-        self.pairing() || matches!(self.list.model.name, "team" | "judge" | "room")
+        self.pairing()
+            || self.registration()
+            || matches!(self.list.model.name, "team" | "judge" | "room")
     }
 
     pub fn attributed(&self) -> bool {
@@ -908,16 +934,29 @@ impl Resource {
         } else {
             None
         };
+        let registration_code =
+            if self.registration() && self.value("herokunator_code", values).is_none() {
+                Some(codes::unique(db, Credential::Registration).await?)
+            } else {
+                None
+            };
         for (field, value) in self.fields.iter().zip(values) {
             if !matches!(field.kind, Kind::Multiple(_)) {
                 let value = match field.name {
                     "tiebreaker" => coin.as_ref().or(value.as_ref()),
                     "ballot_code" => ballot_code.as_ref().or(value.as_ref()),
+                    "herokunator_code" => registration_code.as_ref().or(value.as_ref()),
                     _ => value.as_ref(),
                 };
                 columns
                     .push(format!("`{}` = ", field.column))
                     .push_bind_unseparated(value);
+            }
+        }
+        if self.registration() {
+            columns.push("updated_at = UTC_TIMESTAMP(6)");
+            if id.is_none() {
+                columns.push("created_at = UTC_TIMESTAMP(6)");
             }
         }
         if let Some(code) = team_code.as_ref() {
@@ -972,6 +1011,7 @@ pub struct Form {
     pub fields: Vec<BoundField>,
     pub non_field_error: Option<&'static str>,
     pub pairing_revision: Option<String>,
+    pub inlines: Option<crate::admin_registration_inlines::Inlines>,
 }
 
 pub struct BoundField {
@@ -1031,6 +1071,7 @@ impl Form {
             fields,
             non_field_error: None,
             pairing_revision: None,
+            inlines: None,
         })
     }
 
@@ -1088,7 +1129,7 @@ impl Form {
 }
 
 impl BoundField {
-    fn clean(&mut self) -> Option<String> {
+    pub(super) fn clean(&mut self) -> Option<String> {
         let raw = self.value.as_deref().unwrap_or_default().trim();
         let invalid = |error: &mut Option<String>, message: &str| {
             *error = Some(message.into());

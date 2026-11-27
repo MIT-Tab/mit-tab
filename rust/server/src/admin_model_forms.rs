@@ -20,6 +20,7 @@ use crate::{
     admin_html::{self, Shell},
     admin_model_data::{BoundField, Form, Kind, MANAGED, Resource},
     admin_records::readonly,
+    admin_registration_inlines::Inlines,
     admin_repairs::{self, LATER_STAGE},
     admin_scores::score_audit,
     board_snapshot, entity_store,
@@ -35,7 +36,8 @@ use crate::{
 
 pub fn routes() -> Router<App> {
     MANAGED.iter().fold(Router::new(), |router, model| {
-        let model = format!("/admin/tab/{model}/");
+        let application = admin_changelist::application(model);
+        let model = format!("/admin/{application}/{model}/");
         router
             .route(&model, get(entry).post(entry))
             .route(&format!("{model}add/"), get(entry).post(entry))
@@ -57,10 +59,10 @@ enum Screen {
 impl Screen {
     fn find(path: &str) -> Option<(&str, Self)> {
         let segments: Vec<_> = path.trim_matches('/').split('/').collect();
-        match segments.as_slice() {
-            ["admin", "tab", model] => Some((model, Self::List)),
-            ["admin", "tab", model, "add"] => Some((model, Self::Add)),
-            ["admin", "tab", model, id, operation] => {
+        let screen = match segments.as_slice() {
+            ["admin", app, model] => (app, model, Self::List),
+            ["admin", app, model, "add"] => (app, model, Self::Add),
+            ["admin", app, model, id, operation] => {
                 let id = id.parse().ok()?;
                 let screen = match *operation {
                     "change" => Self::Change(id),
@@ -68,10 +70,11 @@ impl Screen {
                     "history" => Self::History(id),
                     _ => return None,
                 };
-                Some((model, screen))
+                (app, model, screen)
             }
-            _ => None,
-        }
+            _ => return None,
+        };
+        (admin_changelist::application(screen.1) == *screen.0).then_some((screen.1, screen.2))
     }
 }
 
@@ -89,7 +92,7 @@ impl Page<'_> {
     fn markup(self, template: &str, context: Value) -> Response {
         let base = context! {
             opts => self.resource.list.model.opts(),
-            app_url => "/admin/tab/",
+            app_url => format!("/admin/{}/", self.resource.list.model.application()),
             model_url => &self.model_url,
         };
         self.shell
@@ -145,9 +148,16 @@ async fn entry(
         return access::access_denied();
     };
     if matches!(screen, Screen::List) && method != Method::POST {
-        return admin_changelist::get(&app, actor, &headers, "tab", model, raw)
-            .await
-            .unwrap_or_else(unavailable);
+        return admin_changelist::get(
+            &app,
+            actor,
+            &headers,
+            admin_changelist::application(model),
+            model,
+            raw,
+        )
+        .await
+        .unwrap_or_else(unavailable);
     }
     let post = (method == Method::POST).then(|| Fields::parse(&body));
     if let Some(post) = &post
@@ -220,12 +230,55 @@ async fn change(
     let stale = post
         .zip(pairing_revision.as_ref())
         .is_some_and(|(post, proof)| !proof.verified(app, post.get("mittab_pairing_revision")));
-    let bound = post.filter(|_| !stale);
+    let mut inlines = if resource.registration() {
+        Some(Inlines::load(&mut db, id, post.is_some()).await?)
+    } else {
+        None
+    };
+    let registration_revision =
+        initial
+            .as_ref()
+            .zip(inlines.as_ref())
+            .and_then(|(parent, inlines)| {
+                AdminFormProof::for_session(
+                    &page,
+                    "admin registration edit",
+                    (parent, inlines.revision()),
+                )
+            });
+    let stale_fields = post
+        .zip(registration_revision.as_ref())
+        .is_some_and(|(post, proof)| {
+            !proof.verified(app, post.get("mittab_registration_revision"))
+        });
+    let stale_removal = if let Some((inlines, post)) = inlines.as_ref().zip(post)
+        && !stale_fields
+        && inlines.requests_removal(post)
+    {
+        registration_deletion_proof(&page, &mut db, inlines, true)
+            .await?
+            .is_none_or(|proof| {
+                !proof.verified(app, post.get("mittab_registration_delete_revision"))
+            })
+    } else {
+        false
+    };
+    let stale_registration = stale_fields || stale_removal;
+    let bound = post.filter(|_| !stale && !stale_registration);
     let mut form = Form::load(resource, &mut db, initial.as_deref(), bound, &page.query).await?;
     form.pairing_revision = pairing_revision.map(|revision| revision.token(app));
-    if stale {
-        form.non_field_error =
-            Some("This pairing changed. Review the current values before saving.");
+    if let Some(inlines) = &mut inlines {
+        inlines.token = registration_revision.map(|proof| proof.token(app));
+        inlines.bind(bound, &mut db).await?;
+    }
+    form.inlines = inlines;
+    if stale || stale_registration {
+        form.non_field_error = Some(if stale_registration {
+            "This registration changed. Review the current values before saving."
+        } else {
+            "This pairing changed. Review the current values before saving."
+        });
+        refresh_registration_deletion_proof(app, &page, &mut db, &mut form).await?;
         db.commit().await?;
         return Ok(form_conflict(render_form(
             page,
@@ -243,6 +296,7 @@ async fn change(
     };
     if let Some(post) = post
         && let Some(values) = form.clean(resource, &mut db, id).await?
+        && form.inlines.as_ref().is_none_or(Inlines::valid)
     {
         let effects = match resource.list.model.name {
             "tabsettings" => SettingEffects::for_keys(
@@ -298,7 +352,13 @@ async fn change(
                     )
                     .await?;
                 }
-                let (flag, message) = change_log(id.is_none(), &changed);
+                let (flag, mut message) = change_log(id.is_none(), &changed);
+                if let Some(inlines) = &mut form.inlines {
+                    let mut events: Vec<serde_json::Value> =
+                        serde_json::from_str(&message).expect("serialized change log");
+                    events.extend(inlines.save(&mut db, saved, page.user).await?);
+                    message = serde_json::to_string(&events).expect("serializable change log");
+                }
                 let log_id = admin_html::log_action(
                     &mut db,
                     resource.list.model.name,
@@ -341,6 +401,7 @@ async fn change(
                     .check_duplicates(resource, &mut db, id, &values)
                     .await?
                 {
+                    refresh_registration_deletion_proof(app, &page, &mut db, &mut form).await?;
                     return Ok(render_form(
                         page,
                         id,
@@ -355,6 +416,7 @@ async fn change(
             Err(error) => return Err(error),
         }
     }
+    refresh_registration_deletion_proof(app, &page, &mut db, &mut form).await?;
     db.commit().await?;
     Ok(render_form(
         page,
@@ -364,6 +426,37 @@ async fn change(
         attribution,
         post,
     ))
+}
+
+async fn registration_deletion_proof(
+    page: &Page<'_>,
+    db: &mut MySqlConnection,
+    inlines: &Inlines,
+    lock: bool,
+) -> Result<Option<AdminFormProof>, sqlx::Error> {
+    if inlines.token.is_none() && !lock {
+        return Ok(None);
+    }
+    let (cascade, pairings) = inlines.deletion_scope(db, lock).await?;
+    Ok(AdminFormProof::for_session(
+        page,
+        "admin registration inline deletion",
+        (inlines.revision(), cascade.scope(), pairings.scope()),
+    ))
+}
+
+async fn refresh_registration_deletion_proof(
+    app: &App,
+    page: &Page<'_>,
+    db: &mut MySqlConnection,
+    form: &mut Form,
+) -> Result<(), sqlx::Error> {
+    if let Some(inlines) = &mut form.inlines {
+        inlines.removal_token = registration_deletion_proof(page, db, inlines, false)
+            .await?
+            .map(|proof| proof.token(app));
+    }
+    Ok(())
 }
 
 async fn record_attribution(
@@ -561,12 +654,16 @@ fn render_form(
         return unavailable();
     };
     widgets.extend(attribution.into_iter().flatten());
+    let Ok(inline_admin_formsets) = form.inlines.as_ref().map(Inlines::markup).transpose() else {
+        return unavailable();
+    };
     let errors = form
         .fields
         .iter()
         .filter(|field| field.error.is_some())
         .count()
-        + usize::from(form.non_field_error.is_some());
+        + usize::from(form.non_field_error.is_some())
+        + form.inlines.as_ref().map_or(0, Inlines::error_count);
     let add = id.is_none();
     let action = if add { "Add" } else { "Change" };
     let popup = page.query.get("_popup").is_some()
@@ -584,12 +681,17 @@ fn render_form(
         object_url, form_url => &suffix, filter_suffix => &suffix,
         adminform => [context! { classes => "", lines => widgets }],
         pairing_revision => form.pairing_revision,
+        registration_revision => form.inlines.as_ref().and_then(|inlines| inlines.token.as_deref()),
+        registration_delete_revision => form.inlines.as_ref().and_then(|inlines| inlines.removal_token.as_deref()),
+        inline_admin_formsets,
         show_delete_link => !popup && !add, show_save => true,
         show_save_and_add_another => !popup, show_save_and_continue => !popup,
         has_view_permission => true, can_change => true,
         errors => (0..errors).collect::<Vec<_>>(),
         non_field_errors => form.non_field_error.map(|message| error_list(message, true)).unwrap_or_default(),
-        media => if resource.fields.iter().any(|field| field.filter_label.is_some()) {
+        media => if resource.registration() {
+            admin_html::registration_admin_scripts()
+        } else if resource.fields.iter().any(|field| field.filter_label.is_some()) {
             admin_html::filtered_select_scripts()
         } else { admin_html::scripts() },
         prepopulated_fields_json => "[]",
@@ -637,7 +739,7 @@ fn change_log(add: bool, changed: &[&crate::admin_model_data::Field]) -> (u8, St
     (2, message)
 }
 
-fn error_list(message: &str, non_field: bool) -> String {
+pub(super) fn error_list(message: &str, non_field: bool) -> String {
     let class = if non_field {
         "errorlist nonfield"
     } else {
@@ -646,11 +748,18 @@ fn error_list(message: &str, non_field: bool) -> String {
     format!("<ul class=\"{class}\"><li>{}</li></ul>", escape(message))
 }
 
-fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
+pub(super) fn render_widget(
+    bound: &BoundField,
+    name: &str,
+    use_required_attribute: bool,
+) -> Result<String, minijinja::Error> {
     let field = bound.field;
-    let name = field.name;
     let checked = bound.value.as_deref() == Some("1");
-    let required = if field.required { " required" } else { "" };
+    let required = if use_required_attribute && field.required {
+        " required"
+    } else {
+        ""
+    };
     let value = bound
         .value
         .as_ref()
@@ -707,7 +816,7 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
                 context! {
                     name, options => &bound.options, selected => &bound.selected,
                     has_selection => bound.value.as_deref().is_some_and(|value| !value.is_empty()),
-                    blank, multiple, filter_label => field.filter_label, required => (blank || multiple) && field.required,
+                    blank, multiple, filter_label => field.filter_label, required => use_required_attribute && (blank || multiple) && field.required,
                 },
             )?;
             if let Some(relation) = relation.filter(|_| field.related_widget) {
@@ -728,6 +837,13 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
             }
         }
     };
+    Ok(widget)
+}
+
+fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
+    let field = bound.field;
+    let name = field.name;
+    let widget = render_widget(bound, name, true)?;
     let class = if field.required {
         r#" class="required""#
     } else {
@@ -904,7 +1020,7 @@ impl AdminFormProof {
 type Placement = (i32, Option<i32>, Option<i32>, Option<u32>);
 type PublicationScope = (i32, i32, i32, Vec<Placement>);
 
-struct CascadePairings {
+pub(super) struct CascadePairings {
     outrounds: Option<BTreeMap<i32, board_snapshot::Snapshot>>,
     removed_outrounds: BTreeSet<i32>,
     inrounds: BTreeMap<i32, round_audit::Snapshot>,
@@ -913,7 +1029,7 @@ struct CascadePairings {
 }
 
 impl CascadePairings {
-    async fn capture(
+    pub(super) async fn capture(
         db: &mut MySqlConnection,
         cascade: &Cascade,
         model: &str,
@@ -1007,7 +1123,7 @@ impl CascadePairings {
         })
     }
 
-    fn scope(&self) -> impl serde::Serialize + '_ {
+    pub(super) fn scope(&self) -> impl serde::Serialize + '_ {
         let removed = self
             .outrounds
             .iter()
@@ -1022,13 +1138,17 @@ impl CascadePairings {
         )
     }
 
-    fn blocked(&self) -> bool {
+    pub(super) fn blocked(&self) -> bool {
         self.outrounds.as_ref().is_some_and(|before| {
             admin_repairs::later_stage_depends_on(before, &self.removed_outrounds)
         })
     }
 
-    async fn record(self, db: &mut MySqlConnection, user: i32) -> Result<(), sqlx::Error> {
+    pub(super) async fn record(
+        self,
+        db: &mut MySqlConnection,
+        user: i32,
+    ) -> Result<(), sqlx::Error> {
         if !self.inrounds.is_empty() {
             let mut after = BTreeMap::new();
             for id in self.inrounds.keys() {
@@ -1053,6 +1173,7 @@ impl Removed {
         db: &mut MySqlConnection,
         resource: &Resource,
         filter: &[i32],
+        query: Option<&Query>,
         selected: Option<&BTreeSet<i32>>,
         lock: bool,
     ) -> Result<Self, sqlx::Error> {
@@ -1062,6 +1183,11 @@ impl Removed {
             list.label, list.source
         ));
         filter_ids(&mut sql, filter);
+        if resource.registration()
+            && let Some(query) = query
+        {
+            crate::admin_registration::search(&mut sql, query);
+        }
         if let Some(ids) = selected {
             if ids.is_empty() {
                 return Ok(Self { rows: Vec::new() });
@@ -1348,6 +1474,9 @@ impl Removed {
                     }
                 }
             }
+            "registration" => {
+                crate::admin_registration_inlines::record_cascade_removals(db, &cascade).await?;
+            }
             "debater" => links.extend([
                 ("tab_roundstats", "debater_id"),
                 ("tab_rankinggroup_debaters", "debater_id"),
@@ -1403,7 +1532,7 @@ async fn delete(
     if confirm {
         lock_round_if_configured(&mut db).await?;
     }
-    let records = Removed::read(&mut db, &page.resource, &[id], None, confirm).await?;
+    let records = Removed::read(&mut db, &page.resource, &[id], None, None, confirm).await?;
     let Some((_, description)) = records.rows.first() else {
         return Ok(access::found("/admin/"));
     };
@@ -1504,7 +1633,15 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
     if confirm {
         lock_round_if_configured(&mut db).await?;
     }
-    let records = Removed::read(&mut db, &page.resource, &filter, selected, confirm).await?;
+    let records = Removed::read(
+        &mut db,
+        &page.resource,
+        &filter,
+        Some(&page.query),
+        selected,
+        confirm,
+    )
+    .await?;
     if records.rows.is_empty() {
         return Ok(access::found(page.target));
     }
@@ -1607,9 +1744,10 @@ async fn history(app: &App, page: Page<'_>, id: i32) -> Result<Response, sqlx::E
     let model = &page.resource.list.model;
     let filter = "FROM django_admin_log l JOIN django_content_type t ON l.content_type_id = t.id
         JOIN auth_user u ON l.user_id = u.id
-        WHERE t.app_label = 'tab' AND t.model = ? AND l.object_id = ?";
+        WHERE t.app_label = ? AND t.model = ? AND l.object_id = ?";
     let object_id = id.to_string();
     let count: i64 = sqlx::query_scalar(AssertSqlSafe(format!("SELECT COUNT(*) {filter}")))
+        .bind(model.application())
         .bind(model.name)
         .bind(&object_id)
         .fetch_one(&mut *db)
@@ -1625,7 +1763,7 @@ async fn history(app: &App, page: Page<'_>, id: i32) -> Result<Response, sqlx::E
         "SELECT l.action_time, u.username, TRIM(CONCAT(u.first_name, ' ', u.last_name)), l.change_message
          {filter} ORDER BY l.action_time, l.id LIMIT ? OFFSET ?"
     )))
-    .bind(model.name).bind(object_id).bind(page_size).bind((number - 1) * page_size)
+    .bind(model.application()).bind(model.name).bind(object_id).bind(page_size).bind((number - 1) * page_size)
     .fetch_all(&mut *db).await?;
     let action_list: Vec<_> = log
         .into_iter()

@@ -7,6 +7,8 @@ mod admin_html;
 mod admin_model_data;
 mod admin_model_forms;
 mod admin_records;
+mod admin_registration;
+mod admin_registration_inlines;
 mod admin_repairs;
 mod admin_scores;
 mod administration;

@@ -254,27 +254,60 @@ pub(super) fn choice_filter(
     admin_html::render_fragment("admin/filter.html", context! { title, choices })
 }
 
-pub(super) fn search_terms(text: &str) -> Vec<String> {
+pub(super) fn search_terms(mut text: &str) -> Vec<String> {
     let mut terms = Vec::new();
-    let mut current = String::new();
-    let mut quote = None;
-    for character in text.chars() {
-        if quote == Some(character) {
-            quote = None;
-        } else if current.is_empty() && matches!(character, '\'' | '"') {
-            quote = Some(character);
-        } else if character.is_whitespace() && quote.is_none() {
-            if !current.is_empty() {
-                terms.push(std::mem::take(&mut current));
-            }
-        } else {
-            current.push(character);
+    loop {
+        text = text.trim_start();
+        if text.is_empty() {
+            break;
         }
-    }
-    if !current.is_empty() {
-        terms.push(current);
+        let end = search_token_end(text);
+        let term = &text[..end];
+        let quote = term.as_bytes()[0] as char;
+        if matches!(quote, '\'' | '"') && term.len() > 1 && term.ends_with(quote) {
+            terms.push(
+                term[1..term.len() - 1]
+                    .replace(&format!("\\{quote}"), &quote.to_string())
+                    .replace("\\\\", "\\"),
+            );
+        } else {
+            terms.push(term.to_owned());
+        }
+        text = &text[end..];
     }
     terms
+}
+
+fn search_token_end(text: &str) -> usize {
+    let mut characters = text.char_indices().peekable();
+    let mut end = 0;
+    let mut has_phrase = false;
+    while let Some((index, character)) = characters.next() {
+        if character.is_whitespace() {
+            return index;
+        }
+        if matches!(character, '\'' | '"') {
+            let mut closed = false;
+            while let Some((_, next)) = characters.next() {
+                if next == character {
+                    closed = true;
+                    break;
+                }
+                if next == '\\' {
+                    characters.next();
+                }
+            }
+            if !closed {
+                if has_phrase {
+                    return index;
+                }
+                return text.find(char::is_whitespace).unwrap_or(text.len());
+            }
+            has_phrase = true;
+        }
+        end = characters.peek().map_or(text.len(), |(index, _)| *index);
+    }
+    end
 }
 
 fn filter_audit(

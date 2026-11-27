@@ -244,6 +244,7 @@ fn templates(env: &mut Environment<'static>) {
         upstream!("change_form_object_tools.html"),
         upstream!("submit_line.html"),
         upstream!("includes/fieldset.html"),
+        upstream!("edit_inline/tabular.html"),
         upstream!("prepopulated_fields_js.html"),
         upstream!("popup_response.html"),
         upstream!("widgets/related_widget_wrapper.html"),
@@ -274,7 +275,7 @@ fn translate(source: &str) -> String {
         .replace("{{ block.super }}", "{{ super() }}")
         .replace(
             "{% csrf_token %}{% block form_top %}",
-            r#"{% csrf_token %}{% if pairing_revision %}<input type="hidden" name="mittab_pairing_revision" value="{{ pairing_revision }}">{% endif %}{% block form_top %}"#,
+            r#"{% csrf_token %}{% if pairing_revision %}<input type="hidden" name="mittab_pairing_revision" value="{{ pairing_revision }}">{% endif %}{% if registration_revision %}<input type="hidden" name="mittab_registration_revision" value="{{ registration_revision }}">{% endif %}{% if registration_delete_revision %}<input type="hidden" name="mittab_registration_delete_revision" value="{{ registration_delete_revision }}">{% endif %}{% block form_top %}"#,
         )
         .replace(
             r#"<input type="hidden" name="post" value="yes">"#,
@@ -288,6 +289,20 @@ fn translate(source: &str) -> String {
         .replace("pair.1", "pair[1]")
         .replace("|iriencode", "")
         .replace("{{ field.contents }}", "{{ field.contents|safe }}")
+        .replace("in inline_admin_formset %}", "in inline_admin_formset.rows %}")
+        .replace("in inline_admin_form %}", "in inline_admin_form.fieldsets %}")
+        .replace("forloop.last", "loop.last")
+        .replace("forloop.counter0", "loop.index0")
+        .replace("{{ inline_admin_form|cell_count }}", "{{ inline_admin_formset.cell_count }}")
+        .replace("inline_admin_formset.has_change_permission|yesno:'inlinechangelink,inlineviewlink'", "('inlinechangelink' if inline_admin_formset.has_change_permission else 'inlineviewlink')")
+        .replace("field.help_text|striptags", "field.help_text")
+        .replace("{{ field.field.errors.as_ul }}", "{{ field.errors|safe }}")
+        .replace("{{ inline_admin_formset.formset.management_form }}", "{{ inline_admin_formset.formset.management_form|safe }}")
+        .replace("{{ inline_admin_formset.formset.non_form_errors }}", "{{ inline_admin_formset.formset.non_form_errors|safe }}")
+        .replace("{{ inline_admin_form.form.non_field_errors }}", "{{ inline_admin_form.form.non_field_errors|safe }}")
+        .replace("{{ inline_admin_form.pk_field.field }}", "{{ inline_admin_form.pk_field.field|safe }}")
+        .replace("{{ inline_admin_form.fk_field.field }}", "{{ inline_admin_form.fk_field.field|safe }}")
+        .replace("{{ inline_admin_form.deletion_field.field }}", "{{ inline_admin_form.deletion_field.field|safe }}")
         .replace("{{ original.get_username }}", "{{ original }}")
         .replace("{% blocktranslate with username=original %}", "")
         .replace("<strong>{{ username }}</strong>", "<strong>{{ original }}</strong>")
@@ -396,6 +411,13 @@ fn translate(source: &str) -> String {
                 translated.push_str("{{ user.short_name }}")
             }
             ["csrf_token"] => translated.push_str("{{ csrf_input|safe }}"),
+            [
+                "url",
+                "inline_admin_form.model_admin.opts|admin_urlname:'change'",
+                ..,
+            ] => {
+                translated.push_str("{{ inline_admin_form.change_url }}");
+            }
             ["url", "opts|admin_urlname:'change'", ..] => {
                 translated.push_str("{{ object_url }}change/");
             }
@@ -514,6 +536,16 @@ pub fn filtered_select_scripts() -> String {
     form_scripts(true, false)
 }
 
+pub fn registration_admin_scripts() -> String {
+    let mut scripts = ADMIN_MEDIA.to_vec();
+    scripts.insert(3, "inlines.js");
+    scripts
+        .iter()
+        .map(|script| format!("<script src=\"/static/admin/js/{script}\"></script>"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 pub fn account_editor_scripts() -> String {
     form_scripts(true, true)
 }
@@ -608,23 +640,41 @@ pub fn admin_change_message(message: &str) -> String {
     let messages = entries
         .iter()
         .filter_map(|entry| {
-            if entry.get("added").is_some() {
-                return Some("Added.".into());
+            let inline_name = |message: &serde_json::Value| {
+                Some(format!(
+                    "{} “{}”",
+                    message["name"].as_str()?,
+                    message["object"].as_str()?
+                ))
+            };
+            if let Some(added) = entry.get("added") {
+                return Some(
+                    inline_name(added)
+                        .map_or_else(|| "Added.".into(), |name| format!("Added {name}.")),
+                );
             }
-            if entry.get("deleted").is_some() {
-                return Some("Deleted.".into());
+            if let Some(deleted) = entry.get("deleted") {
+                return Some(
+                    inline_name(deleted)
+                        .map_or_else(|| "Deleted.".into(), |name| format!("Deleted {name}.")),
+                );
             }
-            let fields: Vec<_> = entry["changed"]["fields"]
+            let changed = &entry["changed"];
+            let fields: Vec<_> = changed["fields"]
                 .as_array()?
                 .iter()
                 .filter_map(serde_json::Value::as_str)
                 .collect();
             let (last, rest) = fields.split_last()?;
-            if rest.is_empty() {
-                Some(format!("Changed {last}."))
+            let fields = if rest.is_empty() {
+                (*last).to_owned()
             } else {
-                Some(format!("Changed {} and {last}.", rest.join(", ")))
-            }
+                format!("{} and {last}", rest.join(", "))
+            };
+            Some(inline_name(changed).map_or_else(
+                || format!("Changed {fields}."),
+                |name| format!("Changed {fields} for {name}."),
+            ))
         })
         .collect::<Vec<_>>();
     if messages.is_empty() {
@@ -663,11 +713,7 @@ pub async fn log_action(
     .bind(description.chars().take(200).collect::<String>())
     .bind(flag)
     .bind(message)
-    .bind(if matches!(model, "user" | "group") {
-        "auth"
-    } else {
-        "tab"
-    })
+    .bind(crate::admin_changelist::application(model))
     .bind(model)
     .bind(user)
     .execute(db)
@@ -761,7 +807,7 @@ async fn notice(
     let data = sqlx::query_as::<_, (String, String, String, String, u8)>(
         "SELECT t.app_label, t.model, l.object_id, l.object_repr, l.action_flag
          FROM django_admin_log l JOIN django_content_type t ON t.id = l.content_type_id
-         WHERE l.id = ? AND l.user_id = ? AND t.app_label IN ('tab', 'auth')
+         WHERE l.id = ? AND l.user_id = ? AND t.app_label IN ('tab', 'auth', 'registration')
            AND l.action_time > UTC_TIMESTAMP(6) - INTERVAL 1 MINUTE",
     )
     .bind(log)
@@ -774,7 +820,7 @@ async fn notice(
     let model = match (app.as_str(), model.as_str()) {
         ("auth", "user") => crate::admin_auth_pages::USER,
         ("auth", "group") => crate::admin_auth_pages::GROUP,
-        ("tab", model) => {
+        ("tab" | "registration", model) => {
             let Some(resource) = crate::admin_changelist::default_list(model) else {
                 return Ok(None);
             };

@@ -6046,10 +6046,15 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
         assert admin.password == replacement
 
 
-def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False):
+def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
+                       registration_revision=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
+    if registration_revision and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["mittab_registration_revision"] = registration_edit_proof(previous)
     if pairing_revision and form is not None:
         status, _, previous = request(port, path, cookie=session)
         assert status == 200
@@ -6072,7 +6077,188 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
         if pairing_revision:
             body, metadata = re.subn(rb'<input type="hidden" name="mittab_pairing_revision" value="[a-f0-9]{64}">', b"", body)
             assert metadata == 1
+        if registration_revision:
+            body, metadata = re.subn(
+                rb'<input type="hidden" name="mittab_registration_revision" value="[a-f0-9]{64}">', b"", body,
+            )
+            assert metadata == 1
+            body, metadata = re.subn(
+                rb'<input type="hidden" name="mittab_registration_delete_revision" value="[a-f0-9]{64}">', b"", body,
+            )
+            assert metadata == 1
         assert_html_bytes(body, reference.content)
+
+
+def registration_delete_proof(body):
+    return re.search(rb'name="mittab_registration_delete_revision" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+def registration_edit_proof(body):
+    return re.search(rb'name="mittab_registration_revision" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_registration_admin_matches_django_and_saves_bound_inlines(html_assets, subtests):
+    from django.contrib.admin.models import LogEntry
+    from mittab.apps.registration.models import (
+        Registration, RegistrationChangeLog, RegistrationConfirmationEmailLog,
+    )
+
+    user_model = get_user_model()
+    session = legacy_tab_session("registration-admin")
+    board = legacy_tab_session("registration-board")
+    user_model.objects.get(username="registration-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Fixture & School")
+    other_school = School.objects.create(name='Other "Quoted" School')
+    registration = Registration.objects.create(school=school, email="fixture@example.org",
+        dietary_requests="Notes < & >", housing_requests="Fixture Housing", herokunator_code="fixture-registration")
+    other = Registration.objects.create(school=other_school, email="other@example.org",
+        herokunator_code="other-registration")
+    team = Team.objects.create(name="Fixture & Team", school=school, seed=1, registration=registration)
+    other_team = Team.objects.create(name="Other Team", school=other_school, seed=1, registration=other)
+    debater = Debater.objects.create(name="Fixture Debater", school=school, novice_status=0)
+    team.debaters.add(debater)
+    judge = Judge.objects.create(name="Fixture <Judge>", rank=Decimal("2.50"), reported_experience=5,
+                                 registration=registration, email="judge@example.org")
+    round_obj = Round.objects.create(round_number=1, gov_team=team, opp_team=other_team, victor=Round.GOV)
+    change = RegistrationChangeLog.objects.create(registration=registration, action="created",
+        summary="Created test registration\nOne <team>.", email=registration.email, school_name=school.name,
+        registration_code=registration.herokunator_code)
+    email = RegistrationConfirmationEmailLog.objects.create(registration=registration,
+        email=registration.email, email_payload={"subject": "Fixture"}, successful=False,
+        error_message="Delivery failed\r\nCheck <address>.")
+    client = Client()
+    csrf = "a" * 32
+    client.cookies["sessionid"] = session
+    client.cookies["csrftoken"] = csrf
+    root = "/admin/registration/registration/"
+    edit = f"{root}{registration.id}/change/"
+
+    def submit(port, path, fields, sid=session):
+        return request(port, path, method="POST", form={**fields, "csrfmiddlewaretoken": csrf},
+                       extra_headers={"Cookie": f"sessionid={sid}; csrftoken={csrf}"})
+
+    fields = {
+        "school": school.id, "email": registration.email, "dietary_requests": registration.dietary_requests,
+        "housing_requests": registration.housing_requests, "herokunator_code": registration.herokunator_code,
+        "teams-TOTAL_FORMS": 1, "teams-INITIAL_FORMS": 1,
+        "teams-0-id": team.id, "teams-0-registration": registration.id, "teams-0-name": team.name,
+        "teams-0-seed": team.seed, "teams-0-school": school.id, "teams-0-hybrid_school": "",
+        "judges-TOTAL_FORMS": 1, "judges-INITIAL_FORMS": 1,
+        "judges-0-id": judge.id, "judges-0-registration": registration.id, "judges-0-name": judge.name,
+        "judges-0-reported_experience": 5, "judges-0-rank": "2.50", "judges-0-email": judge.email,
+        "confirmation_email_logs-TOTAL_FORMS": 1, "confirmation_email_logs-INITIAL_FORMS": 1,
+        "confirmation_email_logs-0-id": email.id, "confirmation_email_logs-0-registration": registration.id,
+        "change_logs-TOTAL_FORMS": 1, "change_logs-INITIAL_FORMS": 1,
+        "change_logs-0-id": change.id, "change_logs-0-registration": registration.id,
+    }
+
+    for prefix, maximum in (("teams", 1000), ("judges", 1000),
+                            ("confirmation_email_logs", 0), ("change_logs", 0)):
+        fields[f"{prefix}-MIN_NUM_FORMS"] = 0
+        fields[f"{prefix}-MAX_NUM_FORMS"] = maximum
+
+    with rust_server(overrides=html_assets) as port:
+        for path in (
+            root, root + "?q=Fixture", root + "?o=2", root + "?_popup=1&_to_field=id",
+            root + "?" + urlencode({"q": r'"Other \"Quoted\" School"'}),
+            root + "add/", f"{root}{other.id}/change/", edit,
+            f"{root}{registration.id}/history/",
+        ):
+            with subtests.test(path=path):
+                compare_admin_page(port, path, client, registration_revision=path.endswith("/change/"))
+        compare_admin_page(port, edit, client, {**fields, "email": "invalid"}, registration_revision=True)
+        compare_admin_page(port, edit, client, {
+            **fields, "judges-TOTAL_FORMS": 3,
+            "judges-1-name": "Duplicate Judge", "judges-1-rank": "2.00",
+            "judges-2-name": "Duplicate Judge", "judges-2-rank": "2.50",
+        }, registration_revision=True)
+        original_page = request(port, edit, cookie=session)[2]
+        initial = registration_edit_proof(original_page)
+        initial_delete = registration_delete_proof(original_page)
+        added_round = Round.objects.create(round_number=2, gov_team=team, opp_team=other_team)
+        assert submit(port, edit, {**fields, "mittab_registration_revision": initial,
+                                  "mittab_registration_delete_revision": initial_delete,
+                                  "teams-0-DELETE": "on"})[0] == 409
+        assert Team.objects.filter(pk=team.id).exists() and Round.objects.filter(pk=added_round.id).exists()
+        # A dependency change requires a fresh deletion confirmation. Other edits may proceed.
+        assert submit(port, edit, {**fields, "mittab_registration_revision": initial,
+                                  "email": "updated-metadata@example.org"})[0] == 302
+        added_round.delete()
+        form = {**fields, "mittab_registration_revision": registration_edit_proof(
+            request(port, edit, cookie=session)[2],
+        )}
+        assert request(port, edit, cookie=board)[1]["Location"] == "/403/"
+        assert submit(port, edit, form, sid=board)[1]["Location"] == "/403/"
+        status, _, body = submit(port, edit, {**form, "teams-0-id": other_team.id, "email": "forged@example.org"})
+        assert status == 200 and b"The submitted rows do not match this registration." in body
+        assert Registration.objects.get(pk=registration.pk).email == "updated-metadata@example.org"
+        assert Team.objects.get(pk=other_team.pk).registration_id == other.id
+
+        status, _, body = submit(port, edit, {**form, "judges-0-rank": "bad", "teams-0-name": "No partial save"})
+        assert status == 200 and b"Enter a number." in body
+        assert Team.objects.get(pk=team.pk).name == team.name
+        assert submit(port, edit, {
+            **form, "email": "updated@example.org", "teams-0-seed": 2,
+            "judges-TOTAL_FORMS": 2, "judges-0-name": "Updated Judge", "judges-1-name": "New Judge", "judges-1-rank": "3.00",
+        })[0] == 302
+        registration.refresh_from_db()
+        team.refresh_from_db()
+        assert registration.email == "updated@example.org"
+        assert team.seed == 2 and team.debaters.filter(pk=debater.pk).exists()
+        new_judge = Judge.objects.get(registration=registration, name="New Judge")
+        assert new_judge.rank == Decimal("3.00") and new_judge.ballot_code and new_judge.created_at
+        assert submit(port, edit, form)[0] == 409
+        assert LogEntry.objects.filter(content_type__app_label="registration", object_id=str(registration.id),
+                                       action_flag=2).exists()
+        compare_admin_page(port, edit, client, registration_revision=True)
+        compare_admin_page(port, f"{root}{registration.id}/history/", client)
+        delete_path = f"{root}{registration.id}/delete/"
+        compare_admin_page(port, delete_path, client, deletion_scope=True)
+        status, _, body = request(port, delete_path, cookie=session)
+        assert status == 200 and b"Fixture &amp; Team" in body and b"Registration confirmation failed:" in body
+        scope = re.search(rb'name="mittab_delete_scope" value="([a-f0-9]{64})"', body)[1].decode()
+        late_change = RegistrationChangeLog.objects.create(registration=registration, action="updated")
+        assert submit(port, delete_path, {"post": "yes", "mittab_delete_scope": scope})[0] == 409
+        assert RegistrationChangeLog.objects.get(pk=late_change.pk).registration_id == registration.id
+        scope = re.search(rb'name="mittab_delete_scope" value="([a-f0-9]{64})"',
+                          request(port, delete_path, cookie=session)[2])[1].decode()
+        assert submit(port, delete_path, {"post": "yes", "mittab_delete_scope": scope})[0] == 302
+        assert Registration.objects.filter(pk=other.pk).exists()
+        assert not Registration.objects.filter(pk=registration.pk).exists()
+        assert not Round.objects.filter(pk=round_obj.pk).exists()
+        assert not Judge.objects.filter(pk__in=(judge.pk, new_judge.pk)).exists()
+        assert not RegistrationConfirmationEmailLog.objects.filter(pk=email.pk).exists()
+        assert RegistrationChangeLog.objects.get(pk=change.pk).registration_id is None
+        assert Debater.objects.filter(pk=debater.pk).exists()
+        assert Team.objects.filter(pk=other_team.pk).exists()
+        assert submit(port, root + "?q=NoSuchRegistration", {
+            "action": "delete_selected", "_selected_action": other.id, "index": "0",
+        })[0] == 302
+        assert Registration.objects.filter(pk=other.pk).exists()
+        add_form = {
+            "school": other_school.id, "email": "new@example.org",
+            "teams-TOTAL_FORMS": 1, "teams-INITIAL_FORMS": 0,
+            "teams-0-name": "New Team", "teams-0-school": other_school.id, "teams-0-seed": 0,
+            "judges-TOTAL_FORMS": 0, "judges-INITIAL_FORMS": 0,
+            "confirmation_email_logs-TOTAL_FORMS": 0, "confirmation_email_logs-INITIAL_FORMS": 0,
+            "change_logs-TOTAL_FORMS": 0, "change_logs-INITIAL_FORMS": 0,
+        }
+        assert submit(port, root + "add/", add_form)[0] == 302
+        created = Registration.objects.get(email=add_form["email"])
+        created_team = created.teams.get()
+        assert created_team.created_at and created_team.checked_in and created_team.team_code
+        assert created.herokunator_code and created.created_at
+        created_path = f"{root}{created.id}/change/"
+        created_page = request(port, created_path, cookie=session)[2]
+        created_form = {**add_form, "herokunator_code": created.herokunator_code,
+                        "teams-INITIAL_FORMS": 1, "teams-0-id": created_team.id, "teams-0-DELETE": "on",
+                        "mittab_registration_revision": registration_edit_proof(created_page),
+                        "mittab_registration_delete_revision": registration_delete_proof(created_page)}
+        assert submit(port, created_path, created_form)[0] == 302
+        assert not created.teams.exists() and Registration.objects.filter(pk=created.id).exists()
 
 
 @pytest.mark.django_db(transaction=True)
