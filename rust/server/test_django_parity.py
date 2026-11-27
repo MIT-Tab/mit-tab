@@ -305,6 +305,10 @@ def test_speaker_awards_match_legacy_scoring_and_publication_gates():
 
     with rust_server() as port:
         check(port, 423)
+        baseline = json.loads(request(port, LIVE, forwarded_proto="https")[2])
+        assert baseline == json.loads(request(port, LIVE, forwarded_proto="https")[2])
+        different_host = json.loads(request(port, LIVE, extra_headers={"Host": "fixture.example"})[2])
+        assert different_host["source_url"] == "http://fixture.example"
         compare_import(port, client, ready=False)
         old = timezone.now() - timedelta(hours=4)
         Round.objects.filter(pk=rounds[-1].pk).update(result_entered_at=old)
@@ -1819,7 +1823,7 @@ def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_a
     ]
     for team, speaker in zip(teams, people):
         team.debaters.add(speaker)
-    extra_speaker = Debater.objects.create(name="A Ranking Speaker")
+    extra_speaker = Debater.objects.create(name="A Ranking Speaker", novice_status=0)
     teams[0].debaters.add(extra_speaker)
     first = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
     private_debate = Round.objects.create(round_number=1, gov_team=teams[2], opp_team=teams[3], victor=Round.GOV)
@@ -1836,7 +1840,7 @@ def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_a
     ballots = "/public/ballots/"
     paths = (standings, speakers_page, ballots)
 
-    with rust_server() as port:
+    with rust_server(overrides={"MITTAB_SHARED_PUBLIC_CACHE": "1"}) as port:
         for path in paths:
             assert request(port, path)[1]["Location"] == "/public/access-error/"
         status, headers, page = request(port, control, cookie=tab)
@@ -1853,7 +1857,11 @@ def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_a
         assert post(policy)[1]["Location"] == control
         assert get_ranking_settings("team")["up_to_round"] == 1
         assert PublicDisplaySetting.objects.get(slug="ballot_round_1").include_ranks
-        teams_page = request(port, standings)[2]
+        status, headers, teams_page = request(port, standings)
+        assert status == 200
+        assert headers["Vary"] == "Cookie"
+        assert headers["Cache-Control"] == "public, max-age=10, s-maxage=10, stale-while-revalidate=10"
+        assert request(port, standings)[2] == teams_page
         assert b"Top Example" in teams_page and b"Private Example" not in teams_page
         assert b"A Ranking Speaker, Ranking Speaker 0" in teams_page
         assert b"31.75" not in teams_page and b"Speaks</th>" not in teams_page

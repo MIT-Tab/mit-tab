@@ -79,6 +79,14 @@ impl Config {
         MySqlPoolOptions::new()
             .max_connections(10)
             .acquire_timeout(Duration::from_secs(5))
+            .after_connect(|db, _| {
+                Box::pin(async move {
+                    sqlx::query("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+                        .execute(db)
+                        .await?;
+                    Ok(())
+                })
+            })
             .connect_with(self.db.clone())
             .await
             .map_err(|_| "Could not connect to the MySQL database")

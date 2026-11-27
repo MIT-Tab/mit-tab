@@ -16,7 +16,7 @@ use crate::{
     placements::Placements,
     private,
     public_api::{self, ELIGIBLE_TEAMS},
-    publication,
+    public_cache, publication,
     settings::Settings,
     speakers::{self, RankedSpeaker},
     unavailable,
@@ -97,32 +97,41 @@ async fn respond(app: &App, headers: HeaderMap, include_import: bool) -> Respons
         return private(axum::http::StatusCode::BAD_REQUEST);
     };
     let source = format!("{scheme}://{host}");
-    match payload(app, &source, include_import).await {
-        Ok(value) => private(Json(value)),
-        Err(_) => unavailable(),
+    if !include_import {
+        return public_cache::live_results(app, &source, async |db| {
+            Ok(private(Json(payload(db, &source, false).await?)))
+        })
+        .await;
     }
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let value = payload(&mut db, &source, true).await?;
+        db.commit().await?;
+        Ok::<_, sqlx::Error>(private(Json(value)))
+    }
+    .await;
+    result.unwrap_or_else(|_| unavailable())
 }
 
 async fn payload(
-    app: &App,
+    db: &mut MySqlConnection,
     source: &str,
     include_import: bool,
 ) -> Result<serde_json::Value, sqlx::Error> {
-    let mut db = app.db.begin().await?;
     let keys: Vec<_> = speakers::SETTINGS
         .iter()
         .chain(METADATA_KEYS)
         .copied()
         .collect();
-    let settings = Settings::load(&mut db, &keys).await?;
-    let placements = publication::refresh_placements(&mut db, &settings).await?;
-    let completed_at = publication::completion_time(&mut db, &settings).await?;
+    let settings = Settings::load(db, &keys).await?;
+    let placements = publication::refresh_placements(db, &settings).await?;
+    let completed_at = publication::completion_time(db, &settings).await?;
     let now = Utc::now();
     let speakers_available = publication::speakers_released(&placements, completed_at, now);
     let (ranked_speakers, debaters) = if speakers_available {
         (
-            speakers::ordered_speaker_rows(&mut db, &settings).await?,
-            speaker_profiles(&mut db).await?,
+            speakers::ordered_speaker_rows(db, &settings).await?,
+            speaker_profiles(db).await?,
         )
     } else {
         (Vec::new(), HashMap::new())
@@ -133,7 +142,7 @@ async fn payload(
         if id_map.is_empty() {
             continue;
         }
-        let names = team_rosters(&mut db, id_map).await?;
+        let names = team_rosters(db, id_map).await?;
         let mut teams: Vec<_> = names.into_values().collect();
         teams.sort_by_key(|team| (id_map[&team.tournament_id], team.tournament_id));
         team_results.extend(teams.into_iter().map(|team| TeamResult {
@@ -201,7 +210,7 @@ async fn payload(
             .as_object_mut()
             .expect("live-results payload is an object");
         append_import(
-            &mut db,
+            db,
             object,
             &ranked_speakers,
             speakers_available,
@@ -209,7 +218,6 @@ async fn payload(
         )
         .await?;
     }
-    db.commit().await?;
     Ok(payload)
 }
 

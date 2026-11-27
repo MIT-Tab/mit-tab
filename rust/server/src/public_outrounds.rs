@@ -14,9 +14,9 @@ use crate::{
     App, access, bracket_display,
     html::{self, Navigation},
     legacy_session::Actor,
+    public_cache::{self, Page},
     public_pairings::{Team, paired_teams},
     settings::Settings,
-    unavailable,
 };
 
 const SETTINGS: &[&str] = &[
@@ -130,28 +130,26 @@ pub async fn page(
     if !matches!(division, 0 | 1) {
         return crate::private((StatusCode::NOT_FOUND, "Division not found."));
     }
-    match render(&app, actor, division).await {
-        Ok(response) => response,
-        Err(_) => unavailable(),
-    }
+    public_cache::render(&app, actor, Page::Outrounds(division), async |db| {
+        render(db, actor, division).await
+    })
+    .await
 }
 
-async fn render(app: &App, actor: Actor, division: i32) -> Result<Response, sqlx::Error> {
-    let mut db = app.db.begin().await?;
-    let settings = Settings::load(&mut db, SETTINGS).await?;
+async fn render(
+    db: &mut MySqlConnection,
+    actor: Actor,
+    division: i32,
+) -> Result<Response, sqlx::Error> {
+    let settings = Settings::load(db, SETTINGS).await?;
     let varsity = settings.integer("var_teams_visible", 256);
     let novice = settings.integer("nov_teams_visible", 256);
-    let metadata = matches(
-        &mut db,
-        division,
-        if division == 0 { varsity } else { novice },
-    )
-    .await?;
+    let metadata = matches(db, division, if division == 0 { varsity } else { novice }).await?;
     if metadata.is_empty() {
         return Ok(access::found("/public/access-error/"));
     }
     let names = settings.flag("debaters_public", true);
-    let teams = paired_teams(&mut db, names).await?;
+    let teams = paired_teams(db, names).await?;
     let seeded: BTreeMap<_, _> = sqlx::query_as::<_, (i32, i32)>(
         "SELECT seed, team_id FROM tab_breakingteam WHERE type_of_team = ? ORDER BY id",
     )
@@ -176,7 +174,6 @@ async fn render(app: &App, actor: Actor, division: i32) -> Result<Response, sqlx
     .bind(novice)
     .fetch_one(&mut *db)
     .await?;
-    db.commit().await?;
 
     let matches: Vec<_> = metadata
         .into_iter()

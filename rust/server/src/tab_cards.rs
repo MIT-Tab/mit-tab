@@ -20,6 +20,7 @@ use crate::{
     html::{self, Navigation},
     legacy_session::Actor,
     private,
+    public_cache::{self, Page},
     settings::Settings,
     speakers,
     tournament_data::TournamentData,
@@ -389,11 +390,14 @@ pub async fn public(State(app): State<App>, Extension(actor): Extension<Actor>) 
     ) {
         return access::found("/all_tab_cards/");
     }
-    page(&app, actor, None, true).await
+    public_cache::render(&app, actor, Page::TabCards, async |db| {
+        page(db, actor, None, true).await
+    })
+    .await
 }
 
 pub async fn all(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    page(&app, actor, None, false).await
+    private_page(&app, actor, None).await
 }
 
 pub async fn single(
@@ -401,37 +405,61 @@ pub async fn single(
     Extension(actor): Extension<Actor>,
     Path(id): Path<i32>,
 ) -> Response {
-    page(&app, actor, Some(id), false).await
+    private_page(&app, actor, Some(id)).await
 }
 
-async fn page(app: &App, actor: Actor, chosen: Option<i32>, public: bool) -> Response {
-    let board = matches!(actor, Actor::User { board: true, .. });
+async fn private_page(app: &App, actor: Actor, chosen: Option<i32>) -> Response {
     let result = async {
         let mut db = app.db.begin().await?;
-        let settings = Settings::load(&mut db, SETTINGS).await?;
-        if public {
-            let released = sqlx::query_scalar::<_, bool>(
+        let response = page(&mut db, actor, chosen, false).await?;
+        db.commit().await?;
+        Ok::<_, sqlx::Error>(response)
+    }
+    .await;
+    result.unwrap_or_else(|_| unavailable())
+}
+
+async fn page(
+    db: &mut MySqlConnection,
+    actor: Actor,
+    chosen: Option<i32>,
+    public: bool,
+) -> Result<Response, sqlx::Error> {
+    let board = matches!(actor, Actor::User { board: true, .. });
+    let settings = Settings::load(db, SETTINGS).await?;
+    if public {
+        let released = sqlx::query_scalar::<_, bool>(
                 "SELECT EXISTS(SELECT 1 FROM tab_outround
                  WHERE (type_of_round = 0 AND num_teams >= ?) OR (type_of_round = 1 AND num_teams >= ?))",
             ).bind(settings.integer("var_teams_visible", 256)).bind(settings.integer("nov_teams_visible", 256))
                 .fetch_one(&mut *db).await?;
-            if !released || !settings.flag("publish_tab_cards_with_first_outround", true) {
-                return Ok(access::found("/public/access-error/"));
-            }
+        if !released || !settings.flag("publish_tab_cards_with_first_outround", true) {
+            return Ok(access::found("/public/access-error/"));
         }
-        let index: Vec<_> = if board { sqlx::query_as::<_, (i32, String)>("SELECT id, name FROM tab_team ORDER BY name, id")
-            .fetch_all(&mut *db).await? } else { Vec::new() };
-        let cards = if board && chosen.is_none() { Vec::new() } else { cards(&mut db, &settings, chosen, board).await? };
-        db.commit().await?;
-        if chosen.is_some() && cards.is_empty() {
-            return Ok(private((StatusCode::NOT_FOUND, "Tab card not found.")));
-        }
-        Ok::<_, sqlx::Error>(html::render("tab_cards.html", context! {
+    }
+    let index: Vec<_> = if board {
+        sqlx::query_as::<_, (i32, String)>("SELECT id, name FROM tab_team ORDER BY name, id")
+            .fetch_all(&mut *db)
+            .await?
+    } else {
+        Vec::new()
+    };
+    let cards = if board && chosen.is_none() {
+        Vec::new()
+    } else {
+        cards(db, &settings, chosen, board).await?
+    };
+    if chosen.is_some() && cards.is_empty() {
+        return Ok(private((StatusCode::NOT_FOUND, "Tab card not found.")));
+    }
+    Ok::<_, sqlx::Error>(html::render(
+        "tab_cards.html",
+        context! {
             title => "Tab Cards", chosen, cards, index, board, public,
             nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-        }, StatusCode::OK))
-    }.await;
-    result.unwrap_or_else(|_| unavailable())
+        },
+        StatusCode::OK,
+    ))
 }
 
 pub async fn bundle(State(app): State<App>, headers: HeaderMap) -> Response {

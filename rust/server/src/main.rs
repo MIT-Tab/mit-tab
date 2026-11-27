@@ -41,6 +41,7 @@ mod native_session;
 mod passwords;
 mod placements;
 mod public_api;
+mod public_cache;
 mod public_outrounds;
 mod public_pairings;
 mod public_rankings;
@@ -103,6 +104,9 @@ use crate::config::Config;
 #[derive(Clone)]
 struct App {
     db: MySqlPool,
+    public_cache: Arc<public_cache::PublicCache>,
+    cache_public_pages: bool,
+    cache_shared_public_pages: bool,
     backups: Arc<backups::Backups>,
     django_secret: Option<Arc<str>>,
 }
@@ -157,6 +161,10 @@ async fn run() -> Result<(), &'static str> {
         .map_err(|_| "Could not bind the MIT-Tab HTTP listener")?;
     let app = router(App {
         db,
+        public_cache: Arc::default(),
+        cache_public_pages: std::env::var("MITTAB_DISABLE_ORIGIN_CACHE").as_deref() != Ok("1"),
+        cache_shared_public_pages: std::env::var("MITTAB_SHARED_PUBLIC_CACHE").as_deref()
+            == Ok("1"),
         backups: Arc::new(config.backups),
         django_secret: config.django_secret.map(Arc::from),
     });

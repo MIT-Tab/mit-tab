@@ -20,6 +20,7 @@ use crate::{
     html::{self, Navigation},
     legacy_session::Actor,
     login, private,
+    public_cache::{self, Page},
     settings::Settings,
     speakers,
     staff_pairing::lock_round,
@@ -191,15 +192,14 @@ fn score_pair(score: Score, speaks: Stat, ranks: Stat) -> (String, String) {
 }
 
 pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let result = async {
-        let mut db = app.db.begin().await?;
-        let display = configured(&mut db, 0).await?;
+    public_cache::render(&app, actor, Page::TeamRankings, async |db| {
+        let display = configured(db, 0).await?;
         let config = &display[0];
         if !config.visible {
             return Ok(access::found(PUBLIC_ERROR));
         }
         let settings = Settings::load(
-            &mut db,
+            db,
             &[
                 "cur_round",
                 "lenient_late",
@@ -208,7 +208,7 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
             ],
         )
         .await?;
-        let tournament = TournamentData::load(&mut db).await?;
+        let tournament = TournamentData::load(db).await?;
         let mut metadata: HashMap<_, (String, Vec<String>)> = HashMap::new();
         for (id, team, debater) in sqlx::query_as::<_, (i32, String, Option<String>)>(
             "SELECT t.id, t.name, d.name FROM tab_team t
@@ -227,7 +227,6 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
                 debaters.push(debater);
             }
         }
-        db.commit().await?;
 
         let standings = tournament
             .scores(
@@ -277,9 +276,8 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
             },
             StatusCode::OK,
         ))
-    }
-    .await;
-    result.unwrap_or_else(|_| unavailable())
+    })
+    .await
 }
 
 #[derive(Serialize)]
@@ -319,19 +317,17 @@ fn speaker_columns(score: Score, adjusted: bool) -> Vec<(&'static str, String, S
 }
 
 pub async fn speaker_page(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let result = async {
-        let mut db = app.db.begin().await?;
-        let display = configured(&mut db, 0).await?;
+    public_cache::render(&app, actor, Page::SpeakerRankings, async |db| {
+        let display = configured(db, 0).await?;
         if !display[1..].iter().any(|config| config.visible) { return Ok(access::found(PUBLIC_ERROR)); }
         let mut keys = speakers::SETTINGS.to_vec();
         keys.push("motions_enabled");
-        let settings = Settings::load(&mut db, &keys).await?;
-        let ordered = speakers::ordered_speaker_rows(&mut db, &settings).await?;
+        let settings = Settings::load(db, &keys).await?;
+        let ordered = speakers::ordered_speaker_rows(db, &settings).await?;
         let names: HashMap<_, _> = sqlx::query_as::<_, (i32, String, Option<String>)>(
             "SELECT d.id, d.name, t.name FROM tab_debater d LEFT JOIN tab_team t
              ON t.id = (SELECT MIN(m.team_id) FROM tab_team_debaters m WHERE m.debater_id = d.id)",
         ).fetch_all(&mut *db).await?.into_iter().map(|(id, name, team)| (id, (name, team))).collect();
-        db.commit().await?;
         let adjusted = settings.flag("speaker_rankings_use_single_adjusted", false);
         let sections: Vec<_> = display[1..].iter().enumerate().filter(|(_, config)| config.visible)
             .map(|(index, config)| SpeakerSection {
@@ -347,8 +343,7 @@ pub async fn speaker_page(State(app): State<App>, Extension(actor): Extension<Ac
         Ok::<_, sqlx::Error>(html::render("public_speaker_rankings.html", context! {
             title => "Speaker Rankings", sections, nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
         }, StatusCode::OK))
-    }.await;
-    result.unwrap_or_else(|_| unavailable())
+    }).await
 }
 
 #[derive(Serialize)]
@@ -427,19 +422,16 @@ async fn ballots_for(
 }
 
 pub async fn ballots(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let result = async {
-        let mut db = app.db.begin().await?;
-        let settings = Settings::load(&mut db, &["tot_rounds", "motions_enabled"]).await?;
-        let display = configured(&mut db, settings.integer("tot_rounds", 0)).await?;
+    public_cache::render(&app, actor, Page::Ballots, async |db| {
+        let settings = Settings::load(db, &["tot_rounds", "motions_enabled"]).await?;
+        let display = configured(db, settings.integer("tot_rounds", 0)).await?;
         let mut rounds = Vec::new();
         for config in display.iter().rev().filter(|config| config.kind == "ballot" && config.visible) {
-            rounds.push(ballots_for(&mut db, config).await?);
+            rounds.push(ballots_for(db, config).await?);
         }
-        db.commit().await?;
         if rounds.is_empty() { return Ok(access::found(PUBLIC_ERROR)); }
         Ok::<_, sqlx::Error>(html::render("public_ballots.html", context! {
             title => "Public Ballots", rounds, nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
         }, StatusCode::OK))
-    }.await;
-    result.unwrap_or_else(|_| unavailable())
+    }).await
 }

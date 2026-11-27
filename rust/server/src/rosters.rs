@@ -16,6 +16,7 @@ use crate::{
     App, access,
     html::{self, Navigation},
     legacy_session::Actor,
+    public_cache::{self, Page},
     settings::Settings,
     unavailable,
 };
@@ -72,66 +73,46 @@ struct Record {
 }
 
 pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let Ok(mut db) = app.db.begin().await else {
-        return unavailable();
-    };
-    let Ok(settings) = Settings::load(&mut db, SETTINGS).await else {
-        return unavailable();
-    };
-    if !settings.flag("teams_public", false) {
-        return access::found("/public/access-error/");
-    }
-    let Ok(teams) = team_rows(&mut db, settings.flag("debaters_public", true)).await else {
-        return unavailable();
-    };
-    let Ok(changes) = changes(&mut db, "teams", settings.flag("debaters_public", true)).await
-    else {
-        return unavailable();
-    };
-    if db.commit().await.is_err() {
-        return unavailable();
-    }
-    let checked_in = teams.iter().filter(|team| team.checked_in).count();
-    html::render(
-        "teams.html",
-        context! {
-            title => "Team List", nav => navigation(actor, &settings),
-            checked_in, checked_in_points => tournament_value(checked_in),
-            total_points => tournament_value(teams.len()), teams, changes,
-        },
-        StatusCode::OK,
-    )
+    public_cache::render(&app, actor, Page::Teams, async |db| {
+        let settings = Settings::load(db, SETTINGS).await?;
+        if !settings.flag("teams_public", false) {
+            return Ok(access::found("/public/access-error/"));
+        }
+        let teams = team_rows(db, settings.flag("debaters_public", true)).await?;
+        let changes = changes(db, "teams", settings.flag("debaters_public", true)).await?;
+        let checked_in = teams.iter().filter(|team| team.checked_in).count();
+        Ok(html::render(
+            "teams.html",
+            context! {
+                title => "Team List", nav => navigation(actor, &settings),
+                checked_in, checked_in_points => tournament_value(checked_in),
+                total_points => tournament_value(teams.len()), teams, changes,
+            },
+            StatusCode::OK,
+        ))
+    })
+    .await
 }
 
 pub async fn judges(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let Ok(mut db) = app.db.begin().await else {
-        return unavailable();
-    };
-    let Ok(settings) = Settings::load(&mut db, SETTINGS).await else {
-        return unavailable();
-    };
-    if !settings.flag("judges_public", false) {
-        return access::found("/public/access-error/");
-    }
-    let rounds: Vec<_> = (1..=settings.integer("tot_rounds", 5)).collect();
-    let Ok(judges) = judge_rows(&mut db, &rounds).await else {
-        return unavailable();
-    };
-    let Ok(changes) = changes(&mut db, "judges", settings.flag("debaters_public", true)).await
-    else {
-        return unavailable();
-    };
-    if db.commit().await.is_err() {
-        return unavailable();
-    }
-    html::render(
-        "judges.html",
-        context! {
-            title => "Judge List", nav => navigation(actor, &settings),
-            judges, rounds, changes,
-        },
-        StatusCode::OK,
-    )
+    public_cache::render(&app, actor, Page::Judges, async |db| {
+        let settings = Settings::load(db, SETTINGS).await?;
+        if !settings.flag("judges_public", false) {
+            return Ok(access::found("/public/access-error/"));
+        }
+        let rounds: Vec<_> = (1..=settings.integer("tot_rounds", 5)).collect();
+        let judges = judge_rows(db, &rounds).await?;
+        let changes = changes(db, "judges", settings.flag("debaters_public", true)).await?;
+        Ok(html::render(
+            "judges.html",
+            context! {
+                title => "Judge List", nav => navigation(actor, &settings),
+                judges, rounds, changes,
+            },
+            StatusCode::OK,
+        ))
+    })
+    .await
 }
 
 pub async fn records(

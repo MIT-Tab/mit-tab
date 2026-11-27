@@ -14,6 +14,7 @@ use crate::{
     html::{self, Navigation},
     legacy_session::{Actor, cookie},
     login,
+    public_cache::{self, Page},
     settings::Settings,
     unavailable,
 };
@@ -195,42 +196,41 @@ async fn page_settings(app: &App) -> Result<Settings, sqlx::Error> {
 }
 
 pub async fn public(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let Ok(settings) = page_settings(&app).await else {
-        return unavailable();
-    };
-    if !settings.flag("motions_enabled", false) {
-        return access::found(PUBLIC_ERROR);
-    }
-    let Ok(mut rows) = list(&app.db, true).await else {
-        return unavailable();
-    };
-    rows.sort_by_key(|motion| std::cmp::Reverse(motion.round.sort_key()));
-    let has_motions = !rows.is_empty();
-    let [mut varsity, mut novice, mut preliminary] = [Vec::new(), Vec::new(), Vec::new()];
-    for row in rows {
-        if !row.round.is_outround() {
-            preliminary.push(row);
-        } else if row.round.division == Some(0) {
-            varsity.push(row);
-        } else if row.round.division == Some(1) {
-            novice.push(row);
+    public_cache::render(&app, actor, Page::Motions, async |db| {
+        let settings = Settings::load(db, SETTINGS).await?;
+        if !settings.flag("motions_enabled", false) {
+            return Ok(access::found(PUBLIC_ERROR));
         }
-    }
-    let tournament = settings.string("tournament_name", "New Tournament");
-    html::render(
-        "motions.html",
-        context! {
-            title => format!("Motions - {tournament}"),
-            nav => Navigation::new(actor, true),
-            has_motions,
-            groups => [
-                ("Varsity Elimination Rounds", varsity),
-                ("Novice Elimination Rounds", novice),
-                ("Preliminary Rounds", preliminary),
-            ],
-        },
-        StatusCode::OK,
-    )
+        let mut rows = list(db, true).await?;
+        rows.sort_by_key(|motion| std::cmp::Reverse(motion.round.sort_key()));
+        let has_motions = !rows.is_empty();
+        let [mut varsity, mut novice, mut preliminary] = [Vec::new(), Vec::new(), Vec::new()];
+        for row in rows {
+            if !row.round.is_outround() {
+                preliminary.push(row);
+            } else if row.round.division == Some(0) {
+                varsity.push(row);
+            } else if row.round.division == Some(1) {
+                novice.push(row);
+            }
+        }
+        let tournament = settings.string("tournament_name", "New Tournament");
+        Ok(html::render(
+            "motions.html",
+            context! {
+                title => format!("Motions - {tournament}"),
+                nav => Navigation::new(actor, true),
+                has_motions,
+                groups => [
+                    ("Varsity Elimination Rounds", varsity),
+                    ("Novice Elimination Rounds", novice),
+                    ("Preliminary Rounds", preliminary),
+                ],
+            },
+            StatusCode::OK,
+        ))
+    })
+    .await
 }
 
 pub async fn manage(
@@ -504,8 +504,8 @@ pub async fn back_to_manage() -> Response {
     access::found(MANAGE)
 }
 
-pub async fn public_error(Extension(actor): Extension<Actor>) -> Response {
-    html::render(
+pub async fn public_error(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
+    public_cache::render(&app, actor, Page::AccessError, async |_| Ok(html::render(
         "error.html",
         context! {
             nav => Navigation::new(actor, false), title => "Page Not Public",
@@ -513,7 +513,7 @@ pub async fn public_error(Extension(actor): Extension<Actor>) -> Response {
             detail => "Access to this information is limited by the tournament settings. Check back later or contact the tournament staff if you believe this is an error.",
         },
         StatusCode::OK,
-    )
+    ))).await
 }
 
 pub async fn forbidden(Extension(actor): Extension<Actor>) -> Response {

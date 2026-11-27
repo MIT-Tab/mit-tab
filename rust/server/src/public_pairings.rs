@@ -14,8 +14,8 @@ use crate::{
     App, access,
     html::{self, Navigation},
     legacy_session::Actor,
+    public_cache::{self, Page},
     settings::Settings,
-    unavailable,
 };
 
 const DISPLAY_SETTINGS: &[&str] = &[
@@ -59,10 +59,10 @@ struct Missing {
 }
 
 pub async fn current(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    match pairings(&app, actor, None).await {
-        Ok(response) => response,
-        Err(_) => unavailable(),
-    }
+    public_cache::render(&app, actor, Page::Pairings(None), async |db| {
+        pairings(db, actor, None).await
+    })
+    .await
 }
 
 pub async fn previous(
@@ -70,15 +70,18 @@ pub async fn previous(
     Extension(actor): Extension<Actor>,
     Path(round): Path<i32>,
 ) -> Response {
-    match pairings(&app, actor, Some(round)).await {
-        Ok(response) => response,
-        Err(_) => unavailable(),
-    }
+    public_cache::render(&app, actor, Page::Pairings(Some(round)), async |db| {
+        pairings(db, actor, Some(round)).await
+    })
+    .await
 }
 
-async fn pairings(app: &App, actor: Actor, selected: Option<i32>) -> Result<Response, sqlx::Error> {
-    let mut db = app.db.begin().await?;
-    let settings = Settings::load(&mut db, DISPLAY_SETTINGS).await?;
+async fn pairings(
+    db: &mut MySqlConnection,
+    actor: Actor,
+    selected: Option<i32>,
+) -> Result<Response, sqlx::Error> {
+    let settings = Settings::load(db, DISPLAY_SETTINGS).await?;
     let current = settings.integer("cur_round", 1).saturating_sub(1);
     let round = selected.unwrap_or(current);
     if selected.is_some() && (round < 1 || round >= current) {
@@ -97,7 +100,7 @@ async fn pairings(app: &App, actor: Actor, selected: Option<i32>) -> Result<Resp
     .bind(current)
     .fetch_all(&mut *db)
     .await?;
-    if selected.is_none() && numbers.is_empty() && !has_inrounds(&mut db).await? {
+    if selected.is_none() && numbers.is_empty() && !has_inrounds(db).await? {
         return Ok(access::found("/public/access-error/"));
     }
     let (varsity, novice) = sqlx::query_as::<_, (i64, i64)>(
@@ -111,8 +114,8 @@ async fn pairings(app: &App, actor: Actor, selected: Option<i32>) -> Result<Resp
     let published = selected.is_some() || settings.integer("pairing_released", 0) == 1;
     let members_public = settings.flag("debaters_public", true);
     let (team_count, byes, unpaired, rows, teams) = if published {
-        let teams = paired_teams(&mut db, members_public).await?;
-        let rows = assigned_pairs(&mut db, round).await?;
+        let teams = paired_teams(db, members_public).await?;
+        let rows = assigned_pairs(db, round).await?;
         let mut paired: HashSet<_> = rows
             .iter()
             .flat_map(|row| [row.government, row.opposition])
@@ -151,7 +154,6 @@ async fn pairings(app: &App, actor: Actor, selected: Option<i32>) -> Result<Resp
         .await?;
         (size, Vec::new(), Vec::new(), Vec::new(), HashMap::new())
     };
-    db.commit().await?;
     let rows: Vec<_> = rows
         .into_iter()
         .map(|row| Pairing {
@@ -268,16 +270,15 @@ async fn assigned_pairs(
 }
 
 pub async fn missing(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    match missing_ballots(&app, actor).await {
-        Ok(response) => response,
-        Err(_) => unavailable(),
-    }
+    public_cache::render(&app, actor, Page::MissingBallots, async |db| {
+        missing_ballots(db, actor).await
+    })
+    .await
 }
 
-async fn missing_ballots(app: &App, actor: Actor) -> Result<Response, sqlx::Error> {
-    let mut db = app.db.begin().await?;
-    let settings = Settings::load(&mut db, DISPLAY_SETTINGS).await?;
-    if settings.integer("pairing_released", 0) != 1 || !has_inrounds(&mut db).await? {
+async fn missing_ballots(db: &mut MySqlConnection, actor: Actor) -> Result<Response, sqlx::Error> {
+    let settings = Settings::load(db, DISPLAY_SETTINGS).await?;
+    if settings.integer("pairing_released", 0) != 1 || !has_inrounds(db).await? {
         return Ok(access::found("/public/access-error/"));
     }
     let round = settings.integer("cur_round", 1).saturating_sub(1);
@@ -292,7 +293,6 @@ async fn missing_ballots(app: &App, actor: Actor) -> Result<Response, sqlx::Erro
     .bind(round)
     .fetch_all(&mut *db)
     .await?;
-    db.commit().await?;
     rows.sort_by(|left, right| {
         left.2
             .as_deref()

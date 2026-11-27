@@ -14,6 +14,7 @@ use crate::{
     App, access,
     html::{self, Navigation},
     legacy_session::Actor,
+    public_cache,
     settings::Settings,
     unavailable,
 };
@@ -62,22 +63,26 @@ struct Staff {
 }
 
 pub async fn public_home(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    match page(&app, actor).await {
-        Ok(response) => response,
-        Err(_) => unavailable(),
-    }
+    let logo = legacy_logo_href().await;
+    public_cache::home(&app, actor, logo.clone(), async |db| {
+        page(db, actor, logo).await
+    })
+    .await
 }
 
-async fn page(app: &App, actor: Actor) -> Result<Response, sqlx::Error> {
-    let mut db = app.db.begin().await?;
-    let settings = Settings::load(&mut db, SETTINGS).await?;
+async fn page(
+    db: &mut MySqlConnection,
+    actor: Actor,
+    legacy_logo: Option<String>,
+) -> Result<Response, sqlx::Error> {
+    let settings = Settings::load(db, SETTINGS).await?;
     let started = settings.integer("cur_round", 1) > 1;
     let prelim = settings.integer("cur_round", 1).saturating_sub(1);
-    let (has_pairing, elims) = round_status(&mut db, &settings).await?;
+    let (has_pairing, elims) = round_status(db, &settings).await?;
     let has_outrounds = elims.iter().any(Option::is_some);
     let published_inround = settings.integer("pairing_released", 0) == 1;
-    let (team_results, speaker_results, ballots) = display_state(&mut db).await?;
-    let open = registration_open(&mut db).await?;
+    let (team_results, speaker_results, ballots) = display_state(db).await?;
+    let open = registration_open(db).await?;
     let show_registration_lead = !started && open;
 
     let mut quick_links = Vec::new();
@@ -203,13 +208,12 @@ async fn page(app: &App, actor: Actor) -> Result<Response, sqlx::Error> {
             });
         }
     }
-    let (info_links, info_texts, tournament_staff) = resources(&mut db, &settings).await?;
-    db.commit().await?;
+    let (info_links, info_texts, tournament_staff) = resources(db, &settings).await?;
     let mut nav = Navigation::new(actor, motions_public);
     nav.teams_public = teams_public;
     nav.judges_public = judges_public;
     let tournament_name = settings.string("tournament_name", "New Tournament");
-    let logo = logo_url(app).await;
+    let logo = database_logo_href(db).await.or(legacy_logo);
     let public_tiles_odd = (quick_links.len() + usize::from(show_registration_lead)) % 2 == 1;
     Ok(html::render(
         "home.html",
@@ -356,11 +360,19 @@ fn uploads_dir() -> PathBuf {
 }
 
 pub async fn logo_url(app: &App) -> Option<String> {
-    if let Ok(Some(version)) = sqlx::query_scalar::<_, i64>(
-        "SELECT TIMESTAMPDIFF(MICROSECOND, '1970-01-01', updated_at) FROM mittab_public_logo WHERE id = 1",
-    ).fetch_optional(&app.db).await {
-        return Some(format!("/tournament-logo/?v={version}"));
+    match database_logo_href(&app.db).await {
+        Some(logo) => Some(logo),
+        None => legacy_logo_href().await,
     }
+}
+
+async fn database_logo_href<'e>(db: impl sqlx::MySqlExecutor<'e>) -> Option<String> {
+    sqlx::query_scalar::<_, i64>(
+        "SELECT TIMESTAMPDIFF(MICROSECOND, '1970-01-01', updated_at) FROM mittab_public_logo WHERE id = 1",
+    ).fetch_optional(db).await.ok().flatten().map(|version| format!("/tournament-logo/?v={version}"))
+}
+
+async fn legacy_logo_href() -> Option<String> {
     let path = uploads_dir().join("tournament_logo.png");
     let metadata = tokio::fs::symlink_metadata(path).await.ok()?;
     if !metadata.is_file() {

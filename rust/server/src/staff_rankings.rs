@@ -10,6 +10,7 @@ use crate::{
     App,
     html::{self, Navigation},
     legacy_session::Actor,
+    public_cache::{self, Page},
     public_rankings::policy,
     settings::Settings,
     speakers,
@@ -201,12 +202,10 @@ async fn groups(
 }
 
 async fn team_rankings(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let result = async {
-        let mut db = app.db.begin().await?;
-        let settings = Settings::load(&mut db, SETTINGS).await?;
-        let rankings = teams(&mut db, &settings).await?;
-        let memberships = groups(&mut db, true).await?;
-        db.commit().await?;
+    public_cache::render(&app, actor, Page::StaffTeamRankings, async |db| {
+        let settings = Settings::load(db, SETTINGS).await?;
+        let rankings = teams(db, &settings).await?;
+        let memberships = groups(db, true).await?;
         let novice: Vec<_> = rankings.iter().filter(|row| row.novice).collect();
         let groups: Vec<_> = memberships.into_iter().map(|(title, members)| {
             (title, rankings.iter().filter(|row| members.contains(&(row.id as i32))).collect::<Vec<_>>())
@@ -215,17 +214,14 @@ async fn team_rankings(State(app): State<App>, Extension(actor): Extension<Actor
             title => "Team Rankings", nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
             varsity => rankings, novice, groups, team => true,
         }, StatusCode::OK))
-    }.await;
-    result.unwrap_or_else(|_| unavailable())
+    }).await
 }
 
 async fn speaker_rankings(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let result = async {
-        let mut db = app.db.begin().await?;
-        let settings = Settings::load(&mut db, SETTINGS).await?;
-        let rankings = speaker_rows(&mut db, &settings).await?;
-        let memberships = groups(&mut db, false).await?;
-        db.commit().await?;
+    public_cache::render(&app, actor, Page::StaffSpeakerRankings, async |db| {
+        let settings = Settings::load(db, SETTINGS).await?;
+        let rankings = speaker_rows(db, &settings).await?;
+        let memberships = groups(db, false).await?;
         let novice: Vec<_> = rankings.iter().filter(|row| row.novice).collect();
         let groups: Vec<_> = memberships.into_iter().map(|(title, members)| {
             (title, rankings.iter().filter(|row| members.contains(&row.id)).collect::<Vec<_>>())
@@ -235,8 +231,7 @@ async fn speaker_rankings(State(app): State<App>, Extension(actor): Extension<Ac
             varsity => rankings, novice, groups, team => false,
             adjusted_first => settings.flag("speaker_rankings_use_single_adjusted", false),
         }, StatusCode::OK))
-    }.await;
-    result.unwrap_or_else(|_| unavailable())
+    }).await
 }
 
 async fn forum(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
