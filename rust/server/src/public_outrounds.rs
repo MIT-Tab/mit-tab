@@ -11,11 +11,10 @@ use serde::Serialize;
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access, bracket_display,
-    html::{self, Navigation},
+    App, access, bracket_display, legacy_html,
     legacy_session::Actor,
     public_cache::{self, Page},
-    public_pairings::{Team, paired_teams},
+    public_pairings::{Team, navigation, paired_teams},
     settings::Settings,
 };
 
@@ -29,9 +28,6 @@ const SETTINGS: &[&str] = &[
     "choice",
     "outround_pairing_mode",
     "show_outs_bracket",
-    "motions_enabled",
-    "teams_public",
-    "judges_public",
 ];
 
 #[derive(Clone, Serialize)]
@@ -40,7 +36,6 @@ pub struct Judge {
     pub is_chair: bool,
 }
 
-#[derive(Serialize)]
 pub struct Match<'a> {
     pub id: i32,
     pub size: i32,
@@ -51,6 +46,15 @@ pub struct Match<'a> {
     pub victor: i32,
     pub sidelock: bool,
     pub choice: i32,
+}
+
+impl Match<'_> {
+    fn display(&self) -> minijinja::Value {
+        context! {
+            gov_team => self.gov, opp_team => self.opp, judges => &self.judges,
+            room => context! {name => &self.room}, sidelock => self.sidelock, choice => self.choice,
+        }
+    }
 }
 
 struct Metadata {
@@ -107,19 +111,12 @@ async fn matches(
     Ok(sqlx::query_as::<_, Row>(
         "SELECT r.id, r.num_teams, r.gov_team_id, r.opp_team_id, m.name, r.victor, r.sidelock, r.choice
          FROM tab_outround r LEFT JOIN tab_room m ON m.id = r.room_id
-         WHERE r.type_of_round = ? AND r.num_teams >= ? ORDER BY r.id",
+         WHERE r.type_of_round = ? AND r.num_teams >= ? ORDER BY r.num_teams DESC, r.id",
     ).bind(division).bind(visible).fetch_all(db).await?.into_iter().map(
         |(id, size, gov, opp, room, victor, sidelock, choice)| Metadata {
             id, size, gov, opp, room, victor, sidelock, choice, judges: panels.remove(&id).unwrap_or_default(),
         }
     ).collect())
-}
-
-#[derive(Serialize)]
-struct Stage<'a> {
-    size: i32,
-    matches: Vec<&'a Match<'a>>,
-    advancing: Vec<&'a str>,
 }
 
 pub async fn page(
@@ -150,7 +147,7 @@ async fn render(
     }
     let names = settings.flag("debaters_public", true);
     let teams = paired_teams(db, names).await?;
-    let seeded: BTreeMap<_, _> = sqlx::query_as::<_, (i32, i32)>(
+    let breaking: Vec<_> = sqlx::query_as::<_, (i32, i32)>(
         "SELECT seed, team_id FROM tab_breakingteam WHERE type_of_team = ? ORDER BY id",
     )
     .bind(division)
@@ -159,21 +156,6 @@ async fn render(
     .into_iter()
     .filter_map(|(seed, id)| teams.get(&id).map(|team| (seed, team)))
     .collect();
-    let current = settings.integer("cur_round", 1).saturating_sub(1);
-    let prelims = sqlx::query_scalar::<_, i32>(
-        "SELECT DISTINCT round_number FROM tab_round WHERE round_number <= ? ORDER BY round_number",
-    )
-    .bind(current)
-    .fetch_all(&mut *db)
-    .await?;
-    let (varsity, novice) = sqlx::query_as::<_, (bool, bool)>(
-        "SELECT EXISTS(SELECT 1 FROM tab_outround WHERE type_of_round = 0 AND num_teams >= ?),
-                EXISTS(SELECT 1 FROM tab_outround WHERE type_of_round = 1 AND num_teams >= ?)",
-    )
-    .bind(varsity)
-    .bind(novice)
-    .fetch_one(&mut *db)
-    .await?;
 
     let matches: Vec<_> = metadata
         .into_iter()
@@ -190,7 +172,7 @@ async fn render(
         };
         eliminated.extend(loser);
     }
-    let stages: Vec<_> = by_stage
+    let outround_pairings: Vec<_> = by_stage
         .into_iter()
         .rev()
         .map(|(size, matches)| {
@@ -198,39 +180,41 @@ async fn render(
                 .iter()
                 .flat_map(|row| [row.gov.id, row.opp.id])
                 .collect();
-            let advancing = seeded
-                .values()
+            // The public list must not move teams based on unreleased outcomes.
+            let excluded: Vec<_> = breaking
+                .iter()
+                .map(|(_, team)| *team)
                 .filter(|team| !present.contains(&team.id) && !eliminated.contains(&team.id))
-                .map(|team| team.name.as_str())
                 .collect();
-            Stage {
-                size,
-                matches,
-                advancing,
-            }
+            let rounds: Vec<_> = matches.into_iter().map(Match::display).collect();
+            let division_label = if division == 0 { 'V' } else { 'N' };
+            context! {label => format!("[{division_label}] Ro{size}"), rounds, excluded}
         })
         .collect();
-    let use_bracket = settings.flag("show_outs_bracket", true)
+    let show_outrounds_bracket = settings.flag("show_outs_bracket", true)
         && settings.integer("outround_pairing_mode", 0) != 1;
-    let bracket = if use_bracket {
-        bracket_display::data(&matches, &seeded).map(|payload| payload.to_string())
+    let bracket_data_json = if show_outrounds_bracket {
+        let seeded = breaking.into_iter().collect();
+        bracket_display::data(&matches, &seeded)
     } else {
         None
     };
-    let mut nav = Navigation::new(actor, settings.flag("motions_enabled", true));
-    nav.teams_public = settings.flag("teams_public", false);
-    nav.judges_public = settings.flag("judges_public", false);
-    let title = if division == 0 {
+    let label = if division == 0 {
         "Varsity Outrounds Pairings"
     } else {
         "Novice Outrounds Pairings"
     };
-    Ok(html::render(
-        "public_outrounds.html",
+    let shell = legacy_html::shell(db, actor, &format!("/public/outrounds/{division}/")).await?;
+    let navigation = navigation(db, &settings).await?;
+    Ok(legacy_html::render(
+        "public/outround_pairing.html",
+        shell,
         context! {
-            title, stages, bracket, division, names, current, rounds => prelims, varsity, novice, nav,
-            show_sides => settings.flag("gov_opp_display", false),
+            label, outround_pairings, show_outrounds_bracket, bracket_data_json,
+            debater_team_memberships_public => names,
+            gov_opp_display => settings.flag("gov_opp_display", false),
             sidelock => settings.flag("sidelock", false), choice => settings.flag("choice", false),
+            ..navigation,
         },
         StatusCode::OK,
     ))

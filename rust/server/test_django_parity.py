@@ -138,7 +138,7 @@ def isolate_tournament_settings(django_db_setup, django_db_blocker):
 def html_assets(tmp_path, monkeypatch):
     chunks = {
         bundle: [f"{bundle}.css", f"{bundle}-fixture.js"]
-        for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin")
+        for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin", "bracket")
     }
     assets = {
         name: {"name": name, "publicPath": f"/static/webpack_bundles/{name}"}
@@ -2435,19 +2435,8 @@ def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_a
             assert status == 302 and headers["Location"] == "/public/access-error/"
 
 
-class BracketMarkup(HTMLParser):
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.payload = None
-
-    def handle_starttag(self, tag, attrs):
-        fields = dict(attrs)
-        if tag == "div" and fields.get("id") == "brackets-viewer-container":
-            self.payload = json.loads(fields["data-bracket"])
-
-
 @pytest.mark.django_db(transaction=True)
-def test_native_public_outrounds_match_the_visible_django_bracket_payload():
+def test_native_public_outrounds_match_the_visible_django_bracket_payload(html_assets, subtests):
     from mittab.libs.bracket_display_logic import generate_bracket_data
 
     TabSettings.set("cur_round", 3)
@@ -2457,55 +2446,170 @@ def test_native_public_outrounds_match_the_visible_django_bracket_payload():
     school = School.objects.create(name="Outrounds School")
     teams = {}
     for seed in range(1, 7):
-        name = "Outround </script> Team" if seed == 5 else f"Outround Team {seed}"
+        name = "Outround </script> '≤' 🎤 Team" if seed == 5 else f"Outround Team {seed}"
         team = Team.objects.create(name=name, school=school, seed=Team.UNSEEDED)
-        team.debaters.add(Debater.objects.create(name=f"Outround Speaker {seed}", novice_status=0))
+        team.debaters.add(Debater.objects.create(name=f"Outround Speaker {seed} & Co", novice_status=0))
         BreakingTeam.objects.create(team=team, seed=seed, effective_seed=seed, type_of_team=0)
         teams[seed] = team
     chair = Judge.objects.create(name="Public Outround Chair", rank=9)
     wing = Judge.objects.create(name="Public Outround Wing", rank=8)
     hidden = Judge.objects.create(name="Undisclosed Outround Judge", rank=10, wing_only=True)
     room = Room.objects.create(name="Public Outround Room", rank=10)
-    first = Outround.objects.create(num_teams=8, gov_team=teams[5], opp_team=teams[4], victor=1, room=room)
+    first = Outround.objects.create(num_teams=8, gov_team=teams[5], opp_team=teams[4],
+                                    victor=1, room=room, sidelock=True, choice=Outround.GOV)
     first.judges.add(chair, wing)
     Outround.objects.filter(id=first.id).update(chair=chair)
     other = Outround.objects.create(num_teams=8, gov_team=teams[3], opp_team=teams[6], victor=1)
     next_round = Outround.objects.create(num_teams=4, gov_team=teams[1], opp_team=teams[5])
     next_round.judges.add(hidden)
+    novice_teams = [
+        Team.objects.create(name=f"Novice Outround Team {index}", school=school, seed=0)
+        for index in range(1, 3)
+    ]
+    for seed, team in enumerate(novice_teams, start=1):
+        BreakingTeam.objects.create(team=team, seed=seed, effective_seed=seed, type_of_team=Outround.NOVICE)
+    Outround.objects.create(num_teams=2, type_of_round=Outround.NOVICE,
+                            gov_team=novice_teams[0], opp_team=novice_teams[1], victor=Outround.OPP_VIA_FORFEIT)
+    TabSettings.set("gov_opp_display", 1)
+    TabSettings.set("sidelock", 1)
+    TabSettings.set("choice", 1)
     board = legacy_tab_session("public-outs-board")
     get_user_model().objects.get(username="public-outs-board").groups.add(Group.objects.create(name="APDA Board"))
     varsity = "/public/outrounds/0/"
     novice = "/public/outrounds/1/"
 
     def payload(page):
-        parser = BracketMarkup()
-        parser.feed(page.decode())
-        return parser.payload
+        match = re.search(rb"window\.bracketViewerData = JSON\.parse\('([^']*)'\);", page)
+        return json.loads(json.loads(b'"' + match[1] + b'"')) if match else None
 
-    with rust_server() as port:
+    def compare(port, path, session=None):
+        for alias in ("default", "filesystem"):
+            caches[alias].clear()
+        client = Client()
+        if session:
+            client.cookies["sessionid"] = session
+        reference = client.get(path)
+        status, _, body = request(port, path, cookie=session)
+        assert status == reference.status_code == 200
+        assert_html_bytes(body, reference.content)
+        return body
+
+    with rust_server(overrides=html_assets) as port:
         assert request(port, novice)[1]["Location"] == "/public/access-error/"
-        status, _, page = request(port, varsity, cookie=board)
-        assert status == 200 and b"Round of 8" in page and b"Round of 4" not in page
-        assert b"Advancing Teams" in page and b"<b>Public Outround Chair</b>" in page
-        assert b"Undisclosed Outround Judge" not in page and b"Outround </script> Team" not in page
+        for session in (None, legacy_tab_session("public-outs-staff"), board):
+            with subtests.test(audience=session is None, board=session == board):
+                compare(port, varsity, session)
+        page = request(port, varsity, cookie=board)[2]
+        assert b"[V] Ro8" in page and b"[V] Ro4" not in page
+        assert re.search(rb'Advancing Teams:</b></td>\s*<td colspan="3">\s*Outround Team 1', page)
+        assert b"<b>Public Outround Chair</b>" in page
+        assert b"Undisclosed Outround Judge" not in page and b"Outround </script>" not in page
         pairings = list(Outround.objects.filter(pk__in=(first.id, other.id)).order_by("id"))
         assert payload(page) == json.loads(json.dumps(generate_bracket_data([{"rounds": pairings}])))
         Scratch.objects.create(team=teams[4], judge=chair, scratch_type=Scratch.TAB_SCRATCH)
         Judge.objects.filter(id=chair.id).update(rank=1, wing_only=True, request_wing=True)
+        # Scoring a hidden debate must not affect the advancing-team line on the public page.
+        Outround.objects.filter(pk=next_round.id).update(victor=Outround.OPP)
         assert request(port, varsity, cookie=board)[2] == page
+        Outround.objects.filter(pk=next_round.id).update(victor=Outround.UNKNOWN)
         assert request(port, varsity, cookie=board, method="POST")[1]["Location"] == "/403/"
 
         TabSettings.set("var_teams_visible", 4)
-        updated = request(port, varsity)[2]
-        assert b"Round of 4" in updated and b"Undisclosed Outround Judge" in updated
+        updated = compare(port, varsity)
+        assert b"[V] Ro4" in updated and b"Undisclosed Outround Judge" in updated
         expected = generate_bracket_data([{"rounds": pairings}, {"rounds": [next_round]}])
         assert payload(updated) == json.loads(json.dumps(expected))
         TabSettings.set("debaters_public", 0)
-        confidential = request(port, varsity)[2]
+        TabSettings.set("nov_teams_visible", 2)
+        confidential = compare(port, varsity)
         assert b"Outround Speaker" not in confidential
         assert b"Outround Team 1" in confidential
+        assert b"[N] Ro2" in compare(port, novice)
+        TabSettings.set("show_outs_bracket", 0)
+        assert payload(compare(port, novice)) is None
+        TabSettings.set("show_outs_bracket", 1)
+        Outround.objects.filter(type_of_round=Outround.NOVICE).update(num_teams=1)
+        TabSettings.set("nov_teams_visible", 1)
+        status, _, unavailable_bracket = request(port, novice)
+        assert status == 200 and b"[N] Ro1" in unavailable_bracket
+        assert payload(unavailable_bracket) is None and b"No bracket data available." in unavailable_bracket
         TabSettings.set("outround_pairing_mode", 1)
-        assert payload(request(port, varsity)[2]) is None
+        assert payload(compare(port, varsity)) is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_public_preliminary_pairings_and_missing_ballots_match_django_bytes(html_assets, subtests):
+    path = "/public/pairings/"
+    missing_path = "/public/missing-ballots/"
+    school = School.objects.create(name="Visible Pairings School")
+    terms = ("Zeta & Co", "North", "Alpha", "East", "Bye Team", "Unpaired Team")
+    teams = [Team.objects.create(name=name, school=school, seed=0, checked_in=True) for name in terms]
+    for number, team in enumerate(teams, start=1):
+        team.debaters.add(Debater.objects.create(name=f"Public Speaker {number}", novice_status=0))
+    wing = Judge.objects.create(name="Public Earlier Wing", rank=5)
+    chair = Judge.objects.create(name="Public Later Chair", rank=9)
+    room = Room.objects.create(name="Public & Released", rank=3)
+    Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
+    first = Round.objects.create(round_number=2, gov_team=teams[0], opp_team=teams[3], chair=chair, room=room)
+    first.judges.add(chair, wing)
+    second = Round.objects.create(round_number=2, gov_team=teams[2], opp_team=teams[1], victor=Round.OPP)
+    Bye.objects.create(round_number=2, bye_team=teams[4])
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("tot_rounds", 2)
+    TabSettings.set("debaters_public", 1)
+    TabSettings.set("pairing_released", 0)
+    board = legacy_tab_session("public-pairings-board")
+    get_user_model().objects.get(username="public-pairings-board").groups.add(Group.objects.create(name="APDA Board"))
+    previous = f"{path}1/"
+
+    with rust_server(overrides=html_assets) as port:
+        cases = (
+            (path, {}),
+            (previous, {}),
+            (path, {"pairing_released": 1}),
+            (missing_path, {}),
+            (path, {"debaters_public": 0}),
+            (missing_path, {"finish": True}),
+        )
+        assert request(port, previous, cookie=board)[0] == 403
+        assert request(port, missing_path)[1]["Location"] == "/public/access-error/"
+        for target, changes in cases:
+            with subtests.test(path=target, changes=changes):
+                for key, value in changes.items():
+                    if key == "finish":
+                        Round.objects.filter(pk__in=(first.id, second.id)).update(victor=Round.GOV)
+                    else:
+                        TabSettings.set(key, value)
+                caches["default"].clear()
+                status, _, body = request(port, target)
+                golden = Client().get(target)
+                assert status == golden.status_code == 200
+                assert_html_bytes(body, golden.content)
+                if target == path and changes == {"debaters_public": 0}:
+                    assert b"Public Speaker" not in body and b"Public Earlier Wing" in body
+
+        with subtests.test(audience="Board"):
+            client = Client()
+            client.cookies["sessionid"] = board
+            status, headers, body = request(port, path, cookie=board)
+            reference = client.get(path)
+            assert status == reference.status_code == 200
+            assert headers["Cache-Control"] == "private, no-store"
+            assert_html_bytes(body, reference.content)
+            assert request(port, path, method="HEAD", cookie=board)[0] == 200
+            for target in (previous, "/public/access-error/"):
+                assert request(port, target, cookie=board)[1]["Location"] == client.get(target)["Location"] == "/403/"
+            assert b"<b>Public Later Chair</b>" in body
+            scratch = Scratch.objects.create(team=teams[0], judge=chair, scratch_type=Scratch.TAB_SCRATCH)
+            Judge.objects.filter(pk=chair.id).update(rank=8, wing_only=True, request_wing=True,
+                                                     ballot_code="Private-Example-Fixture")
+            assert request(port, path, cookie=board)[2] == body
+            assert b"Private-Example-Fixture" not in body
+            assert request(port, "/public/e-ballots/Private-Example-Fixture/", cookie=board)[1]["Location"] == "/403/"
+            assert request(port, path, method="POST", cookie=board, form={"judge": wing.id})[1]["Location"] == "/403/"
+            first.refresh_from_db()
+            assert first.chair_id == chair.id and set(first.judges.values_list("id", flat=True)) == {chair.id, wing.id}
+            assert Scratch.objects.filter(pk=scratch.id, judge_id=chair.id, team_id=teams[0].id).exists()
 
 
 @pytest.mark.django_db(transaction=True)

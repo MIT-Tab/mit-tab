@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::LazyLock};
+use std::{collections::BTreeMap, fmt::Write, sync::LazyLock};
 
 use axum::{
     http::StatusCode,
@@ -85,6 +85,30 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
     });
     env.add_filter("django_date", django_date);
     env.add_filter("django_length", |value: Value| value.len().unwrap_or(0));
+    env.add_filter("escapejs", |value: String| {
+        let mut escaped = String::with_capacity(value.len());
+        for character in value.chars() {
+            match character {
+                '\\'
+                | '\''
+                | '"'
+                | '>'
+                | '<'
+                | '&'
+                | '='
+                | '-'
+                | ';'
+                | '`'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\0'..='\u{001f}' => {
+                    let _ = write!(escaped, "\\u{:04X}", character as u32);
+                }
+                _ => escaped.push(character),
+            }
+        }
+        Value::from_safe_string(escaped)
+    });
     env.add_function("legacy_active", |path: String, target: Value| {
         if target.as_str() == Some(path.as_str()) {
             "active"
@@ -136,6 +160,22 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "public/public_team_results.html",
             include_str!("../../../mittab/templates/public/public_team_results.html"),
+        ),
+        (
+            "public/outround_pairing.html",
+            include_str!("../../../mittab/templates/public/outround_pairing.html"),
+        ),
+        (
+            "public/pairing_display.html",
+            include_str!("../../../mittab/templates/public/pairing_display.html"),
+        ),
+        (
+            "public/missing_ballots.html",
+            include_str!("../../../mittab/templates/public/missing_ballots.html"),
+        ),
+        (
+            "public/_pairing_navigation.html",
+            include_str!("../../../mittab/templates/public/_pairing_navigation.html"),
         ),
         (
             "batch_check_in/check_in.html",
@@ -315,6 +355,12 @@ fn translate(source: &str) -> String {
             ["url", "'outround_pretty_pair'", "section.type_of_round"] => {
                 output.push_str("/public/outrounds/{{ section.type_of_round }}/");
             }
+            ["url", "'outround_pretty_pair'", division @ ("0" | "1")] => {
+                output.push_str(&format!("/public/outrounds/{division}/"));
+            }
+            ["url", "'previous_pretty_pair'", "pairing_round"] => {
+                output.push_str("/public/pairings/{{ pairing_round }}/");
+            }
             ["return_to_input", "return_path"] => output.push_str(
                 "{% with redirect_target=return_path %}{% include 'common/_return_to_input.html' %}{% endwith %}",
             ),
@@ -360,6 +406,10 @@ fn translate(source: &str) -> String {
             ["tournament_name"] => output.push_str("{{ tournament }}"),
             ["endblock", _] => output.push_str("{% endblock %}"),
             ["empty"] => output.push_str("{% else %}"),
+            // Django includes keep their local URL aliases out of the calling template.
+            ["include", "\"base/_navigation.html\""] => output.push_str(
+                "{% with %}{% include 'base/_navigation.html' %}{% endwith %}",
+            ),
             ["include", template, "with", "compact_staff=True"] => {
                 output.push_str(&format!(
                     "{{% with compact_staff=true %}}{{% include {template} %}}{{% endwith %}}"
@@ -410,6 +460,7 @@ fn translate(source: &str) -> String {
         )
         .replace("pairing.judges.all", "pairing.judges")
         .replace("pairing.chair == judge", "pairing.chair_id == judge.id")
+        .replace("judge == pairing.chair", "judge.is_chair")
         .replace("if judge.rank > warning", "if judge.high_rank")
         .replace("if judge.rank %}", "if judge.has_rank %}")
         .replace("|default_if_none:''", "")

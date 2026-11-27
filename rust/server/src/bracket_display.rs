@@ -1,9 +1,152 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::{self, Write},
+};
 
 use mittab_tabulation::bracket::opening_matchups;
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde_json::{Serializer, ser::Formatter};
 
-use crate::{public_outrounds::Match, public_pairings::Team};
+use crate::{
+    public_outrounds::{Judge, Match},
+    public_pairings::Team,
+};
+
+// Preserve the key order and spelling of the Python payload in the inline script.
+#[derive(Serialize)]
+struct Bracket<'a> {
+    stages: [Stage; 1],
+    groups: [Group; 1],
+    rounds: Vec<Round>,
+    participants: Vec<Participant>,
+    matches: Vec<BracketMatch>,
+    #[serde(rename = "matchGames")]
+    match_games: [(); 0],
+    match_metadata: BTreeMap<usize, Metadata<'a>>,
+}
+
+#[derive(Serialize)]
+struct Stage {
+    id: usize,
+    tournament_id: usize,
+    name: &'static str,
+    #[serde(rename = "type")]
+    kind: &'static str,
+    number: usize,
+    settings: StageSettings,
+}
+
+#[derive(Serialize)]
+struct StageSettings {
+    size: usize,
+}
+
+#[derive(Serialize)]
+struct Group {
+    id: usize,
+    stage_id: usize,
+    number: usize,
+}
+
+#[derive(Serialize)]
+struct Round {
+    id: usize,
+    number: usize,
+    stage_id: usize,
+    group_id: usize,
+}
+
+#[derive(Serialize)]
+struct Participant {
+    id: usize,
+    tournament_id: usize,
+    name: String,
+    team_name: String,
+    debaters_names: String,
+}
+
+#[derive(Serialize)]
+struct BracketMatch {
+    id: usize,
+    number: usize,
+    stage_id: usize,
+    group_id: usize,
+    round_id: usize,
+    child_count: usize,
+    status: i32,
+    opponent1: Option<Opponent>,
+    opponent2: Option<Opponent>,
+}
+
+#[derive(Serialize)]
+struct Opponent {
+    id: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    result: Option<&'static str>,
+}
+
+#[derive(Serialize)]
+struct Metadata<'a> {
+    id: i32,
+    room: &'a str,
+    judges: &'a [Judge],
+    gov_team: Appearance,
+    opp_team: Appearance,
+}
+
+#[derive(Serialize)]
+struct Appearance {
+    display: String,
+    debaters: String,
+    seed: Option<usize>,
+    name: String,
+    debaters_plain: String,
+}
+
+struct DjangoJson;
+
+impl Formatter for DjangoJson {
+    fn begin_array_value<W: ?Sized + Write>(
+        &mut self,
+        writer: &mut W,
+        first: bool,
+    ) -> io::Result<()> {
+        if first {
+            Ok(())
+        } else {
+            writer.write_all(b", ")
+        }
+    }
+
+    fn begin_object_key<W: ?Sized + Write>(
+        &mut self,
+        writer: &mut W,
+        first: bool,
+    ) -> io::Result<()> {
+        self.begin_array_value(writer, first)
+    }
+
+    fn begin_object_value<W: ?Sized + Write>(&mut self, writer: &mut W) -> io::Result<()> {
+        writer.write_all(b": ")
+    }
+
+    fn write_string_fragment<W: ?Sized + Write>(
+        &mut self,
+        writer: &mut W,
+        fragment: &str,
+    ) -> io::Result<()> {
+        for character in fragment.chars() {
+            if character < '\u{007f}' {
+                writer.write_all(&[character as u8])?;
+            } else {
+                for unit in character.encode_utf16(&mut [0; 2]) {
+                    write!(writer, "\\u{unit:04x}")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
 
 struct Slot {
     seeds: Vec<usize>,
@@ -57,9 +200,13 @@ impl Node<'_> {
     }
 }
 
-pub fn data(matches: &[Match<'_>], seeded: &BTreeMap<i32, &Team>) -> Option<Value> {
-    let size =
-        (matches.iter().map(|row| row.size).max()?.max(2) as usize).checked_next_power_of_two()?;
+pub fn data(matches: &[Match<'_>], seeded: &BTreeMap<i32, &Team>) -> Option<String> {
+    let size = (matches
+        .iter()
+        .filter(|row| row.size >= 2)
+        .map(|row| row.size)
+        .max()? as usize)
+        .checked_next_power_of_two()?;
     if size > 8192 {
         return None;
     }
@@ -91,8 +238,13 @@ pub fn data(matches: &[Match<'_>], seeded: &BTreeMap<i32, &Team>) -> Option<Valu
                 let id = participants.len() + 1;
                 let name = format!("[{seed}] {}", team.name);
                 let debaters = format!("[{seed}] {}", team.debaters);
-                participants.push(json!({"id": id, "tournament_id": 1, "name": name,
-                    "team_name": name, "debaters_names": debaters}));
+                participants.push(Participant {
+                    id,
+                    tournament_id: 1,
+                    name: name.clone(),
+                    team_name: name,
+                    debaters_names: debaters,
+                });
                 participant_id.insert(team.id, id);
                 slot.team = Some(team.id);
             } else {
@@ -164,11 +316,12 @@ pub fn data(matches: &[Match<'_>], seeded: &BTreeMap<i32, &Team>) -> Option<Valu
         }
     }
 
-    let round_rows: Vec<_> = (1..=rounds.len())
-        .map(|number| {
-            json!({
-                "id": number, "number": number, "stage_id": 1, "group_id": 1,
-            })
+    let round_rows = (1..=rounds.len())
+        .map(|number| Round {
+            id: number,
+            number,
+            stage_id: 1,
+            group_id: 1,
         })
         .collect();
     let mut match_rows = Vec::new();
@@ -176,24 +329,45 @@ pub fn data(matches: &[Match<'_>], seeded: &BTreeMap<i32, &Team>) -> Option<Valu
     for (stage, nodes) in rounds.iter().enumerate() {
         for (position, node) in nodes.iter().enumerate() {
             let id = match_rows.len() + 1;
-            let opponents: Vec<_> = node.slots.iter().enumerate().map(|(index, slot)| {
-                if slot.bye { return Value::Null; }
-                let Some(participant) = slot.team.and_then(|id| participant_id.get(&id)) else {
-                    return if stage == 0 { Value::Null } else { json!({"id": null}) };
-                };
-                if let Some(winner) = node.winner {
-                    json!({"id": participant, "result": if winner == index { "win" } else { "loss" }})
-                } else { json!({"id": participant}) }
-            }).collect();
-            match_rows.push(json!({
-                "id": id, "number": position + 1, "stage_id": 1, "group_id": 1, "round_id": stage + 1,
-                "child_count": 0, "status": node.status(), "opponent1": opponents[0], "opponent2": opponents[1],
-            }));
+            let opponent = |index: usize| {
+                let slot = &node.slots[index];
+                if slot.bye {
+                    return None;
+                }
+                let participant = slot
+                    .team
+                    .and_then(|team| participant_id.get(&team).copied());
+                if participant.is_none() && stage == 0 {
+                    return None;
+                }
+                Some(Opponent {
+                    id: participant,
+                    result: participant.and_then(|_| {
+                        node.winner
+                            .map(|winner| if winner == index { "win" } else { "loss" })
+                    }),
+                })
+            };
+            match_rows.push(BracketMatch {
+                id,
+                number: position + 1,
+                stage_id: 1,
+                group_id: 1,
+                round_id: stage + 1,
+                child_count: 0,
+                status: node.status(),
+                opponent1: opponent(0),
+                opponent2: opponent(1),
+            });
             if let Some(row) = node.matchup {
                 let appearance = |slot: &Slot| match slot.team.and_then(|team| by_team.get(&team)) {
-                    Some((seed, team)) => json!({"display": format!("[{seed}] {}", team.name),
-                        "debaters": format!("[{seed}] {}", team.debaters), "seed": seed,
-                        "name": team.name, "debaters_plain": team.debaters}),
+                    Some((seed, team)) => Appearance {
+                        display: format!("[{seed}] {}", team.name),
+                        debaters: format!("[{seed}] {}", team.debaters),
+                        seed: Some(*seed as usize),
+                        name: team.name.clone(),
+                        debaters_plain: team.debaters.clone(),
+                    },
                     None => {
                         let mut seeds = slot.seeds.clone();
                         seeds.sort_unstable();
@@ -202,20 +376,51 @@ pub fn data(matches: &[Match<'_>], seeded: &BTreeMap<i32, &Team>) -> Option<Valu
                             .map(|seed| format!("Seed {seed}"))
                             .collect::<Vec<_>>()
                             .join(" / ");
-                        json!({"display": label, "debaters": "", "seed": seeds.first(),
-                               "name": label, "debaters_plain": ""})
+                        Appearance {
+                            display: label.clone(),
+                            debaters: String::new(),
+                            seed: seeds.first().copied(),
+                            name: label,
+                            debaters_plain: String::new(),
+                        }
                     }
                 };
-                metadata.insert(id, json!({"id": row.id, "room": row.room.as_deref().unwrap_or("TBD"),
-                    "judges": row.judges, "gov_team": appearance(&node.slots[0]), "opp_team": appearance(&node.slots[1])}));
+                metadata.insert(
+                    id,
+                    Metadata {
+                        id: row.id,
+                        room: row.room.as_deref().unwrap_or("TBD"),
+                        judges: &row.judges,
+                        gov_team: appearance(&node.slots[0]),
+                        opp_team: appearance(&node.slots[1]),
+                    },
+                );
             }
         }
     }
-    Some(json!({
-        "stages": [{"id": 1, "tournament_id": 1, "name": "Elimination Bracket",
-                    "type": "single_elimination", "number": 1, "settings": {"size": size}}],
-        "groups": [{"id": 1, "stage_id": 1, "number": 1}],
-        "rounds": round_rows, "participants": participants,
-        "matches": match_rows, "matchGames": [], "match_metadata": metadata,
-    }))
+    let bracket = Bracket {
+        stages: [Stage {
+            id: 1,
+            tournament_id: 1,
+            name: "Elimination Bracket",
+            kind: "single_elimination",
+            number: 1,
+            settings: StageSettings { size },
+        }],
+        groups: [Group {
+            id: 1,
+            stage_id: 1,
+            number: 1,
+        }],
+        rounds: round_rows,
+        participants,
+        matches: match_rows,
+        match_games: [],
+        match_metadata: metadata,
+    };
+    let mut payload = Vec::new();
+    bracket
+        .serialize(&mut Serializer::with_formatter(&mut payload, DjangoJson))
+        .ok()?;
+    String::from_utf8(payload).ok()
 }

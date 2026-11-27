@@ -13,6 +13,7 @@ use sqlx::MySqlConnection;
 use crate::{
     App, access,
     html::{self, Navigation},
+    legacy_html,
     legacy_session::Actor,
     public_cache::{self, Page},
     settings::Settings,
@@ -32,30 +33,16 @@ const DISPLAY_SETTINGS: &[&str] = &[
 #[derive(Serialize)]
 pub struct Team {
     pub id: i32,
+    #[serde(rename = "display")]
     pub name: String,
+    #[serde(rename = "debaters_display")]
     pub debaters: String,
 }
 
 #[derive(Serialize)]
 struct Judge {
     name: String,
-    chair: bool,
-}
-
-#[derive(Serialize)]
-struct Pairing<'a> {
-    government: &'a Team,
-    opposition: &'a Team,
-    judges: Vec<Judge>,
-    room: Option<String>,
-}
-
-#[derive(Serialize)]
-struct Missing {
-    government: String,
-    opposition: String,
-    chair: Option<String>,
-    room: Option<String>,
+    is_chair: bool,
 }
 
 pub async fn current(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
@@ -94,23 +81,9 @@ async fn pairings(
             StatusCode::NOT_FOUND,
         ));
     }
-    let numbers = sqlx::query_scalar::<_, i32>(
-        "SELECT DISTINCT round_number FROM tab_round WHERE round_number <= ? ORDER BY round_number",
-    )
-    .bind(current)
-    .fetch_all(&mut *db)
-    .await?;
-    if selected.is_none() && numbers.is_empty() && !has_inrounds(db).await? {
+    if selected.is_none() && !has_inrounds(db).await? {
         return Ok(access::found("/public/access-error/"));
     }
-    let (varsity, novice) = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT EXISTS(SELECT 1 FROM tab_outround WHERE type_of_round = 0 AND num_teams >= ?),
-                EXISTS(SELECT 1 FROM tab_outround WHERE type_of_round = 1 AND num_teams >= ?)",
-    )
-    .bind(settings.integer("var_teams_visible", 256))
-    .bind(settings.integer("nov_teams_visible", 256))
-    .fetch_one(&mut *db)
-    .await?;
     let published = selected.is_some() || settings.integer("pairing_released", 0) == 1;
     let members_public = settings.flag("debaters_public", true);
     let (team_count, byes, unpaired, rows, teams) = if published {
@@ -154,26 +127,57 @@ async fn pairings(
         .await?;
         (size, Vec::new(), Vec::new(), Vec::new(), HashMap::new())
     };
-    let rows: Vec<_> = rows
+    let round_pairing: Vec<_> = rows
         .into_iter()
-        .map(|row| Pairing {
-            government: &teams[&row.government],
-            opposition: &teams[&row.opposition],
-            room: row.room,
-            judges: row.judges,
+        .map(|row| {
+            context! {
+                gov_team => &teams[&row.government], opp_team => &teams[&row.opposition],
+                room => context! { name => row.room }, judges => row.judges,
+            }
         })
         .collect();
-    Ok(html::render(
-        "pairings.html",
+    let path = selected.map_or("/public/pairings/".into(), |round| {
+        format!("/public/pairings/{round}/")
+    });
+    let shell = legacy_html::shell(db, actor, &path).await?;
+    let navigation = navigation(db, &settings).await?;
+    Ok(legacy_html::render(
+        "public/pairing_display.html",
+        shell,
         context! {
-            title => format!("Pairings for Round {round}"), nav => nav(actor, &settings),
-            round, current, numbers, varsity => varsity != 0, novice => novice != 0,
-            team_count, published, members_public, rows,
+            round_number => round, pairing_exists => published, team_count,
+            debater_team_memberships_public => members_public, round_pairing,
             byes => byes.iter().filter_map(|id| teams.get(id)).collect::<Vec<_>>(),
-            unpaired => unpaired.iter().filter_map(|id| teams.get(id)).collect::<Vec<_>>(),
+            errors => unpaired.iter().filter_map(|id| teams.get(id)).collect::<Vec<_>>(),
+            ..navigation,
         },
         StatusCode::OK,
     ))
+}
+
+pub async fn navigation(
+    db: &mut MySqlConnection,
+    settings: &Settings,
+) -> Result<minijinja::Value, sqlx::Error> {
+    let current = settings.integer("cur_round", 1).saturating_sub(1);
+    let numbers = sqlx::query_scalar::<_, i32>(
+        "SELECT DISTINCT round_number FROM tab_round WHERE round_number <= ? ORDER BY round_number",
+    )
+    .bind(current)
+    .fetch_all(&mut *db)
+    .await?;
+    let (varsity, novice) = sqlx::query_as::<_, (bool, bool)>(
+        "SELECT EXISTS(SELECT 1 FROM tab_outround WHERE type_of_round = 0 AND num_teams >= ?),
+                EXISTS(SELECT 1 FROM tab_outround WHERE type_of_round = 1 AND num_teams >= ?)",
+    )
+    .bind(settings.integer("var_teams_visible", 256))
+    .bind(settings.integer("nov_teams_visible", 256))
+    .fetch_one(db)
+    .await?;
+    Ok(context! {
+        pairing_round_numbers => numbers, current_round_number => current,
+        varsity_outrounds_available => varsity, novice_outrounds_available => novice,
+    })
 }
 
 async fn has_inrounds(db: &mut MySqlConnection) -> Result<bool, sqlx::Error> {
@@ -245,7 +249,7 @@ async fn assigned_pairs(
     {
         judges_by_round.entry(id).or_default().push(Judge {
             name,
-            chair: chair != 0,
+            is_chair: chair != 0,
         });
     }
     let mut rows = sqlx::query_as::<_, (i32, i32, i32, String, Option<String>)>(
@@ -299,20 +303,18 @@ async fn missing_ballots(db: &mut MySqlConnection, actor: Actor) -> Result<Respo
             .unwrap_or_default()
             .cmp(right.2.as_deref().unwrap_or_default())
     });
-    let rows: Vec<_> = rows
+    let rounds: Vec<_> = rows
         .into_iter()
-        .map(|(government, opposition, chair, room)| Missing {
-            government,
-            opposition,
-            chair,
-            room,
+        .map(|(government, opposition, chair, room)| context! {
+            gov_team => context! { display => government }, opp_team => context! { display => opposition },
+            chair => context! { name => chair }, room => context! { name => room },
         })
         .collect();
-    Ok(html::render(
-        "missing_ballots.html",
-        context! {
-            title => "Missing Ballots", nav => nav(actor, &settings), rows,
-        },
+    let shell = legacy_html::shell(db, actor, "/public/missing-ballots/").await?;
+    Ok(legacy_html::render(
+        "public/missing_ballots.html",
+        shell,
+        context! { rounds, pairing_exists => true },
         StatusCode::OK,
     ))
 }

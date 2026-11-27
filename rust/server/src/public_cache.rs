@@ -112,6 +112,7 @@ impl Page {
             ],
             Self::Pairings(_) => &[
                 SETTINGS,
+                DISPLAY,
                 TEAMS,
                 MEMBERS,
                 DEBATERS,
@@ -122,7 +123,7 @@ impl Page {
                 ROOMS,
                 ROUND_JUDGES,
             ],
-            Self::MissingBallots => &[SETTINGS, TEAMS, ROUNDS, JUDGES, ROOMS],
+            Self::MissingBallots => &[SETTINGS, DISPLAY, TEAMS, ROUNDS, OUTROUNDS, JUDGES, ROOMS],
             Self::TeamRankings | Self::SpeakerRankings => &[
                 SETTINGS, DISPLAY, TEAMS, MEMBERS, DEBATERS, ROUNDS, OUTROUNDS, BYES, NO_SHOWS,
                 SCORES,
@@ -132,6 +133,7 @@ impl Page {
             ],
             Self::Outrounds(_) => &[
                 SETTINGS,
+                DISPLAY,
                 TEAMS,
                 MEMBERS,
                 DEBATERS,
@@ -230,6 +232,9 @@ impl Page {
                 | Self::TeamRankings
                 | Self::SpeakerRankings
                 | Self::Ballots
+                | Self::Pairings(_)
+                | Self::MissingBallots
+                | Self::Outrounds(_)
         )
     }
 
