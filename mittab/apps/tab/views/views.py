@@ -546,11 +546,11 @@ def view_room(request, room_id):
 
         # Get all rounds that happened in this room with related judges
         rounds = Round.objects.filter(room=room).select_related(
-            "gov_team", "opp_team", "chair").prefetch_related("judges")
+            "gov_team", "opp_team", "chair").prefetch_related("judges").order_by("round_number", "pk")
 
         # Get all outrounds that happened in this room with related judges
         outrounds = Outround.objects.filter(room=room).select_related(
-            "gov_team", "opp_team", "chair").prefetch_related("judges")
+            "gov_team", "opp_team", "chair").prefetch_related("judges").order_by("pk")
 
     return render(request, "tab/room_detail.html", {
         "form": form,

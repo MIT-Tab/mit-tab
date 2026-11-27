@@ -12,17 +12,10 @@ use crate::{App, access, legacy_html, legacy_session::cookie, login};
 const COOKIE: &str = "mittab_roster_notice";
 const LIFETIME: u32 = 60;
 
-pub fn school_saved(
-    app: &App,
-    headers: &HeaderMap,
-    target: &str,
-    updated: bool,
-    name: &str,
-) -> Response {
+pub fn saved(app: &App, headers: &HeaderMap, target: &str, text: &str) -> Response {
     let mut response = access::found(target);
     if let Some(session) = cookie(headers, "sessionid") {
-        let action = if updated { "updated" } else { "created" };
-        let message = URL_SAFE_NO_PAD.encode(format!("School {name} {action} successfully"));
+        let message = URL_SAFE_NO_PAD.encode(text);
         let expires = Utc::now().timestamp() + i64::from(LIFETIME);
         let body = format!("{expires}.{message}");
         let path = target.split(['?', '#']).next().unwrap_or("/");
@@ -74,12 +67,13 @@ pub fn render(
     let Some(text) = message(app, headers, path) else {
         return legacy_html::render(template, shell, page, status);
     };
-    let mut response = legacy_html::render(
-        template,
-        shell,
-        context! { messages => [context! { text, tags => "success", level => 25 }], ..page },
-        status,
-    );
+    let existing = page.get_attr("messages").unwrap_or_default();
+    let mut messages: Vec<_> = existing
+        .try_iter()
+        .map(|messages| messages.collect())
+        .unwrap_or_default();
+    messages.push(context! { text, tags => "success", level => 25 });
+    let mut response = legacy_html::render(template, shell, context! { messages, ..page }, status);
     login::set_cookie(
         &mut response,
         COOKIE,

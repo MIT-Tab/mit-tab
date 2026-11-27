@@ -22,7 +22,7 @@ use crate::{
     registration_form::Fields,
     settings::Settings,
     staff_pairing::lock_round,
-    staff_rankings, staff_roles,
+    staff_rankings, staff_roles, staff_room,
     staff_roster_data::{self as data, Edit, Error, Kind},
     staff_roster_notice, staff_school, unavailable,
 };
@@ -547,14 +547,18 @@ async fn save_edit(
     match result {
         Ok(saved) => {
             db.commit().await?;
-            if kind == Kind::School {
-                Ok(staff_roster_notice::school_saved(
-                    app,
-                    headers,
-                    if id.is_some() { return_path } else { "/" },
-                    id.is_some(),
-                    fields.get("name"),
-                ))
+            if matches!(kind, Kind::School | Kind::Room) {
+                let name = fields.get("name");
+                let (target, message) = if id.is_some() {
+                    // The Django room edit also uses "School" in its success message.
+                    (return_path, format!("School {name} updated successfully"))
+                } else {
+                    (
+                        "/",
+                        format!("{} {name} created successfully", kind.singular()),
+                    )
+                };
+                Ok(staff_roster_notice::saved(app, headers, target, &message))
             } else {
                 Ok(access::found(format!("/{}/{saved}/", kind.model())))
             }
@@ -588,8 +592,15 @@ async fn show(
     let Some(kind) = kind else {
         return missing();
     };
-    if kind == Kind::School {
-        return match staff_school::show(app, actor, headers, id, return_path, posted).await {
+    let legacy = match kind {
+        Kind::School => {
+            Some(staff_school::show(app, actor, headers, id, return_path, posted).await)
+        }
+        Kind::Room => Some(staff_room::show(app, actor, headers, id, return_path, posted).await),
+        _ => None,
+    };
+    if let Some(legacy) = legacy {
+        return match legacy {
             Ok(response) => response,
             Err(Error::Missing) => missing(),
             Err(_) => unavailable(),
@@ -672,8 +683,7 @@ async fn edit_page(
     let checkins = staff_roles::can_check_in(&mut *db, actor).await?;
     let values = current(&mut db, kind, id, checkins).await?;
     let mut fields = form_fields(&mut db, kind, &values, id, checkins).await?;
-    let checkin_fields = checkins
-        && (kind == Kind::Team || id.is_some() && matches!(kind, Kind::Judge | Kind::Room));
+    let checkin_fields = checkins && (kind == Kind::Team || id.is_some() && kind == Kind::Judge);
     if let Some((posted, _)) = posted {
         for field in &mut fields {
             if (field.name == "checked_in" || field.name.starts_with("checkin_"))
@@ -728,10 +738,10 @@ async fn form_fields(
 ) -> Result<Vec<FormField>, sqlx::Error> {
     let field = |name, label, control| FormField::new(values, name, label, control);
     let mut output = vec![field("name", "Name", "text").input(true, kind.limit())];
-    if matches!(kind, Kind::School | Kind::Debater) {
+    if kind == Kind::Debater {
         output.push(field("apda_id", "APDA ID", "number"));
     }
-    if matches!(kind, Kind::Room | Kind::Judge) {
+    if kind == Kind::Judge {
         let mut rank = field("rank", "Rank", "number");
         rank.required = true;
         rank.step = Some("0.01");
@@ -805,20 +815,16 @@ async fn form_fields(
             output.push(field("checked_in", "Checked in", "checkbox"));
         }
     }
-    if matches!(kind, Kind::Room | Kind::Team | Kind::Judge) {
-        let (key, label) = if kind == Kind::Room {
-            ("tags", "Room tags")
-        } else {
-            ("required_room_tags", "Required room tags")
-        };
-        output.push(field(key, label, "multi").choices(
-            options(db, "SELECT id, tag FROM tab_roomtag ORDER BY tag, id").await?,
-            false,
-        ));
+    if matches!(kind, Kind::Team | Kind::Judge) {
+        output.push(
+            field("required_room_tags", "Required room tags", "multi").choices(
+                options(db, "SELECT id, tag FROM tab_roomtag ORDER BY tag, id").await?,
+                false,
+            ),
+        );
     }
-    if tab && id.is_some() && matches!(kind, Kind::Room | Kind::Judge) {
-        let settings = Settings::load(db, &["tot_rounds"]).await?;
-        for round in 0..=settings.integer("tot_rounds", 6).clamp(0, 50) {
+    if tab && id.is_some() && kind == Kind::Judge {
+        for round in data::checkin_rounds(db).await? {
             let label = if round == 0 {
                 "Checked in for outrounds".into()
             } else {
@@ -871,8 +877,7 @@ async fn current(
             .collect());
     };
     let fields = match kind {
-        Kind::School => "'apda_id', apda_id",
-        Kind::Room => "'rank', CAST(`rank` AS CHAR)",
+        Kind::School | Kind::Room => unreachable!(),
         Kind::Debater => "'apda_id', apda_id, 'school', school_id, 'email', email, 'qualified', qualified,
             'needs_crash_housing', needs_crash_housing, 'requests_wgm_housing', requests_wgm_housing,
             'novice_status', novice_status",
@@ -903,10 +908,6 @@ async fn current(
         })
         .collect();
     let relations: &[(&str, &str)] = match kind {
-        Kind::Room => &[(
-            "tags",
-            "SELECT roomtag_id FROM tab_room_tags WHERE room_id = ?",
-        )],
         Kind::Team => &[
             (
                 "required_room_tags",
@@ -939,20 +940,14 @@ async fn current(
             ids.into_iter().map(|id| id.to_string()).collect(),
         );
     }
-    if tab {
-        let checkins = match kind {
-            Kind::Room => Some("SELECT round_number FROM tab_roomcheckin WHERE room_id = ?"),
-            Kind::Judge => Some("SELECT round_number FROM tab_checkin WHERE judge_id = ?"),
-            _ => None,
-        };
-        if let Some(checkins) = checkins {
-            let rounds = sqlx::query_scalar::<_, i32>(checkins)
+    if tab && kind == Kind::Judge {
+        let rounds =
+            sqlx::query_scalar::<_, i32>("SELECT round_number FROM tab_checkin WHERE judge_id = ?")
                 .bind(id)
                 .fetch_all(&mut *db)
                 .await?;
-            for round in rounds {
-                values.insert(format!("checkin_{}", round - 1), vec!["1".into()]);
-            }
+        for round in rounds {
+            values.insert(format!("checkin_{}", round - 1), vec!["1".into()]);
         }
     }
     Ok(values)

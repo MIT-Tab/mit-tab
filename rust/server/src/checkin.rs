@@ -21,7 +21,7 @@ use crate::{
     login, private,
     settings::Settings,
     staff_pairing::lock_round,
-    unavailable,
+    staff_roster_notice, unavailable,
 };
 
 const PAGE: &str = "/batch_checkin/";
@@ -272,7 +272,10 @@ pub async fn page(
                 text => format!("Reversed {edits} check-in edits."),
             }]
         });
-        let mut response = legacy_html::render(
+        let mut response = staff_roster_notice::render(
+            &app,
+            &headers,
+            PAGE,
             "batch_check_in/check_in.html",
             shell,
             context! {

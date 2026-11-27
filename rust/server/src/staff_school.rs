@@ -13,7 +13,8 @@ use crate::{
     legacy_session::Actor,
     login::TemplateCsrf,
     registration_form::{Fields, integer_input},
-    staff_roster_data::Error,
+    staff_roster_data::{Error, Kind},
+    staff_roster_fields::{input, name_error},
     staff_roster_notice, unavailable,
 };
 
@@ -104,37 +105,13 @@ async fn school_fields(
     apda_id: &str,
     posted: Option<(&Fields, &str)>,
 ) -> Result<[Value; 2], sqlx::Error> {
-    let (mut name_error, mut id_error) = (None, None);
+    let (mut invalid_name, mut id_error) = (None, None);
     let mut name = name.to_owned();
     let mut apda_id = apda_id.to_owned();
     if let Some((fields, message)) = posted {
         name = fields.all("name").last().cloned().unwrap_or_default();
         apda_id = fields.all("apda_id").last().cloned().unwrap_or_default();
-        let clean_name = name.trim();
-        let length = clean_name.chars().count();
-        name_error = if clean_name.is_empty() {
-            Some("This field is required.".into())
-        } else if length > 50 {
-            Some(format!(
-                "Ensure this value has at most 50 characters (it has {length})."
-            ))
-        } else if clean_name.contains('\0') {
-            Some("Null characters are not allowed.".into())
-        } else if clean_name.chars().any(char::is_control) {
-            Some(message.into())
-        } else if message == "That name or code already exists."
-            || sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM tab_school WHERE name = ? AND id <> COALESCE(?, 0))",
-            )
-            .bind(clean_name)
-            .bind(id)
-            .fetch_one(db)
-            .await?
-        {
-            Some("School with this Name already exists.".into())
-        } else {
-            None
-        };
+        invalid_name = name_error(db, Kind::School, id, &name, message).await?;
         if !apda_id.trim().is_empty()
             && let Err(error) = integer_input(apda_id.trim())
         {
@@ -160,45 +137,12 @@ async fn school_fields(
             &name,
             r#" maxlength="50""#,
             true,
-            name_error,
+            invalid_name,
         ),
         input(
             "apda_id", "Apda id:", "number", &apda_id, "", false, id_error,
         ),
     ])
-}
-
-fn input(
-    name: &str,
-    label: &str,
-    kind: &str,
-    value: &str,
-    attributes: &str,
-    required: bool,
-    error: Option<String>,
-) -> Value {
-    let id = format!("id_{name}");
-    let label_tag = Value::from_safe_string(format!(r#"<label for="{id}">{label}</label>"#));
-    let value = if value.is_empty() {
-        String::new()
-    } else {
-        format!(" value=\"{}\"", legacy_html::escape(value))
-    };
-    let (class, aria, error_id) = if error.is_some() {
-        let error_id = format!("{id}_error");
-        (
-            "form-control is-invalid",
-            format!(" aria-invalid=\"true\" aria-describedby=\"{error_id}\""),
-            error_id,
-        )
-    } else {
-        ("form-control", String::new(), String::new())
-    };
-    let required = if required { " required" } else { "" };
-    let input = format!(
-        r#"<input type="{kind}" name="{name}"{value}{attributes} class="{class}"{aria}{required} id="{id}">"#,
-    );
-    context! { label_tag, input, errors => error.into_iter().collect::<Vec<_>>(), error_id }
 }
 
 #[derive(Clone, Serialize)]

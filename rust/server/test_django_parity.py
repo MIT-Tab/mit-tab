@@ -4138,6 +4138,147 @@ def test_school_roster_create_and_detail_match_django(html_assets, subtests):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_room_roster_forms_and_history_match_django(html_assets, subtests):
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 4)
+    room = Room.objects.create(name="Room <A> & Auditorium", rank="3.75")
+    empty = Room.objects.create(name="Empty Room", rank=0)
+    late_label = RoomTag.objects.create(tag="Z <Projector>", priority=1)
+    early_label = RoomTag.objects.create(tag="A & Accessible", priority=3)
+    room.tags.add(early_label, late_label)
+    RoomCheckIn.objects.create(room=room, round_number=0)
+    RoomCheckIn.objects.create(room=room, round_number=2)
+    school = School.objects.create(name="Room Fixture Campus")
+    gov = Team.objects.create(name="Home <Team>", school=school, seed=0)
+    opp = Team.objects.create(name="Away & Partners", school=school, seed=0)
+    chair = Judge.objects.create(name="B Chair", rank=5)
+    wings = [Judge.objects.create(name=name, rank=3) for name in ("Z Wing", "A Wing & Coach")]
+    first = Round.objects.create(round_number=2, gov_team=gov, opp_team=opp, room=room, chair=chair)
+    first.judges.add(chair, *wings)
+    second = Round.objects.create(round_number=1, gov_team=opp, opp_team=gov, room=room)
+    second.judges.add(wings[0])
+    elim = Outround.objects.create(num_teams=4, type_of_round=0, gov_team=gov, opp_team=opp, room=room, chair=chair)
+    elim.judges.add(chair, *wings)
+
+    users = get_user_model().objects
+    admin = users.create_superuser(username="room-form-admin")
+    entry = users.create_user(username="entry")
+    board = users.create_superuser(username="room-form-board")
+    board.groups.add(Group.objects.create(name="APDA Board"))
+
+    def staff(username, group_name):
+        user = users.create_user(username=username, is_staff=True)
+        user.groups.add(Group.objects.create(name=group_name))
+        return user
+
+    helper = staff("room-form-helper", "MIT-TAB: Data entry helper")
+    assistant = staff("room-form-assistant", "MIT-TAB: Tab assistant")
+    checkin_helper = staff("room-form-checkin-desk", "MIT-TAB: Check-in helper")
+
+    def client_for(user):
+        client = Client()
+        client.force_login(user)
+        client.cookies["csrftoken"] = "a" * 32
+        return client
+
+    create = "/enter_room/"
+    detail = f"/room/{room.id}/"
+    clients = {user.username: client_for(user) for user in (admin, entry, helper, assistant, board, checkin_helper)}
+    with rust_server(overrides=html_assets) as port:
+        for user in (admin, entry, helper, assistant):
+            for path in (create, detail, f"/room/{empty.id}/"):
+                with subtests.test(user=user.username, path=path):
+                    compare_admin_page(port, path, clients[user.username],
+                                       roster_checkins=user in (admin, assistant) and path != create)
+
+        client = clients[admin.username]
+        invalid = (
+            {"name": "", "rank": "", "tags": ["not-a-tag"]},
+            {"name": room.name, "rank": "123", "tags": [early_label.id, 999999]},
+            {"name": "X" * 31, "rank": "1.001"},
+            {"name": "Too many digits", "rank": "123.00"},
+        )
+        for fields in invalid:
+            with subtests.test(invalid=fields):
+                compare_admin_page(port, create, client, {**fields, "return_to": create})
+        admin_session = client.cookies["sessionid"].value
+        loaded = request(port, detail, cookie=admin_session)[2]
+        original_revision = room_checkin_proof(loaded)
+        compare_admin_page(port, detail, client,
+                           {"name": room.name, "rank": "invalid", "tags": [early_label.id],
+                            "mittab_checkins_present": "1", "checkin_0": "on", "return_to": detail,
+                            "mittab_room_checkin_revision": original_revision},
+                           roster_checkins=True)
+
+        def request_as(user, path, form=None, *, stable=False):
+            session = clients[user.username].cookies["sessionid"].value
+            csrf = "a" * (43 if stable else 32)
+            cookies = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+            body = {**form, "csrfmiddlewaretoken": csrf} if form is not None else None
+            return request(port, path, method="POST" if form is not None else "GET", extra_headers=cookies, form=body)
+
+        base = {"name": room.name, "rank": "3.75", "tags": [early_label.id, late_label.id]}
+        marker = {"mittab_checkins_present": "1", "mittab_room_checkin_revision": original_revision}
+        for user in (board, checkin_helper):
+            for path in (create, detail):
+                for form in (None, {**base, **marker, "name": "Forbidden", "checkin_0": "on"}):
+                    with subtests.test(user=user.username, path=path, posted=form is not None):
+                        _, headers, body = request_as(user, path, form)
+                        assert headers["Location"] == "/403/" and b"Z Wing" not in body
+        assert not Room.objects.filter(name="Forbidden").exists()
+        original = request_as(helper, detail, stable=True)[2]
+        assert b"Z Wing" not in original and b"Rounds in this Room" not in original and b"name=\"checkin_" not in original
+        first.judges.clear()
+        RoomCheckIn.objects.filter(room=room, round_number=2).update(round_number=3)
+        assert request_as(helper, detail, stable=True)[2] == original
+        stale = request_as(assistant, detail, {**base, **marker, "name": "Uncommitted rename", "checkin_0": "on"})
+        assert stale[0] == 409 and b"Room check-ins changed." in stale[2]
+        assert b'name="checkin_2" class="form-check-input" id="id_checkin_2" checked' in stale[2]
+        room.refresh_from_db()
+        assert room.name == base["name"]
+        marker["mittab_room_checkin_revision"] = room_checkin_proof(stale[2])
+        older = request_as(assistant, detail, {**base, "mittab_checkins_present": "1",
+                                             "name": "Uncommitted older form", "checkin_0": "on"})
+        assert older[0] == 409 and b"Room check-ins changed." in older[2]
+        room.refresh_from_db()
+        assert room.name == base["name"]
+
+        TabSettings.set("tot_rounds", 5)
+        RoomCheckIn.objects.create(room=room, round_number=5)
+        stale = request_as(assistant, detail, {**base, **marker, "checkin_0": "on"})
+        assert stale[0] == 409
+        assert b'name="checkin_4" class="form-check-input" id="id_checkin_4" checked' in stale[2]
+        marker["mittab_room_checkin_revision"] = room_checkin_proof(stale[2])
+
+        saved = request_as(admin, create, {"name": "New Room & Annex", "rank": "9e-1", "tags": [late_label.id]})
+        assert saved[0] == 302 and saved[1]["Location"] == "/"
+        added = Room.objects.get(name="New Room & Annex")
+        assert added.rank == Decimal("0.90") and added.tags.get() == late_label
+        assert request_as(helper, detail, {**base, **marker, "checkin_0": "on"})[0] == 302
+        assert request_as(assistant, detail, {**base, "checkin_0": "on"})[0] == 302
+        assert list(RoomCheckIn.objects.filter(room=room).order_by("round_number").values_list("round_number", flat=True)) == [0, 3, 5]
+        updated = request_as(assistant, detail, {**base, **marker, "checkin_0": "on", "return_to": "/view_rooms/"})
+        assert updated[0] == 302 and updated[1]["Location"] == "/view_rooms/"
+        assert list(RoomCheckIn.objects.filter(room=room).values_list("round_number", flat=True)) == [1]
+        session = clients[assistant.username].cookies["sessionid"].value
+        notice = load_cookies(updated[1])["mittab_roster_notice"].value
+        page = request(port, "/view_rooms/", extra_headers={"Cookie": f"sessionid={session}; mittab_roster_notice={notice}"})[2]
+        assert b"School Room &lt;A&gt; &amp; Auditorium updated successfully" in page
+        for target in ("/batch_checkin/?tab=room", "/pairings/status/", "/outround_pairing/0/4"):
+            with subtests.test(return_to=target):
+                update = request_as(admin, detail, {**base, "return_to": target})
+                assert update[0] == 302 and update[1]["Location"] == target
+                notice = load_cookies(update[1])["mittab_roster_notice"].value
+                cookie = f"sessionid={admin_session}; mittab_roster_notice={notice}"
+                status, headers, body = request(port, target, extra_headers={"Cookie": cookie})
+                assert status == 200 and b"School Room &lt;A&gt; &amp; Auditorium updated successfully" in body
+                assert load_cookies(headers)["mittab_roster_notice"]["max-age"] == "0"
+        assert request_as(admin, f"/room/{added.id}/delete/")[0] == 200
+        assert Room.objects.filter(id=added.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_native_staff_roster_edits_and_data_entry_scope():
     from time import monotonic, sleep
 
@@ -4255,7 +4396,9 @@ def test_native_staff_roster_edits_and_data_entry_scope():
         room_obj = Room.objects.get(name="Roster Room")
         assert room_obj.tags.get() == tag and room_obj.rank == Decimal("4.25")
         room_path = f"/room/{room_obj.id}/"
-        assert post(room_path, [*room, checkin_intent, ("checkin_-1", "on")])[0] == 302
+        revision = room_checkin_proof(request(port, room_path, cookie=tab)[2])
+        assert post(room_path, [*room, checkin_intent, ("mittab_room_checkin_revision", revision),
+                                ("checkin_-1", "on")])[0] == 302
         assert RoomCheckIn.objects.filter(room=room_obj, round_number=0).exists()
         opponent = Team.objects.create(name="Roster Opponent", school=school, seed=0)
         Round.objects.create(round_number=2, gov_team=team, opp_team=opponent, room=room_obj, victor=Round.GOV)
@@ -6667,7 +6810,7 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
                        registration_revision=False, configuration_revision=False, list_revision=False,
                        content_revision=False, motion_revision=False, staff_motion_revision=False,
-                       email_log_revision=False, challenge_revision=False):
+                       email_log_revision=False, challenge_revision=False, roster_checkins=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
@@ -6765,7 +6908,17 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
                 rb'<input type="hidden" name="mittab_list_revision" value="[a-f0-9]{64}" id="id_mittab_list_revision">', b"", body,
             )
             assert metadata == 1
+        if roster_checkins:
+            proof = b'<input type="hidden" name="mittab_checkins_present" value="1">'
+            assert body.count(proof) == 1
+            body = body.replace(proof, b"")
+            body, removed = re.subn(rb'<input type="hidden" name="mittab_room_checkin_revision" value="[a-f0-9]{64}">', b"", body)
+            assert removed == 1
         assert_html_bytes(body, reference.content)
+
+
+def room_checkin_proof(body):
+    return re.search(rb'name="mittab_room_checkin_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
 
 def staff_motion_proof(body, action=None):

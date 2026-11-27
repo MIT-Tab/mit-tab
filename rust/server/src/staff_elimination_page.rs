@@ -269,7 +269,10 @@ pub async fn render(
     let shell = legacy_html::shell(&mut db, actor, &fallback.url()).await?;
     db.commit().await?;
     let csrf = TemplateCsrf::new(headers).map_err(|_| Error::Database)?;
-    let mut response = legacy_html::render(
+    let mut response = crate::staff_roster_notice::render(
+        app,
+        headers,
+        &fallback.url(),
         "outrounds/pairing_base.html",
         shell,
         context! {

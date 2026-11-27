@@ -178,7 +178,10 @@ pub async fn render(
         })
         .collect::<Vec<_>>();
     let csrf = TemplateCsrf::new(headers).map_err(|_| ChangeError::Storage)?;
-    let mut response = legacy_html::render(
+    let mut response = crate::staff_roster_notice::render(
+        app,
+        headers,
+        &path,
         "pairing/pairing_control.html",
         shell,
         context! {

@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, ops::RangeInclusive};
 
 use serde_json::json;
 use sqlx::{AssertSqlSafe, MySqlConnection, MySqlPool, QueryBuilder};
@@ -10,6 +10,7 @@ use crate::{
     roster_log,
     settings::Settings,
     staff_pairing::lock_round,
+    staff_roster_fields::rank_input,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -338,13 +339,24 @@ async fn save_school(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> R
 }
 
 async fn save_room(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Result<i32, Error> {
-    let rank = decimal(edit.fields, "rank")?;
-    let tags = ids(edit.fields, "tags")?;
+    let rank = rank_input(edit.fields.get("rank")).map_err(Error::Invalid)?;
+    let tags = edit
+        .fields
+        .all("tags")
+        .iter()
+        .map(|value| {
+            value
+                .parse::<i32>()
+                .ok()
+                .filter(|id| id.to_string() == *value)
+                .ok_or(Error::Invalid("Choose a valid roster entry."))
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
     require_existing(db, "tab_roomtag", tags.iter().copied()).await?;
     let id = if let Some(id) = edit.id {
         sqlx::query("UPDATE tab_room SET name = ?, `rank` = ? WHERE id = ?")
             .bind(name)
-            .bind(rank)
+            .bind(&rank)
             .bind(id)
             .execute(&mut *db)
             .await?;
@@ -352,13 +364,17 @@ async fn save_room(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Res
     } else {
         sqlx::query("INSERT INTO tab_room (name, `rank`) VALUES (?, ?)")
             .bind(name)
-            .bind(rank)
+            .bind(&rank)
             .execute(&mut *db)
             .await?
             .last_insert_id() as i32
     };
     set_links(db, "tab_room_tags", "room_id", "roomtag_id", id, tags).await?;
     if edit.checkins && edit.id.is_some() {
+        let snapshot = room_checkins(db, id, true).await?;
+        if snapshot.revision != edit.fields.get("mittab_room_checkin_revision") {
+            return Err(Error::Invalid(ROOM_CHECKIN_CONFLICT));
+        }
         checkins(db, edit.fields, "tab_roomcheckin", "room_id", id).await?;
     }
     Ok(id)
@@ -582,9 +598,7 @@ async fn checkins(
     column: &'static str,
     id: i32,
 ) -> Result<(), sqlx::Error> {
-    let settings = Settings::load(db, &["tot_rounds"]).await?;
-    let rounds = settings.integer("tot_rounds", 6).clamp(0, 50);
-    for round in 0..=rounds {
+    for round in checkin_rounds(db).await? {
         if fields.flag(&format!("checkin_{}", round - 1)) {
             let query = format!(
                 "INSERT INTO {table} ({column}, round_number) VALUES (?, ?)
@@ -605,6 +619,52 @@ async fn checkins(
         }
     }
     Ok(())
+}
+
+pub async fn checkin_rounds(db: &mut MySqlConnection) -> Result<RangeInclusive<i32>, sqlx::Error> {
+    let settings = Settings::load(db, &["tot_rounds"]).await?;
+    Ok(0..=settings.integer("tot_rounds", 6).clamp(0, 50))
+}
+
+pub const ROOM_CHECKIN_CONFLICT: &str =
+    "Room check-ins changed. Review the current check-ins before saving again.";
+
+pub struct RoomCheckins {
+    pub rounds: RangeInclusive<i32>,
+    pub checked: Vec<i32>,
+    pub revision: String,
+}
+
+pub async fn room_checkins(
+    db: &mut MySqlConnection,
+    room: i32,
+    locked: bool,
+) -> Result<RoomCheckins, sqlx::Error> {
+    use ring::digest::{Context, SHA256};
+    let rounds = checkin_rounds(db).await?;
+    let query = if locked {
+        "SELECT round_number FROM tab_roomcheckin WHERE room_id = ? AND round_number BETWEEN 0 AND ? ORDER BY round_number FOR UPDATE"
+    } else {
+        "SELECT round_number FROM tab_roomcheckin WHERE room_id = ? AND round_number BETWEEN 0 AND ? ORDER BY round_number"
+    };
+    let checked = sqlx::query_scalar::<_, i32>(query)
+        .bind(room)
+        .bind(*rounds.end())
+        .fetch_all(db)
+        .await?;
+    let mut stamp = Context::new(&SHA256);
+    stamp.update(b"room check-ins v1\0");
+    stamp.update(&room.to_be_bytes());
+    stamp.update(&rounds.end().to_be_bytes());
+    for round in &checked {
+        stamp.update(&round.to_be_bytes());
+    }
+    let revision = hex::encode(stamp.finish());
+    Ok(RoomCheckins {
+        rounds,
+        checked,
+        revision,
+    })
 }
 
 async fn audit(
