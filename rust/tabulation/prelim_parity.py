@@ -44,6 +44,9 @@ def reference(teams, settings):
         SimpleNamespace(gov_team=team, pullup=Round.GOV) for team in teams if team.pulled_up
     ]
     Bye.objects = Manager()
+    Bye.objects.filter = lambda round_number: SimpleNamespace(
+        exists=lambda: any(bye.round_number == round_number for bye in Bye.objects.rows),
+    )
     TeamModel = SimpleNamespace(
         FREE_SEED=1, UNSEEDED=0,
         objects=SimpleNamespace(filter=lambda **kwargs: []),
@@ -70,7 +73,7 @@ def reference(teams, settings):
         tot_wins=lambda team: team.wins,
     ), patch.object(tab_logic.TabSettings, "get", side_effect=settings.get), patch.object(
         tab_logic.TabSettings, "set"
-    ), redirect_stdout(StringIO()):
+    ), patch.object(tab_logic.cache_logic, "clear_cache"), redirect_stdout(StringIO()):
         try:
             tab_logic.pair_round()
         except (errors.NotEnoughTeamsError, IndexError, StopIteration):

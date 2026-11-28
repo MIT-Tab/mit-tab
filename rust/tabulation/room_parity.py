@@ -44,7 +44,8 @@ def room_cases():
                 tags=SimpleNamespace(all=lambda present=present: present),
             ))
         seeded = index % 2 == 1
-        checkins = [Row(room=room) for room in rooms]
+        # The solver receives room-ID order even when check-ins arrive in reverse.
+        checkins = [Row(room=room) for room in reversed(rooms)]
         with (
             patch.object(assign_rooms.TabSettings, "get",
                          side_effect=lambda key, default=0: seeded if key == "enable_room_seeding" else default),
