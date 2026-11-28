@@ -3443,6 +3443,7 @@ def test_native_public_outrounds_match_the_visible_django_bracket_payload(html_a
 
 @pytest.mark.django_db(transaction=True)
 def test_browser_elimination_release_contract_matches_django():
+    from mittab.apps.tab.public_pages import get_public_page_availability
     from mittab.libs.cacheing import cache_logic
 
     staff = legacy_tab_session("release-browser-admin")
@@ -3500,6 +3501,7 @@ def test_browser_elimination_release_contract_matches_django():
             assert TabSettings.get("var_teams_visible", use_cache=False) == 4
             # A previously cached open value must not restore public visibility after Close.
             TabSettings.set("var_teams_visible", 4)
+            assert get_public_page_availability()["varsity_outrounds"]
             with ThreadPoolExecutor(max_workers=2) as pool:
                 def close():
                     return post("/outround_pairing/release/8/0/", form={"action": "close"})
@@ -3512,6 +3514,7 @@ def test_browser_elimination_release_contract_matches_django():
             assert TabSettings.get("var_teams_visible", use_cache=False) == 16
             cache_logic.cache_fxn_key(lambda: 4, "tab_settings_var_teams_visible", cache_logic.PERSISTENT)
             assert TabSettings.get("var_teams_visible", 256) == 16
+            assert not get_public_page_availability()["varsity_outrounds"]
             TabSettings.set("var_teams_visible", 256)
 
 

@@ -1,5 +1,7 @@
 """Shared availability rules for public tournament pages."""
 
+from django.db.models import Q
+
 from mittab.apps.tab.models import (
     BreakingTeam,
     Outround,
@@ -10,6 +12,12 @@ from mittab.apps.tab.models import (
 from mittab.apps.tab.public_rankings import get_public_display_flags
 
 
+OUTROUND_VISIBILITY = {
+    BreakingTeam.VARSITY: "var_teams_visible",
+    BreakingTeam.NOVICE: "nov_teams_visible",
+}
+
+
 def get_public_page_availability():
     """Return whether each built-in public page currently has useful content."""
     display_flags = get_public_display_flags()
@@ -18,6 +26,7 @@ def get_public_page_availability():
         has_inround_pairing and
         TabSettings.get("pairing_released", 0) == 1
     )
+    released_divisions = _released_outround_divisions()
 
     availability = {
         "released_pairings": has_inround_pairing,
@@ -26,8 +35,8 @@ def get_public_page_availability():
         "team_portal": True,
         "judge_list": bool(TabSettings.get("judges_public", 0)),
         "team_list": bool(TabSettings.get("teams_public", 0)),
-        "varsity_outrounds": _outrounds_are_public(BreakingTeam.VARSITY),
-        "novice_outrounds": _outrounds_are_public(BreakingTeam.NOVICE),
+        "varsity_outrounds": BreakingTeam.VARSITY in released_divisions,
+        "novice_outrounds": BreakingTeam.NOVICE in released_divisions,
         "public_team_results": display_flags["team_results"],
         "public_speaker_results": display_flags["speaker_results"],
         "public_ballots": display_flags["ballots"],
@@ -65,20 +74,26 @@ def get_public_navigation_pages():
 
 def released_outrounds(round_type):
     """Return the same rounds visible on the public outround pairing page."""
-    visibility_key = (
-        "nov_teams_visible"
-        if round_type == BreakingTeam.NOVICE
-        else "var_teams_visible"
-    )
-    visible_at_or_below = TabSettings.get(visibility_key, 256)
+    visibility_key = OUTROUND_VISIBILITY.get(round_type, OUTROUND_VISIBILITY[BreakingTeam.VARSITY])
+    minimum_size = TabSettings.get(visibility_key, 256)
     return Outround.objects.filter(
         type_of_round=round_type,
-        num_teams__gte=visible_at_or_below,
+        num_teams__gte=minimum_size,
     )
 
 
-def _outrounds_are_public(round_type):
-    return released_outrounds(round_type).exists()
+def _released_outround_divisions():
+    # Batch the uncached reads. The oldest setting row wins, as in TabSettings.get.
+    thresholds = {}
+    settings = TabSettings.objects.filter(key__in=OUTROUND_VISIBILITY.values()).order_by("pk")
+    for key, value, text in settings.values_list("key", "value", "value_string"):
+        thresholds.setdefault(key, text if text is not None else value)
+
+    released = Q()
+    for division, key in OUTROUND_VISIBILITY.items():
+        minimum_size = thresholds.get(key)
+        released |= Q(type_of_round=division, num_teams__gte=256 if minimum_size is None else minimum_size)
+    return set(Outround.objects.filter(released).order_by().values_list("type_of_round", flat=True).distinct())
 
 
 def tab_cards_are_public(outrounds_public=None):
@@ -87,7 +102,4 @@ def tab_cards_are_public(outrounds_public=None):
         return False
     if outrounds_public is not None:
         return outrounds_public
-    return (
-        _outrounds_are_public(BreakingTeam.VARSITY)
-        or _outrounds_are_public(BreakingTeam.NOVICE)
-    )
+    return bool(_released_outround_divisions())
