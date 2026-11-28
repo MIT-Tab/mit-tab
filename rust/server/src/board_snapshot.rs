@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use sqlx::{AssertSqlSafe, MySqlConnection};
 
+use crate::legacy_html::DjangoJson;
+
 #[derive(Clone, Deserialize, PartialEq, Serialize)]
 pub struct Identity {
     pub id: i32,
@@ -46,7 +48,15 @@ pub struct Snapshot {
 
 impl Snapshot {
     pub fn revision(&self) -> String {
-        let bytes = serde_json::to_vec(self).expect("serializable pairing");
+        let mut snapshot = serde_json::to_value(self).expect("serializable pairing");
+        snapshot.sort_all_objects();
+        let mut bytes = Vec::new();
+        snapshot
+            .serialize(&mut serde_json::Serializer::with_formatter(
+                &mut bytes,
+                DjangoJson { ascii_only: true },
+            ))
+            .expect("serializable pairing");
         hex::encode(digest::digest(&digest::SHA256, &bytes))
     }
 }

@@ -1125,7 +1125,7 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
         type_of_round=type_of_round,
     ).select_related("gov_team", "opp_team", "room", "chair").prefetch_related(
         "gov_team__debaters", "opp_team__debaters", "judges",
-    ))
+    ).order_by("id"))
     rounds_by_size = defaultdict(list)
     for pairing in round_pairing:
         rounds_by_size[pairing.num_teams].append(pairing)

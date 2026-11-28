@@ -3405,6 +3405,7 @@ def test_native_public_outrounds_match_the_visible_django_bracket_payload(html_a
         assert b"[V] Ro8" in page and b"[V] Ro4" not in page
         assert re.search(rb'Advancing Teams:</b></td>\s*<td colspan="3">\s*Outround Team 1', page)
         assert b"<b>Public Outround Chair</b>" in page
+        assert page.index(b"Public Outround Chair") < page.index(b"Outround Team 3")
         assert b"Undisclosed Outround Judge" not in page and b"Outround </script>" not in page
         pairings = list(Outround.objects.filter(pk__in=(first.id, other.id)).order_by("id"))
         assert payload(page) == json.loads(json.dumps(generate_bracket_data([{"rounds": pairings}])))
@@ -7427,7 +7428,7 @@ def test_elimination_staff_and_board_pages_match_django_bytes(html_assets, subte
     second_room = Room.objects.create(name="Room 205", rank=4)
     for room in (first_room, second_room):
         RoomCheckIn.objects.create(room=room, round_number=0)
-    chair = Judge.objects.create(name="Casey & Co", rank=Decimal("7.25"), request_wing=True)
+    chair = Judge.objects.create(name="Casey & Co – Montréal 🎤", rank=Decimal("7.25"), request_wing=True)
     wing = Judge.objects.create(name="Avery Wing", rank=Decimal("4.75"), wing_only=True)
     unavailable = Judge.objects.create(name="Absent Judge", rank=Decimal("8.00"))
     eligible = Judge.objects.create(name="Eligible Judge", rank=5)
@@ -7470,14 +7471,11 @@ def test_elimination_staff_and_board_pages_match_django_bytes(html_assets, subte
         with patch("django.middleware.csrf._get_new_csrf_string", return_value=token[1][:32].decode() if token else "a" * 32):
             reference = client.get(path)
         assert status == reference.status_code == 200, (path, status)
-        # The native revisions use a different digest and a ballot rejects stale saves.
+        # Native staff forms include a revision so stale saves can be rejected.
         if path.startswith("/outround_pairing/") and "/pair/" not in path:
             body = re.sub(rb' data-revision="[a-f0-9]{64}"', b"", body)
         elif "/result/" in path:
             body = re.sub(rb'<input type="hidden" name="revision" value="[a-f0-9]+">', b"", body)
-        elif path == "/apda-board/outrounds/":
-            body = re.sub(rb'name="revision" value="[a-zA-Z0-9]+"', b'name="revision" value="<revision>"', body)
-            reference.content = re.sub(rb'name="revision" value="[a-zA-Z0-9]+"', b'name="revision" value="<revision>"', reference.content)
         assert_html_bytes(body, reference.content)
         return body
 
