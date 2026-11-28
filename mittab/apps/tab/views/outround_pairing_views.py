@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import permission_required, user_passes_test
 from django.db import transaction
 from django.db.models import Q, Exists, OuterRef, Min
 from django.shortcuts import redirect, reverse
+from django.views.decorators.http import require_POST
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
@@ -988,30 +989,36 @@ def export_outround_pairings_csv_view(request, type_of_round=BreakingTeam.VARSIT
     return export_pairings_csv(is_outround=True, type_of_round=type_of_round)
 
 
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+@require_POST
+@serialize_staff_pairing_post
 def toggle_pairing_released(request, type_of_round, num_teams):
-    published_team_placements(type_of_round)
-    old = 256
+    if (type_of_round not in (Outround.VARSITY, Outround.NOVICE)
+            or not 2 <= num_teams <= 512 or num_teams & (num_teams - 1)
+            or not Outround.objects.filter(type_of_round=type_of_round, num_teams=num_teams).exists()):
+        return HttpResponse("Elimination stage not found.", status=404, content_type="text/plain; charset=utf-8",
+                            headers={"Cache-Control": "private, no-store"})
 
-    if type_of_round == BreakingTeam.VARSITY:
-        old = TabSettings.get("var_teams_visible", 256)
-
-        if old == num_teams:
-            TabSettings.set("var_teams_visible", num_teams * 2)
-        else:
-            TabSettings.set("var_teams_visible", num_teams)
-    else:
-        old = TabSettings.get("nov_teams_visible", 256)
-
-        if old == num_teams:
-            TabSettings.set("nov_teams_visible", num_teams * 2)
-        else:
-            TabSettings.set("nov_teams_visible", num_teams)
-
-    published_team_placements(type_of_round)
-    invalidate_outround_public_pairings_cache(type_of_round)
-
-    data = {"success": True, "pairing_released": not old == num_teams}
-    return JsonResponse(data)
+    action = request.POST.get("action", "")
+    if action not in ("", "release", "close"):
+        return HttpResponse("Choose whether to release or close pairings.", status=422,
+                            content_type="text/plain; charset=utf-8", headers={"Cache-Control": "private, no-store"})
+    key = "var_teams_visible" if type_of_round == Outround.VARSITY else "nov_teams_visible"
+    limit = TabSettings.get(key, 256)
+    visible = limit <= num_teams
+    release = action == "release" if action else not visible
+    if release != visible:
+        published_team_placements(type_of_round)
+        limit = num_teams if release else num_teams * 2
+        TabSettings.set(key, limit)
+        published_team_placements(type_of_round)
+        transaction.on_commit(lambda: invalidate_outround_public_pairings_cache(type_of_round))
+    if request.POST.get("redirect", "").lower() in {"true", "on", "1"}:
+        return redirect("outround_pairing_view", type_of_round, num_teams)
+    data = {"success": True, "pairing_released": release}
+    if action:
+        data["visibility_limit"] = limit
+    return JsonResponse(data, headers={"Cache-Control": "private, no-store"})
 
 
 @staff_elimination_correction(choice=True)

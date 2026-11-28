@@ -218,22 +218,27 @@ function togglePairingRelease(event) {
   const button = $(event.currentTarget);
   const numTeams = button.attr("data-num_teams");
   const typeOfRound = button.attr("data-type_of_round");
-  const releaseKey = button.attr("data-release-key");
+  const action = button.hasClass("close-pairings-btn") ? "close" : "release";
 
   event.preventDefault();
   $.ajax({
-    ...pairingWrite(`/outround_pairing/release/${numTeams}/${typeOfRound}/`),
+    ...pairingWrite(`/outround_pairing/release/${numTeams}/${typeOfRound}/`, {
+      action,
+    }),
     success(result) {
-      const groupSelector = `.outround-release[data-release-key='${releaseKey}']`;
-      const closeBtn = `${groupSelector}.close-pairings-btn`;
-      const openBtn = `${groupSelector}.open-pairings-btn`;
-      if (result.pairing_released) {
-        $(closeBtn).removeClass("d-none");
-        $(openBtn).addClass("d-none");
-      } else {
-        $(closeBtn).addClass("d-none");
-        $(openBtn).removeClass("d-none");
-      }
+      const controls = `.outround-release[data-type_of_round='${typeOfRound}']`;
+      $(controls).each((_, element) => {
+        const control = $(element);
+        const released =
+          Number(control.attr("data-num_teams")) >= result.visibility_limit;
+        control.toggleClass(
+          "d-none",
+          control.hasClass("close-pairings-btn") !== released,
+        );
+      });
+    },
+    error() {
+      window.alert("Unable to update the release. Refresh and try again.");
     },
   });
 }

@@ -3442,6 +3442,127 @@ def test_native_public_outrounds_match_the_visible_django_bracket_payload(html_a
 
 
 @pytest.mark.django_db(transaction=True)
+def test_browser_elimination_release_contract_matches_django():
+    from mittab.libs.cacheing import cache_logic
+
+    staff = legacy_tab_session("release-browser-admin")
+    board = legacy_tab_session("release-browser-board")
+    get_user_model().objects.get(username="release-browser-board").groups.add(
+        Group.objects.create(name="APDA Board")
+    )
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("var_teams_visible", 256)
+    TabSettings.set("nov_teams_visible", 256)
+    school = School.objects.create(name="Release Fixture School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Government", "Opposition")]
+    Outround.objects.create(num_teams=2, type_of_round=Outround.VARSITY,
+                            gov_team=gov, opp_team=opp, victor=Outround.GOV)
+    Outround.objects.create(num_teams=8, type_of_round=Outround.VARSITY,
+                            gov_team=gov, opp_team=opp)
+    csrf = "a" * 32
+    path = "/outround_pairing/release/2/0/"
+
+    with rust_server() as port:
+        def native(target=path, *, method="POST", session=staff, token=csrf, form=None):
+            return request(port, target, method=method, form=form if form is not None else {},
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}", "X-CSRFToken": token})
+
+        def reference(target=path, *, method="POST", session=staff, token=csrf, form=None):
+            client = Client(enforce_csrf_checks=True)
+            client.cookies["sessionid"] = session
+            client.cookies["csrftoken"] = csrf
+            response = (client.post(target, form or {}, HTTP_X_CSRFTOKEN=token)
+                        if method == "POST" else client.get(target))
+            return response.status_code, response.headers, response.content
+
+        for post in (reference, native):
+            status, headers, _ = post(method="GET")
+            assert status == 405 and headers["Allow"] == "POST"
+            assert post(token="invalid")[0] == 403
+            assert post(form={"action": "invalid"})[0] == 422
+            assert post(session=board)[1]["Location"] == "/403/"
+            for missing in ("/outround_pairing/release/4/0/", "/outround_pairing/release/2/1/",
+                            "/outround_pairing/release/3/0/", "/outround_pairing/release/2/2/"):
+                status, headers, body = post(missing)
+                assert status == 404 and body == b"Elimination stage not found."
+                assert headers["Cache-Control"] == "private, no-store"
+            assert TabSettings.get("var_teams_visible", use_cache=False) == 256
+            assert TabSettings.get("nov_teams_visible", use_cache=False) == 256
+
+            status, headers, body = post()
+            assert status == 200 and headers["Cache-Control"] == "private, no-store"
+            assert json.loads(body) == {"success": True, "pairing_released": True}
+            assert TabSettings.get("var_teams_visible", use_cache=False) == 2
+
+            status, headers, _ = post(form={"redirect": "on"})
+            assert (status, headers["Location"]) == (302, "/outround_pairing/0/2")
+            assert TabSettings.get("var_teams_visible", use_cache=False) == 4
+            # A previously cached open value must not restore public visibility after Close.
+            TabSettings.set("var_teams_visible", 4)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                def close():
+                    return post("/outround_pairing/release/8/0/", form={"action": "close"})
+
+                replies = [pool.submit(close) for _ in range(2)]
+                for reply in replies:
+                    status, _, body = reply.result(timeout=6)
+                    assert status == 200
+                    assert json.loads(body) == {"success": True, "pairing_released": False, "visibility_limit": 16}
+            assert TabSettings.get("var_teams_visible", use_cache=False) == 16
+            cache_logic.cache_fxn_key(lambda: 4, "tab_settings_var_teams_visible", cache_logic.PERSISTENT)
+            assert TabSettings.get("var_teams_visible", 256) == 16
+            TabSettings.set("var_teams_visible", 256)
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("backend", ("django", "rust"))
+def test_elimination_release_revalidates_staff_after_lock(backend):
+    from time import monotonic, sleep
+    from django.contrib.sessions.models import Session
+
+    staff = legacy_tab_session("release-staff-queued")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("var_teams_visible", 256)
+    school = School.objects.create(name="Queued Fixture School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Government", "Opposition")]
+    Outround.objects.create(num_teams=2, type_of_round=Outround.VARSITY,
+                            gov_team=gov, opp_team=opp, victor=Outround.GOV)
+    path = "/outround_pairing/release/2/0/"
+    csrf = "a" * 32
+
+    with rust_server() as port:
+        def post():
+            if backend == "rust":
+                return request(port, path, method="POST", form={},
+                               extra_headers={"Cookie": f"sessionid={staff}; csrftoken={csrf}", "X-CSRFToken": csrf})[:2]
+            client = Client()
+            client.cookies["sessionid"] = staff
+            response = client.post(path)
+            return response.status_code, response.headers
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with transaction.atomic():
+                TabSettings.objects.select_for_update().get(key="cur_round")
+                pending = pool.submit(post)
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "tab_tabsettings" in row[7] and "cur_round" in row[7]
+                                      and "FOR UPDATE" in row[7] for row in cursor.fetchall())
+                    if waiting:
+                        break
+                    sleep(0.025)
+                assert waiting, "Release request did not reach the tournament lock"
+                Session.objects.filter(session_key=staff).delete()
+            status, headers = pending.result(timeout=6)
+        assert (status, headers["Location"]) == (302, "/403/")
+    assert TabSettings.get("var_teams_visible", use_cache=False) == 256
+
+
+@pytest.mark.django_db(transaction=True)
 def test_public_outround_cache_matches_django_after_ballot_and_release(html_assets):
     from mittab.libs.cacheing.public_cache import invalidate_outround_public_pairings_cache
 

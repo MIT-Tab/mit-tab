@@ -763,9 +763,16 @@ async fn update_seed(
     Ok(())
 }
 
-pub async fn release(app: &App, stage: Stage) -> Result<bool, Error> {
+pub async fn release(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    stage: Stage,
+    action: Option<bool>,
+) -> Result<i32, Error> {
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
+    staff_actor(&mut db, app, actor, headers).await?;
     let exists: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM tab_outround WHERE type_of_round = ? AND num_teams = ?)",
     )
@@ -778,15 +785,20 @@ pub async fn release(app: &App, stage: Stage) -> Result<bool, Error> {
     }
     let key = VISIBILITY[stage.division as usize];
     let before = Settings::load(&mut db, &VISIBILITY).await?;
+    let limit = before.integer(key, 256);
+    let visible = limit <= stage.size;
+    let release = action.unwrap_or(!visible);
+    if release == visible {
+        return Ok(limit);
+    }
     publication::refresh_division(&mut db, &before, stage.division).await?;
-    let publish = before.integer(key, 256) != stage.size;
-    let limit = if publish { stage.size } else { stage.size * 2 };
+    let limit = if release { stage.size } else { stage.size * 2 };
     settings::put(&mut db, key, SettingValue::Number(limit)).await?;
     let after = Settings::load(&mut db, &VISIBILITY).await?;
     publication::refresh_division(&mut db, &after, stage.division).await?;
     db.commit().await?;
     app.public_cache.evict_outround_publication(stage.division);
-    Ok(publish)
+    Ok(limit)
 }
 
 pub async fn ballot(

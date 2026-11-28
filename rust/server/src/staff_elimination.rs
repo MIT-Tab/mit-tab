@@ -473,6 +473,7 @@ async fn assign(
 
 async fn release(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     Path((size, division)): Path<(i32, i32)>,
     headers: HeaderMap,
     body: Bytes,
@@ -484,9 +485,25 @@ async fn release(
     let Some(stage) = Stage::new(division, size) else {
         return error(Error::Missing);
     };
-    match store::release(&app, stage).await {
+    let action = match fields.get("action") {
+        "" => None,
+        "release" => Some(true),
+        "close" => Some(false),
+        _ => {
+            return error(Error::Invalid(
+                "Choose whether to release or close pairings.",
+            ));
+        }
+    };
+    match store::release(&app, actor, &headers, stage, action).await {
         Ok(_) if fields.flag("redirect") => access::found(stage.url()),
-        Ok(released) => private(Json(json!({"success": true, "pairing_released": released}))),
+        Ok(limit) => {
+            let mut data = json!({"success": true, "pairing_released": limit <= stage.size});
+            if action.is_some() {
+                data["visibility_limit"] = json!(limit);
+            }
+            private(Json(data))
+        }
         Err(issue) => error(issue),
     }
 }

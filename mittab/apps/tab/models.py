@@ -194,9 +194,10 @@ class TabSettings(models.Model):
                         is not None else setting.value)
             return None
 
+        # An old release threshold must not refill the shared cache after a close.
         result = (
             cache_logic.cache_fxn_key(safe_get, f"tab_settings_{key}", cache_logic.PERSISTENT)
-            if use_cache else safe_get()
+            if use_cache and key not in {"var_teams_visible", "nov_teams_visible"} else safe_get()
         )
         if result is None and default is _TABSETTING_MISSING:
             raise ValueError(f"No TabSetting with key '{key}'")
