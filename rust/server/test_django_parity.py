@@ -9212,9 +9212,21 @@ def test_admin_roster_forms_match_django_and_preserve_related_records(html_asset
                           f"{base}room/{assigned_room.id}/delete/"):
             status, _, preview = request(port, protected, cookie=session)
             assert status == 200 and b"Cannot delete" in preview and b'value="Yes, I' not in preview
-            assert submit(port, protected, {"post": "yes"})[0] == 409
-        assert submit(port, f"{base}school/", {"action": "delete_selected", "post": "yes",
-                                             "_selected_action": [school.id, other_school.id]})[0] == 409
+            compare_admin_page(port, protected, client)
+            rust = submit(port, protected, {"post": "yes"})
+            django = client.post(protected, {"post": "yes"})
+            assert rust[0] == django.status_code == 409 and rust[2] == django.content
+            for headers in (rust[1], django.headers):
+                assert {"private", "no-store"} <= set(headers["Cache-Control"].split(", "))
+        mixed = {"action": "delete_selected", "index": "0",
+                 "_selected_action": [school.id, other_school.id]}
+        compare_admin_page(port, f"{base}school/", client, post=mixed)
+        confirmed = {**mixed, "post": "yes"}
+        rust = submit(port, f"{base}school/", confirmed)
+        django = client.post(f"{base}school/", confirmed)
+        assert rust[0] == django.status_code == 409 and rust[2] == django.content
+        assert Team.objects.filter(id=gov.id, school=other_school, debaters=other_debater).exists()
+        assert Round.objects.filter(id=debate.id, room=assigned_room).exists()
         assert School.objects.filter(id=school.id).exists()
         assert submit(port, f"{base}school/{school.id}/delete/", {"post": "yes"})[0] == 302
         assert not School.objects.filter(id=school.id).exists()
@@ -9248,6 +9260,123 @@ def test_admin_roster_forms_match_django_and_preserve_related_records(html_asset
         assert submit(port, f"{base}scratch/{added.id}/delete/", {"post": "yes"})[0] == 302
         assert not Scratch.objects.filter(id=added.id).exists()
         assert added.audit_events.count() == 2
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_room_delete_preserves_later_elimination_stages(html_assets):
+    from mittab.apps.tab.models import PublishedOutroundStage
+
+    session = legacy_tab_session("admin-room-delete")
+    TabSettings.set("cur_round", 6)
+    TabSettings.set("var_teams_visible", 4)
+    school = School.objects.create(name="Admin Room School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Gov", "Opp")]
+    first, last = [Room.objects.create(name=name, rank=1) for name in ("Qualifying Hall", "Final Hall")]
+    preliminary = Outround.objects.create(num_teams=4, room=first, gov_team=gov, opp_team=opp, victor=Outround.GOV)
+    final = Outround.objects.create(num_teams=2, room=last, gov_team=gov, opp_team=opp, victor=Outround.OPP)
+    stage = PublishedOutroundStage.objects.create(type_of_round=0, num_teams=2)
+    PublishedTeamPlacement.objects.create(stage=stage, team=opp, place=1)
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = session
+    client.cookies["csrftoken"] = csrf
+    headers = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+    root = "/admin/tab/room/"
+
+    def assert_final_was_removed():
+        assert not Room.objects.filter(pk=last.id).exists()
+        assert not Outround.objects.filter(pk=final.id).exists()
+        assert not PublishedOutroundStage.objects.filter(pk=stage.id).exists()
+        assert Outround.objects.filter(pk=preliminary.id).exists()
+        history = AuditEvent.objects.get(content_type__model="outround", object_id=final.id)
+        assert history.changes["public"]["before"]["room"]["id"] == last.id
+        assert history.changes["public"]["after"] is None
+
+    with rust_server(overrides=html_assets) as port:
+        protected = f"{root}{first.id}/delete/"
+        preview = compare_admin_page(port, protected, client)
+        message = b"Resolve the later stage before deleting this pairing."
+        assert message in preview
+        bulk = {"action": "delete_selected", "_selected_action": first.id, "index": 0}
+        compare_admin_page(port, root, client, post=bulk)
+        for path, fields in ((protected, {"post": "yes"}), (root, {**bulk, "post": "yes"})):
+            status, _, body = request(port, path, method="POST", extra_headers=headers,
+                                      form={**fields, "csrfmiddlewaretoken": csrf})
+            reference = client.post(path, fields)
+            assert status == reference.status_code == 409
+            assert body == reference.content == message
+        assert Outround.objects.filter(id__in=[preliminary.id, final.id]).count() == 2
+
+        allowed = f"{root}{last.id}/delete/"
+        with transaction.atomic():
+            assert client.post(allowed, {"post": "yes"}).status_code == 302
+            assert_final_was_removed()
+            transaction.set_rollback(True)
+        status, _, page = request(port, allowed, extra_headers=headers)
+        assert status == 200
+        assert request(port, allowed, method="POST", extra_headers=headers, form={
+            "post": "yes", "csrfmiddlewaretoken": csrf, "mittab_delete_scope": admin_delete_proof(page),
+        })[0] == 302
+        assert_final_was_removed()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(("scope", "revoked"), [("direct", False), ("bulk", True)])
+def test_django_admin_delete_rechecks_session_after_lock(scope, revoked):
+    from django.contrib.sessions.models import Session
+
+    username = f"queued-{scope}-room-delete"
+    staff = legacy_tab_session(username)
+    user = get_user_model().objects.get(username=username)
+    board = Group.objects.create(name="APDA Board")
+    room = Room.objects.create(name="Queued Room", rank=1)
+    TabSettings.set("cur_round", 1)
+
+    def delete_room():
+        client = Client()
+        client.cookies["sessionid"] = staff
+        root = "/admin/tab/room/"
+        if scope == "direct":
+            # Django's direct form must lock even if a client also supplies an action.
+            return client.post(f"{root}{room.id}/delete/", {"action": "delete_selected"})
+        return client.post(root, {"action": "delete_selected", "_selected_action": room.id, "post": "yes"})
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with transaction.atomic():
+            TabSettings.objects.select_for_update().get(key="cur_round")
+            pending = pool.submit(delete_room)
+            with pytest.raises(FutureTimeout):
+                pending.result(timeout=0.5)
+            if revoked:
+                Session.objects.filter(session_key=staff).delete()
+            else:
+                user.groups.add(board)
+        response = pending.result(timeout=6)
+    assert response.status_code == 302 and response["Location"] == "/403/"
+    assert Room.objects.filter(pk=room.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_queued_group_edit_preserves_its_new_managed_name():
+    staff = legacy_tab_session("queued-group-admin")
+    group = Group.objects.create(name="Fixture former name")
+
+    def save_group():
+        client = Client()
+        client.cookies["sessionid"] = staff
+        return client.post(f"/admin/auth/group/{group.id}/change/", {"name": group.name})
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with transaction.atomic():
+            Group.objects.select_for_update().get(pk=group.pk)
+            pending = pool.submit(save_group)
+            with pytest.raises(FutureTimeout):
+                pending.result(timeout=0.5)
+            Group.objects.filter(pk=group.pk).update(name="MIT-TAB: Fixture managed")
+        response = pending.result(timeout=6)
+    assert response.status_code == 422
+    group.refresh_from_db()
+    assert group.name == "MIT-TAB: Fixture managed"
 
 
 @pytest.mark.django_db(transaction=True)
@@ -9798,8 +9927,21 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
             "post": "yes", "mittab_delete_scope": admin_delete_proof(old_state),
         })[0] == 409
         assert Group.objects.filter(id=chosen.id, name="Renamed & Group").exists()
-        assert submit(port, f"{groups}{board_group.id}/change/", {"name": "Different role"})[0] == 422
-        assert submit(port, f"{groups}{board_group.id}/delete/", {"post": "yes"})[0] == 422
+        guarded_group = f"{groups}{board_group.id}/"
+        compare_admin_page(port, f"{guarded_group}delete/", client)
+        guarded_selection = {"action": "delete_selected", "index": "0",
+                             "_selected_action": [board_group.id, chosen.id]}
+        compare_admin_page(port, groups, client, post=guarded_selection)
+        for path, fields in (
+            (f"{guarded_group}change/", {"name": "Different role"}),
+            (f"{guarded_group}delete/", {"post": "yes"}),
+            (groups, {**guarded_selection, "post": "yes"}),
+        ):
+            rust = submit(port, path, fields)
+            django = client.post(path, fields)
+            assert rust[0] == django.status_code == 422 and rust[2] == django.content
+        assert Group.objects.filter(pk=board_group.id, name="Apda Board").exists()
+        assert board_user.groups.filter(id=board_group.id).exists()
 
         group_filter = f"{groups}?id__exact={chosen.id}"
         selection = {"action": "delete_selected", "_selected_action": [chosen.id, board_group.id], "index": 0}
