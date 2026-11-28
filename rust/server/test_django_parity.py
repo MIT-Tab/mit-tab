@@ -3556,6 +3556,59 @@ def test_tab_card_pages_match_django(html_assets, subtests):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_board_dino_judges_match_django(html_assets):
+    staff = legacy_tab_session("dino-reference-staff")
+    board = legacy_tab_session("dino-reference-board")
+    author = get_user_model().objects.get(username="dino-reference-staff")
+    member = get_user_model().objects.get(username="dino-reference-board")
+    member.groups.create(name="APDA Board")
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("cur_round", 2)
+    school = School.objects.create(name="Dino Test School")
+    gov = Team.objects.create(name="Dino Test Gov", school=school, seed=Team.UNSEEDED)
+    opp = Team.objects.create(name="Dino Test Opp", school=school, seed=Team.UNSEEDED)
+    Outround.objects.create(num_teams=4, gov_team=gov, opp_team=opp)
+    judge = Judge.objects.create(name="Judge <&>", rank=8, is_dino=True)
+    AuditEvent.record(judge, AuditEvent.EDIT, author, changes={"is_dino": {"before": False, "after": True}},
+                      note="protected calibration note")
+    AuditEvent.record(judge, AuditEvent.EDIT, author, changes={"is_dino": {"before": "false", "after": True}})
+    path = "/apda-board/judges/"
+    client = Client()
+    client.cookies["sessionid"] = board
+    secret = "a" * 32
+    client.cookies["csrftoken"] = secret
+    headers = {"Cookie": f"sessionid={board}; csrftoken={secret}"}
+    token_field = rb'(name="csrfmiddlewaretoken" value=")[A-Za-z0-9]+'
+
+    def page(port):
+        status, response_headers, body = request(port, path, extra_headers=headers)
+        expected = client.get(path)
+        assert status == expected.status_code == 200
+        assert response_headers["Cache-Control"] == "private, no-store"
+        assert_html_bytes(re.sub(token_field, rb"\1TOKEN", body), re.sub(token_field, rb"\1TOKEN", expected.content))
+        return body
+
+    with rust_server(overrides=html_assets) as port:
+        body = page(port)
+        assert body.count(b"Not dino") == 1 and b"Dino edits" in body and b"Judge &lt;&amp;&gt;" in body
+        Scratch.objects.create(team=gov, judge=judge, scratch_type=Scratch.TAB_SCRATCH)
+        Judge.objects.filter(pk=judge.pk).update(rank=4, wing_only=True, ballot_code="Dino-Private-fixture")
+        assert re.sub(token_field, rb"\1TOKEN", page(port)) == re.sub(token_field, rb"\1TOKEN", body)
+        token = re.search(token_field, body)[0].split(b'"')[-1].decode()
+        updated = request(port, path, method="POST", extra_headers=headers,
+                          form={"judge": judge.id, "csrfmiddlewaretoken": token})
+        assert updated[0] == 302 and updated[1]["Location"] == path
+        judge.refresh_from_db()
+        assert (judge.is_dino, judge.rank, judge.wing_only, judge.ballot_code) == (
+            False, 4, True, "Dino-Private-fixture",
+        )
+        assert "Dino → Not dino".encode() in page(port)
+        assert request(port, path, cookie=staff)[0] == 403
+        Outround.objects.all().delete()
+        assert request(port, path, extra_headers=headers)[0] == 403
+
+
+@pytest.mark.django_db(transaction=True)
 def test_board_inround_audit_matches_django(html_assets, subtests):
     from mittab.apps.tab.board_audit import pairing_snapshot
 

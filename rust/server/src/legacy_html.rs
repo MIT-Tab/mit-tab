@@ -565,6 +565,10 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/apda_board/inrounds.html"),
         ),
         (
+            "apda_board/judges.html",
+            include_str!("../../../mittab/templates/apda_board/judges.html"),
+        ),
+        (
             "apda_board/_pairing.html",
             include_str!("../../../mittab/templates/apda_board/_pairing.html"),
         ),
@@ -1253,6 +1257,7 @@ fn django_date(value: String, format: String) -> String {
     };
     match format.as_str() {
         "U" => time.and_utc().timestamp().to_string(),
+        "Y-m-d H:i:s T" => time.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
         "M j, g:i a" => format!(
             "{} {}",
             time.format("%b %-d, %-I:%M"),

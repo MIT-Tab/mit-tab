@@ -255,8 +255,24 @@ pub async fn judges(
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
 ) -> Response {
+    let Ok(csrf) = login::TemplateCsrf::new(&headers) else {
+        return unavailable();
+    };
+    let Ok(mut db) = app.db.begin().await else {
+        return unavailable();
+    };
+    let actor = match access::refreshed_user(&mut db, &app, actor, &headers).await {
+        Ok(actor) => actor,
+        Err(error) => {
+            drop(db);
+            return error.response(&app, &headers).await;
+        }
+    };
+    if let Err(error) = access::require_open_board(&mut db, actor).await {
+        drop(db);
+        return error.response(&app, &headers).await;
+    }
     let result = async {
-        let mut db = app.db.begin().await?;
         let mut history: HashMap<i32, Vec<DinoChange>> = HashMap::new();
         for (id, actor, time, before, after) in
             sqlx::query_as::<_, (i32, String, NaiveDateTime, String, String)>(
@@ -275,7 +291,7 @@ pub async fn judges(
         {
             history.entry(id).or_default().push(DinoChange {
                 actor,
-                time: time.format("%b %d %H:%M UTC").to_string(),
+                time: time.format("%Y-%m-%dT%H:%M:%S").to_string(),
                 before: before == "true",
                 after: after == "true",
             });
@@ -293,18 +309,16 @@ pub async fn judges(
             history: history.get(&id),
         })
         .collect();
+        let shell = legacy_html::shell(&mut db, actor, JUDGES).await?;
         db.commit().await?;
-        let Ok(csrf) = html::page_csrf(&headers) else {
-            return Ok(unavailable());
-        };
-        let response = html::render(
-            "board_judges.html",
-            context! {
-                title => "Judges", judges, csrf, nav => Navigation::new(actor, true),
-            },
+        let mut response = legacy_html::render(
+            "apda_board/judges.html",
+            shell,
+            context! { judges, csrf_input => csrf.input() },
             StatusCode::OK,
         );
-        Ok::<_, sqlx::Error>(html::form_response(response, &headers, &csrf))
+        csrf.set_cookie(&mut response, &headers);
+        Ok::<_, sqlx::Error>(response)
     }
     .await;
     result.unwrap_or_else(|_| unavailable())
