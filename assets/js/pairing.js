@@ -327,6 +327,7 @@ function handleJudgeRemoveClick(event) {
 
   const isOutround = $(this).hasClass("outround-judge-remove");
   const endpointPrefix = isOutround ? "outround" : "round";
+  const revision = $(this).attr("data-revision");
 
   function handleRemoveSuccess(response) {
     if (response.success) {
@@ -341,7 +342,10 @@ function handleJudgeRemoveClick(event) {
   }
 
   $.ajax({
-    ...pairingWrite(`/${endpointPrefix}/${roundId}/remove_judge/${judgeId}/`),
+    ...pairingWrite(
+      `/${endpointPrefix}/${roundId}/remove_judge/${judgeId}/`,
+      revision ? { revision } : undefined,
+    ),
     dataType: "json",
     success: handleRemoveSuccess,
     error: handleRemoveError,
@@ -355,6 +359,7 @@ function handleChairClick(event) {
 
   const isOutround = $(this).hasClass("outround-judge-chair");
   const endpointPrefix = isOutround ? "outround" : "round";
+  const revision = $(this).attr("data-revision");
 
   function handleAssignSuccess(response) {
     if (response.success) {
@@ -369,7 +374,10 @@ function handleChairClick(event) {
   }
 
   $.ajax({
-    ...pairingWrite(`/${endpointPrefix}/${roundId}/assign_chair/${judgeId}/`),
+    ...pairingWrite(
+      `/${endpointPrefix}/${roundId}/assign_chair/${judgeId}/`,
+      revision ? { revision } : undefined,
+    ),
     dataType: "json",
     success: handleAssignSuccess,
     error: handleAssignError,

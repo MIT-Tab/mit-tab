@@ -212,11 +212,11 @@ async fn break_submit(
     if !checked(&headers, &fields) {
         return login::csrf_error();
     }
-    let Some(user) = user(actor) else {
+    if user(actor).is_none() {
         return access::access_denied();
-    };
+    }
     let confirmation = fields.flag("confirm").then(|| fields.get("break_revision"));
-    match store::break_tournament(&app, user, confirmation).await {
+    match store::break_tournament(&app, actor, &headers, confirmation).await {
         Ok(()) => staff_roster_notice::saved(&app, &headers, ROOT, "Success!"),
         Err(Error::Invalid(message)) => show_break(&app, actor, &headers, Some(message)).await,
         Err(issue) => error(issue),
@@ -324,9 +324,9 @@ async fn pair_submit(
     if !checked(&headers, &fields) {
         return login::csrf_error();
     }
-    let Some(user) = user(actor) else {
+    if user(actor).is_none() {
         return access::access_denied();
-    };
+    }
     let Some(prior) = Stage::new(division, previous) else {
         return error(Error::Missing);
     };
@@ -338,6 +338,8 @@ async fn pair_submit(
         let result = if let Some(challenger) = challenger.filter(|_| remove || opponent.is_some()) {
             store::set_pick(
                 &app,
+                actor,
+                &headers,
                 prior,
                 challenger,
                 if remove { None } else { opponent },
@@ -364,7 +366,7 @@ async fn pair_submit(
             Err(issue) => error(issue),
         };
     }
-    match store::pair_next(&app, user, prior).await {
+    match store::pair_next(&app, actor, &headers, prior).await {
         Ok(stage) => staff_roster_notice::saved(&app, &headers, &stage.url(), "Success!"),
         Err(Error::Invalid(message)) => {
             show_pair(&app, actor, &headers, prior, false, Some(message), None).await
@@ -424,9 +426,9 @@ async fn assign(
     if !checked(headers, &fields) {
         return login::csrf_error();
     }
-    let Some(user) = user(actor) else {
+    if user(actor).is_none() {
         return access::access_denied();
-    };
+    }
     let mut stages: Vec<_> = ["selected_varsity", "selected_novice"]
         .iter()
         .enumerate()
@@ -459,11 +461,12 @@ async fn assign(
             "Got error during room assignment",
         ),
     };
-    match staff_elimination_assign::assign(app, user, &stages, assignment).await {
+    match staff_elimination_assign::assign(app, actor, headers, &stages, assignment).await {
         Ok(()) => staff_roster_notice::saved(app, headers, &target, success),
         Err(Error::Assignment(message)) => {
             staff_roster_notice::failed(app, headers, &target, &message)
         }
+        Err(Error::Denied) => access::access_denied(),
         Err(_) => staff_roster_notice::failed(app, headers, &target, failure),
     }
 }
@@ -562,10 +565,10 @@ async fn choice(
     if !checked(&headers, &fields) {
         return login::csrf_error();
     }
-    let Some(user) = user(actor) else {
+    if user(actor).is_none() {
         return access::access_denied();
-    };
-    match store::choice(&app, user, id, fields.get("revision")).await {
+    }
+    match store::choice(&app, actor, &headers, id, fields.get("revision")).await {
         Ok((stage, _, _)) if fields.flag("redirect") => access::found(stage.url()),
         Ok((_, value, revision)) => {
             let choice = match value {

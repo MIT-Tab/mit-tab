@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+use axum::http::HeaderMap;
 use mittab_tabulation::{
     judges::{self, Debate, Judge, JudgeError, OutroundGroup, OutroundPolicy, Panel, RankingMode},
     legacy_random::LegacyRandom,
@@ -11,8 +12,9 @@ use sqlx::{MySqlConnection, QueryBuilder};
 use crate::{
     App,
     board_snapshot::{self, Pairings, Snapshot},
+    legacy_session::Actor,
     settings::Settings,
-    staff_elimination_store::{Error, Stage},
+    staff_elimination_store::{Error, Stage, staff_actor},
     staff_pairing::lock_round,
 };
 
@@ -34,12 +36,14 @@ const SETTINGS: &[&str] = &[
 
 pub async fn assign(
     app: &App,
-    user: i32,
+    actor: Actor,
+    headers: &HeaderMap,
     selected: &[Stage],
     assignment: Assignment,
 ) -> Result<(), Error> {
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
+    let user = staff_actor(&mut db, app, actor, headers).await?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
     let before = board_snapshot::capture(&mut db, Pairings::Outround).await?;
     let active: Vec<_> = selected

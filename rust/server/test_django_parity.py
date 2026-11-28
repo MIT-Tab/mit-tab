@@ -7471,9 +7471,6 @@ def test_elimination_staff_and_board_pages_match_django_bytes(html_assets, subte
         with patch("django.middleware.csrf._get_new_csrf_string", return_value=token[1][:32].decode() if token else "a" * 32):
             reference = client.get(path)
         assert status == reference.status_code == 200, (path, status)
-        # Native staff forms include a revision so stale saves can be rejected.
-        if path.startswith("/outround_pairing/") and "/pair/" not in path:
-            body = re.sub(rb' data-revision="[a-f0-9]{64}"', b"", body)
         assert_html_bytes(body, reference.content)
         return body
 
@@ -7599,32 +7596,105 @@ def test_elimination_staff_and_board_pages_match_django_bytes(html_assets, subte
                     assert location == "/403/"
                     assert Outround.objects.get(pk=var.id).victor == Outround.UNKNOWN
 
-        with subtests.test(case="stale staff correction"):
+        with subtests.test(case="staff card revisions and correction responses"):
+            from mittab.apps.tab.board_audit import pairing_revision, pairing_snapshot
+
             csrf = "a" * 32
-            headers = {"Cookie": f"sessionid={staff}; csrftoken={csrf}", "X-CSRFToken": csrf}
             path = "/outround_pairing/0/4"
+            shown = compare(port, path, staff)
             revision = re.search(
                 rb'data-revision="([a-f0-9]{64})"[^>]*>\s*<div[^>]*>\s*<div class="row" round-id="'
-                + str(var.id).encode() + rb'"',
-                request(port, path, extra_headers=headers)[2],
+                + str(var.id).encode() + rb'"', shown,
             )[1].decode()
+            root = f"/outround/{var.id}"
+            room = f"{root}/assign_room/{second_room.id}/"
+            team = f"/outround/pairings/assign_team/{var.id}/gov/{teams[4].id}/"
+            sides = f"{root}/switch_sides/"
+            choice = f"/outround_choice/{var.id}"
+            assign = f"{root}/assign_judge/{eligible.id}/"
+            replace = f"{root}/assign_judge/{unavailable.id}/{chair.id}/"
+            set_chair = f"{root}/assign_chair/{wing.id}/"
+            remove = f"{root}/remove_judge/{eligible.id}/"
+            paths = (room, team, sides, choice, assign, replace, set_chair, remove)
+            client = Client(enforce_csrf_checks=True)
+            client.cookies["csrftoken"] = csrf
 
-            def correction(path, revision):
-                return request(port, path, method="POST", extra_headers=headers, form={"revision": revision})
+            def correction(runtime, url, token, session=staff):
+                if runtime == "rust":
+                    headers = {"Cookie": f"sessionid={session}; csrftoken={csrf}", "X-CSRFToken": csrf}
+                    status, response_headers, body = request(
+                        port, url, method="POST", extra_headers=headers, form={"revision": token},
+                    )
+                else:
+                    client.cookies["sessionid"] = session
+                    response = client.post(url, {"revision": token}, HTTP_X_CSRFTOKEN=csrf)
+                    status, response_headers, body = response.status_code, response.headers, response.content
+                if response_headers.get("Content-Type", "").startswith("application/json"):
+                    body = json.loads(body)
+                return status, response_headers.get("Location"), body
 
-            room_path = f"/outround/{var.id}/assign_room/{second_room.id}/"
-            team_path = f"/outround/pairings/assign_team/{var.id}/gov/{teams[4].id}/"
-            status, _, body = correction(room_path, revision)
-            assert status == 200 and (updated := json.loads(body)["revision"]) != revision
-            assert correction(team_path, revision)[0] == 422
-            assert correction(f"/outround/{var.id}/switch_sides/", revision)[0] == 422
-            assert correction(f"/outround_choice/{var.id}", revision)[0] == 422
-            var.refresh_from_db()
-            assert (var.gov_team_id, var.room_id, var.choice) == (teams[0].id, second_room.id, Outround.GOV)
-            status, _, body = correction(team_path, updated)
-            assert status == 200 and json.loads(body)["revision"] != updated
-            var.refresh_from_db()
-            assert var.gov_team_id == teams[4].id
+            def snapshot():
+                return pairing_snapshot(Outround.objects.get(pk=var.id))
+
+            responses = {}
+            for runtime in ("django", "rust"):
+                with subtests.test(runtime=runtime):
+                    Outround.objects.filter(pk=var.id).update(
+                        room=first_room, gov_team=teams[0], opp_team=teams[1], choice=Outround.GOV, chair=chair,
+                    )
+                    var.judges.set([chair, wing])
+                    current = revision
+                    assert pairing_revision(snapshot()) == current
+                    for url in paths:
+                        assert correction(runtime, url, current, session=board)[:2] == (302, "/403/")
+                    for url in paths:
+                        status, _, body = correction(runtime, url, current)
+                        assert status == 200
+                        updated = body["revision"]
+                        assert updated != current and updated == pairing_revision(snapshot())
+                        if runtime == "django":
+                            responses[url] = body
+                        else:
+                            assert body == responses[url]
+                        saved = snapshot()
+                        audit_count = AuditEvent.objects.count()
+                        for stale_url in paths:
+                            status, _, error = correction(runtime, stale_url, current)
+                            assert status == 422
+                            message = "This pairing changed. Reload it before saving."
+                            assert error == (message.encode() if stale_url == choice else {
+                                "success": False, "error": message,
+                            })
+                        assert snapshot() == saved
+                        assert AuditEvent.objects.count() == audit_count
+                        current = updated
+
+                    # Rejected replacements must preserve the judge assignments and audit history.
+                    for url in (f"{root}/assign_judge/{wing.id}/{wing.id}/",
+                                f"{root}/assign_judge/{eligible.id}/{chair.id}/",
+                                f"{root}/assign_judge/{wing.id}/{unavailable.id}/",
+                                f"{root}/assign_judge/{wing.id}/"):
+                        assert correction(runtime, url, current)[0] == 422
+                    assert snapshot() == saved
+                    assert AuditEvent.objects.count() == audit_count
+
+            from django.contrib.sessions.models import Session
+
+            for runtime in ("django", "rust"):
+                for url in (choice, set_chair, "/outround_pairing/assign_judges/"):
+                    with subtests.test(runtime=runtime, revoked=url):
+                        session = legacy_tab_session(f"queued-card-{runtime}-{url}")
+                        current = pairing_revision(snapshot())
+                        with ThreadPoolExecutor(max_workers=1) as pool:
+                            with transaction.atomic():
+                                TabSettings.objects.select_for_update().filter(key="cur_round").get()
+                                queued = pool.submit(correction, runtime, url, current, session)
+                                with pytest.raises(FutureTimeout):
+                                    queued.result(timeout=0.5)
+                                Session.objects.filter(session_key=session).delete()
+                            assert queued.result()[:2] == (302, "/403/")
+                        assert snapshot() == saved
+                        assert AuditEvent.objects.count() == audit_count
 
         # Challenge entry before the opening varsity round, with and without a saved pick.
         Outround.objects.filter(type_of_round=0).delete()

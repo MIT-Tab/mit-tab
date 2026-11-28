@@ -1,23 +1,23 @@
 import random
 import math
-from functools import wraps
-from types import SimpleNamespace
 from urllib.parse import urlencode
 
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
-from django.contrib.auth import get_user
 from django.contrib.auth.decorators import permission_required, user_passes_test
 from django.db import transaction
 from django.db.models import Q, Exists, OuterRef, Min
 from django.shortcuts import redirect, reverse
 
-from mittab.apps.tab.auth_roles import is_apda_board_user, is_restricted_staff_user
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.apps.tab.board_audit import (
     audit_pairing_change, audit_pairing_generation, manual_team_edits, pairing_revision,
+    with_pairing_snapshot_relations,
+)
+from mittab.apps.tab.staff_pairing import (
+    correction_error, serialize_elimination_post, staff_elimination_correction,
 )
 from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.apps.tab.live_results import published_team_placements
@@ -32,30 +32,6 @@ from mittab.libs.data_export.pairings_export import export_pairings_csv
 from mittab.libs.cacheing.public_cache import (
     invalidate_outround_public_pairings_cache,
 )
-
-
-def serialize_elimination_post(view):
-    @wraps(view)
-    def wrapped(request, *args, **kwargs):
-        if request.method != "POST":
-            return view(request, *args, **kwargs)
-        with transaction.atomic():
-            # Match the tournament lock used by staff ballot entry and advancement.
-            lock_id = (TabSettings.objects.select_for_update().filter(key="cur_round")
-                       .order_by("id").values_list("id", flat=True).first())
-            if lock_id is None:
-                return HttpResponse("Unable to complete this request.", status=503,
-                                    content_type="text/plain; charset=utf-8",
-                                    headers={"Cache-Control": "private, no-store"})
-            session = type(request.session)(session_key=request.session.session_key)
-            actor = get_user(SimpleNamespace(session=session))
-            if (not actor.is_authenticated or actor.pk != request.user.pk
-                    or is_apda_board_user(actor) or is_restricted_staff_user(actor)
-                    or not actor.has_perm("tab.tab_settings.can_change")):
-                return redirect("/403/")
-            request.user = actor
-            return view(request, *args, **kwargs)
-    return wrapped
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -374,6 +350,7 @@ def _existing_selected_specs(selected_specs):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_elimination_post
 @audit_pairing_generation(Outround, "staff break")
 def break_teams(request):
     if request.method == "POST":
@@ -505,7 +482,7 @@ def outround_pairing_view(request,
     excluded_teams_map = {}
     outround_ids = []
     for selected_type, selected_num in selected_specs:
-        section_outrounds = list(
+        section_outrounds = list(with_pairing_snapshot_relations(
             Outround.objects.filter(
                 type_of_round=selected_type,
                 num_teams=selected_num
@@ -515,10 +492,11 @@ def outround_pairing_view(request,
                 "opp_team__required_room_tags",
                 "judges__required_room_tags",
             )
-        )
+        ))
         team_edits = manual_team_edits(Outround, [pair.pk for pair in section_outrounds])
         for pairing in section_outrounds:
             pairing.manual_team_positions = team_edits.get(pairing.pk, set())
+            pairing.revision = pairing_revision(pairing)
         outround_ids.extend(outround.id for outround in section_outrounds)
         judges_per_panel = (
             TabSettings.get("var_panel_size", 3)
@@ -729,6 +707,7 @@ def alternative_judges(request, round_id, judge_id=None):
         excluded_judges = checked_in_judges
         included_judges = checked_in_judges.filter(judges_outrounds=round_obj).distinct()
 
+    included_judges = included_judges.exclude(judges_outrounds=round_obj)
     excluded_judges = excluded_judges.exclude(judges_outrounds=round_obj).distinct()
 
     eligible_excluded = assign_judges.can_judge_teams(
@@ -825,18 +804,24 @@ def alternative_teams(request, round_id, current_team_id, position):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@staff_elimination_correction()
 @audit_pairing_change(Outround, "staff team correction")
 def assign_team(request, round_id, position, team_id):
     try:
         round_obj = Outround.objects.get(id=int(round_id))
         team_obj = Team.objects.get(id=int(team_id))
 
-        if position.lower() == "gov":
+        if position == "gov" and team_obj.pk == round_obj.opp_team_id:
+            return correction_error("Choose a different team for each side.")
+        if position == "opp" and team_obj.pk == round_obj.gov_team_id:
+            return correction_error("Choose a different team for each side.")
+
+        if position == "gov":
             round_obj.gov_team = team_obj
-        elif position.lower() == "opp":
+        elif position == "opp":
             round_obj.opp_team = team_obj
         else:
-            raise ValueError("Got invalid position: " + position)
+            return correction_error("Choose a side.")
         round_obj.save()
 
         data = {
@@ -853,6 +838,7 @@ def assign_team(request, round_id, position, team_id):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@staff_elimination_correction()
 @audit_pairing_change(Outround, "staff side correction")
 def switch_sides(request, round_id):
     try:
@@ -885,46 +871,37 @@ def switch_sides(request, round_id):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@staff_elimination_correction()
 def assign_judge(request, round_id, judge_id, remove_id=None):
     try:
         round_obj = Outround.objects.get(id=int(round_id))
         judge_obj = Judge.objects.get(id=int(judge_id))
-        round_obj.judges.add(judge_obj)
-
+        remove_obj = None
         if remove_id is not None:
-            remove_obj = Judge.objects.get(id=int(remove_id))
+            if int(remove_id) == judge_obj.pk:
+                return correction_error("Choose a different replacement judge.")
+            remove_obj = round_obj.judges.filter(pk=remove_id).first()
+            if remove_obj is None:
+                return correction_error("The previous judge is no longer on this panel.")
+
+        if round_obj.judges.filter(pk=judge_obj.pk).exists():
+            return correction_error("This judge is already on this panel.")
+
+        round_obj.judges.add(judge_obj)
+        changes = {"assigned_judge": judge_obj.name}
+        note = f"Assigned {judge_obj.name}"
+        if remove_obj is not None:
             round_obj.judges.remove(remove_obj)
-            AuditEvent.record(
-                round_obj,
-                AuditEvent.MANUAL_JUDGE_ASSIGN,
-                request.user,
-                changes={
-                    "assigned_judge": judge_obj.name,
-                    "removed_judge": remove_obj.name,
-                },
-                note=f"Swapped {remove_obj.name} for {judge_obj.name}",
-            )
-
+            changes["removed_judge"] = remove_obj.name
+            note = f"Swapped {remove_obj.name} for {judge_obj.name}"
             if remove_obj == round_obj.chair:
-                round_obj.chair = round_obj.judges.order_by("-rank").first()
-        elif not round_obj.chair:
+                round_obj.chair = round_obj.judges.order_by("-rank", "name", "pk").first()
+        if not round_obj.chair_id:
             round_obj.chair = judge_obj
-            AuditEvent.record(
-                round_obj,
-                AuditEvent.MANUAL_JUDGE_ASSIGN,
-                request.user,
-                changes={"assigned_judge": judge_obj.name},
-                note=f"Assigned {judge_obj.name}",
-            )
-        else:
-            AuditEvent.record(
-                round_obj,
-                AuditEvent.MANUAL_JUDGE_ASSIGN,
-                request.user,
-                changes={"assigned_judge": judge_obj.name},
-                note=f"Assigned {judge_obj.name}",
-            )
-
+        AuditEvent.record(
+            round_obj, AuditEvent.MANUAL_JUDGE_ASSIGN, request.user,
+            changes=changes, note=note,
+        )
         round_obj.save()
         data = {
             "success": True,
@@ -1037,6 +1014,7 @@ def toggle_pairing_released(request, type_of_round, num_teams):
     return JsonResponse(data)
 
 
+@staff_elimination_correction(choice=True)
 @audit_pairing_change(Outround, "staff choice correction")
 def update_choice(request, outround_id):
     outround = get_object_or_404(Outround, pk=outround_id)
@@ -1047,6 +1025,8 @@ def update_choice(request, outround_id):
         outround.choice = 0
 
     outround.save()
+    if request.POST.get("redirect", "").lower() in {"true", "on", "1"}:
+        return redirect("outround_pairing_view", outround.type_of_round, outround.num_teams)
     data = {
         "success": True,
         "data": f"{outround.get_choice_display()} choice",
@@ -1163,6 +1143,7 @@ def alternative_rooms(request, round_id, current_room_id=None):
     })
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_elimination_post
 @audit_pairing_generation(Outround, "staff judge assignment")
 def assign_judges_to_pairing(request, round_type=None):
     if request.method != "POST":
@@ -1203,6 +1184,7 @@ def assign_judges_to_pairing(request, round_type=None):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_elimination_post
 @audit_pairing_generation(Outround, "staff room assignment")
 def assign_rooms_to_pairing(request):
     if request.method != "POST":

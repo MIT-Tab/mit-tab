@@ -186,13 +186,28 @@ pub async fn break_revision(
     ))))
 }
 
+pub(super) async fn staff_actor(
+    db: &mut MySqlConnection,
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+) -> Result<i32, Error> {
+    match access::settings_actor(db, app, actor, headers).await {
+        Ok(Actor::User { id, .. }) => Ok(id),
+        Err(access::PortalAccessError::Database) => Err(Error::Database),
+        _ => Err(Error::Denied),
+    }
+}
+
 pub async fn break_tournament(
     app: &App,
-    user: i32,
+    actor: Actor,
+    headers: &HeaderMap,
     confirmation: Option<&str>,
 ) -> Result<(), Error> {
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
+    let user = staff_actor(&mut db, app, actor, headers).await?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
     if let Some(problem) = readiness(&mut db, &settings).await?.first() {
         return Err(Error::Invalid(problem));
@@ -531,6 +546,8 @@ pub async fn prepare(
 
 pub async fn set_pick(
     app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
     prior: Stage,
     challenger: i32,
     opponent: Option<i32>,
@@ -540,6 +557,7 @@ pub async fn set_pick(
     }
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
+    staff_actor(&mut db, app, actor, headers).await?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
     let state = match prepare(&mut db, &settings, prior).await {
         Ok(state) if state.enabled => state,
@@ -615,9 +633,15 @@ fn challenge_error(error: outrounds::ChallengeError) -> Error {
     }
 }
 
-pub async fn pair_next(app: &App, user: i32, prior: Stage) -> Result<Stage, Error> {
+pub async fn pair_next(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    prior: Stage,
+) -> Result<Stage, Error> {
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
+    let user = staff_actor(&mut db, app, actor, headers).await?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
     let state = prepare(&mut db, &settings, prior).await?;
     let target = state.stage;
@@ -778,11 +802,7 @@ pub async fn ballot(
     }
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
-    let user = match access::settings_actor(&mut db, app, actor, headers).await {
-        Ok(Actor::User { id, .. }) => id,
-        Err(access::PortalAccessError::Database) => return Err(Error::Database),
-        _ => return Err(Error::Denied),
-    };
+    let user = staff_actor(&mut db, app, actor, headers).await?;
     let before = board_snapshot::capture(&mut db, Pairings::Outround).await?;
     let original = before.get(&id).cloned().ok_or(Error::Missing)?;
     if !revision.is_empty() && revision != original.revision() {
@@ -864,12 +884,14 @@ pub async fn ballot(
 
 pub async fn choice(
     app: &App,
-    user: i32,
+    actor: Actor,
+    headers: &HeaderMap,
     id: i32,
     revision: &str,
 ) -> Result<(Stage, i32, String), Error> {
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
+    let user = staff_actor(&mut db, app, actor, headers).await?;
     let before = board_snapshot::capture(&mut db, Pairings::Outround).await?;
     let original = before.get(&id).ok_or(Error::Missing)?;
     if !revision.is_empty() && original.revision() != revision {

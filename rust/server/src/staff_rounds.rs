@@ -136,12 +136,7 @@ async fn save(
     if !login::valid_csrf(&headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
-    let Actor::User {
-        id: user,
-        board: false,
-        ..
-    } = actor
-    else {
+    let Actor::User { board: false, .. } = actor else {
         return access::access_denied();
     };
     let target = fields
@@ -179,7 +174,16 @@ async fn save(
         )
         .await;
     };
-    match store::adjust(&app.db, user, kind, id, option, fields.get("revision")).await {
+    match store::adjust(
+        &app,
+        (actor, &headers),
+        kind,
+        id,
+        option,
+        fields.get("revision"),
+    )
+    .await
+    {
         Ok(_) => access::found(format!("/{}/{id}/edit/", kind.model())),
         Err(Error::Invalid(error)) => {
             editor_page(&app, actor, kind, id, &headers, Some(error)).await
@@ -198,6 +202,7 @@ fn error_response(error: Error) -> Response {
             StatusCode::UNPROCESSABLE_ENTITY,
             json!({"success": false, "error": error}),
         ),
+        Error::Denied => access::access_denied(),
         Error::Database => unavailable(),
     }
 }
@@ -221,16 +226,20 @@ async fn action(
     if !login::valid_csrf(headers, token) {
         return login::csrf_error();
     }
-    let Actor::User {
-        id: user,
-        board: false,
-        ..
-    } = actor
-    else {
+    let Actor::User { board: false, .. } = actor else {
         return access::access_denied();
     };
     let (kind, id, operation) = data;
-    match store::adjust(&app.db, user, kind, id, operation, fields.get("revision")).await {
+    match store::adjust(
+        app,
+        (actor, headers),
+        kind,
+        id,
+        operation,
+        fields.get("revision"),
+    )
+    .await
+    {
         Ok(result) => json_response(StatusCode::OK, result),
         Err(error) => error_response(error),
     }

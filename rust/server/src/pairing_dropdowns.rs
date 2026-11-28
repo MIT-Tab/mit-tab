@@ -326,7 +326,7 @@ async fn outround_judges(
             current_judge =
                 Some(context! { name => &name, rank => &rank, wing_only, request_wing, no_wings });
         }
-        if checked && eligible && (occupied || !assigned) {
+        if checked && eligible && !assigned {
             let number = rank.parse::<f64>().unwrap_or_default();
             let rank = if number.fract() == 0.0 {
                 format!("{number:.1}")

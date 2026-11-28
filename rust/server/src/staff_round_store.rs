@@ -1,10 +1,13 @@
 use std::collections::BTreeMap;
 
+use axum::http::HeaderMap;
 use serde_json::{Value, json};
-use sqlx::{AssertSqlSafe, MySqlConnection, MySqlPool};
+use sqlx::{AssertSqlSafe, MySqlConnection};
 
 use crate::{
+    App, access,
     board_snapshot::{self, Identity, Pairings, Snapshot},
+    legacy_session::Actor,
     round_audit,
     staff_pairing::lock_round,
     staff_roster_data::{self as roster, Kind},
@@ -143,6 +146,7 @@ impl Adjustment {
 pub enum Error {
     Missing,
     Invalid(&'static str),
+    Denied,
     Database,
 }
 
@@ -153,15 +157,20 @@ impl From<sqlx::Error> for Error {
 }
 
 pub async fn adjust(
-    pool: &MySqlPool,
-    user: i32,
+    app: &App,
+    (actor, headers): (Actor, &HeaderMap),
     kind: Debate,
     id: i32,
     operation: Adjustment,
     revision: &str,
 ) -> Result<Value, Error> {
-    let mut tx = pool.begin().await?;
+    let mut tx = app.db.begin().await?;
     lock_round(&mut tx).await?;
+    let user = match access::settings_actor(&mut tx, app, actor, headers).await {
+        Ok(Actor::User { id, .. }) => id,
+        Err(access::PortalAccessError::Database) => return Err(Error::Database),
+        _ => return Err(Error::Denied),
+    };
     let before = load(&mut tx, kind, id).await?.ok_or(Error::Missing)?;
     if !revision.is_empty() && before.snapshot.revision() != revision {
         return Err(Error::Invalid(
@@ -370,6 +379,9 @@ async fn set_judge(
     } else {
         None
     };
+    if kind == Debate::Outround && member(debate, judge).is_some() {
+        return Err(Error::Invalid("This judge is already on this panel."));
+    }
     let (table, column) = kind.panel();
     let sql = format!(
         "INSERT INTO {table} ({column}, judge_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE judge_id = judge_id"

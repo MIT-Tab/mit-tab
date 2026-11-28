@@ -21,6 +21,7 @@ from mittab.apps.tab.board_audit import (
     audit_pairing_change, audit_pairing_generation, manual_team_edits,
 )
 from mittab.apps.tab.judge_history import current_manual_judge_events
+from mittab.apps.tab.staff_pairing import correction_error, staff_elimination_correction
 from mittab.apps.tab.written_rfd import (
     round_allows_written_rfd,
     written_rfd_editing_open,
@@ -290,6 +291,7 @@ def alternative_rooms(request, round_id, current_room_id=None):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@staff_elimination_correction(shared=True)
 @audit_pairing_change(None, "staff room correction")
 def assign_room(request, round_id, new_room_id, outround=False):
     try:
@@ -1206,12 +1208,15 @@ def delete_obj(obj_type):
     for obj in objs:
         obj_type.delete(obj)
 
+@staff_elimination_correction(shared=True)
 def remove_judge(request, round_id, judge_id, is_outround=False):
     round_id, judge_id = int(round_id), int(judge_id)
     round_model = Outround if is_outround else Round
     round_obj = get_object_or_404(round_model, id=round_id)
-    judge = get_object_or_404(Judge, id=judge_id)
-    all_judges = list(round_obj.judges.all().order_by("-rank"))
+    all_judges = list(round_obj.judges.order_by("-rank", "name", "pk") if is_outround
+                      else round_obj.judges.order_by("-rank"))
+    judge = (next((member for member in all_judges if member.pk == judge_id), None)
+             if is_outround else get_object_or_404(Judge, id=judge_id))
     if judge in all_judges:
         round_obj.judges.remove(judge)
         all_judges.remove(judge)
@@ -1229,16 +1234,22 @@ def remove_judge(request, round_id, judge_id, is_outround=False):
                 round_obj.chair = None
             round_obj.save()
         return JsonResponse({"success": True})
+    if is_outround:
+        return correction_error("Judge not found on this panel.")
     return redirect_and_flash_error(request, "Judge not found in round")
 
+@staff_elimination_correction(shared=True)
 def assign_chair(request, round_id, chair_id, is_outround=False):
     round_id, chair_id = int(round_id), int(chair_id)
     round_model = Outround if is_outround else Round
     round_obj = get_object_or_404(round_model, id=round_id)
-    chair = get_object_or_404(Judge, id=chair_id)
-    if chair in round_obj.judges.all():
+    chair = (round_obj.judges.filter(pk=chair_id).first() if is_outround
+             else get_object_or_404(Judge, id=chair_id))
+    if chair and chair in round_obj.judges.all():
         try:
             old_chair = round_obj.chair
+            if is_outround and chair == old_chair:
+                return JsonResponse({"success": True})
             round_obj.chair = chair
             round_obj.save()
             AuditEvent.record(
@@ -1254,6 +1265,8 @@ def assign_chair(request, round_id, chair_id, is_outround=False):
             return JsonResponse({"success": True})
         except ValueError:
             return redirect_and_flash_error(request, "Chair could not be assigned")
+    if is_outround:
+        return correction_error("Choose a judge assigned to this panel.")
     return redirect_and_flash_error(request, "Judge not found in round")
 
 

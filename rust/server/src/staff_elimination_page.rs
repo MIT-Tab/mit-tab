@@ -187,7 +187,7 @@ pub async fn render(
                 chair_id => data.chair, room => &data.room, victor => data.victor,
                 judges, get_choice_display => choice_label, manual_team_positions => positions,
                 manual_events => manual.remove(&id).unwrap_or_default(),
-                native_revision => data.revision(),
+                revision => data.revision(),
             });
         }
         excluded_teams.extend(roster.iter().filter_map(|(kind, team)| {

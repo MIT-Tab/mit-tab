@@ -201,9 +201,11 @@ function populateAlternativeJudges() {
   $.ajax({
     url,
     success(result) {
-      $parent.find(".dropdown-menu").html(result);
-      $parent
-        .find(".dropdown-menu")
+      const $menu = $parent.find(".dropdown-menu").html(result);
+      $menu
+        .find(".outround-judge-remove, .outround-judge-chair")
+        .attr("data-revision", revision);
+      $menu
         .find(".judge-assign")
         .click((event) => assignJudge(event, $card, revision));
       quickSearchInit($parent.find("#quick-search"));
