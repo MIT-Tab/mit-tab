@@ -238,8 +238,14 @@ fn templates(env: &mut Environment<'static>) {
         upstream!("filter.html"),
         upstream!("pagination.html"),
         upstream!("object_history.html"),
-        upstream!("delete_confirmation.html"),
-        upstream!("delete_selected_confirmation.html"),
+        (
+            "admin/delete_confirmation.html",
+            include_str!("../../../mittab/templates/admin/delete_confirmation.html"),
+        ),
+        (
+            "admin/delete_selected_confirmation.html",
+            include_str!("../../../mittab/templates/admin/delete_selected_confirmation.html"),
+        ),
         upstream!("includes/object_delete_summary.html"),
         upstream!("change_form_object_tools.html"),
         upstream!("submit_line.html"),
@@ -276,10 +282,6 @@ fn translate(source: &str) -> String {
         .replace(
             "{% csrf_token %}{% block form_top %}",
             r#"{% csrf_token %}{% if pairing_revision %}<input type="hidden" name="mittab_pairing_revision" value="{{ pairing_revision }}">{% endif %}{% if registration_revision %}<input type="hidden" name="mittab_registration_revision" value="{{ registration_revision }}">{% endif %}{% if registration_delete_revision %}<input type="hidden" name="mittab_registration_delete_revision" value="{{ registration_delete_revision }}">{% endif %}{% if resource_revision %}<input type="hidden" name="{{ resource_revision_name }}" value="{{ resource_revision }}">{% endif %}{% block form_top %}"#,
-        )
-        .replace(
-            r#"<input type="hidden" name="post" value="yes">"#,
-            r#"<input type="hidden" name="post" value="yes">{% if delete_scope %}<input type="hidden" name="mittab_delete_scope" value="{{ delete_scope }}">{% endif %}"#,
         )
         .replace("{% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}", " By {{ title }} ")
         .replace("{% blocktranslate count counter=cl.result_count %}{{ counter }} result{% plural %}{{ counter }} results{% endblocktranslate %}", "{{ cl.result_count }} result{% if cl.result_count != 1 %}s{% endif %}")

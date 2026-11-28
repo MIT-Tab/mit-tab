@@ -10,14 +10,16 @@ from django.db import router, transaction
 from django.db.models import Exists, OuterRef, Q, QuerySet
 from django.http import HttpResponse
 from django.shortcuts import redirect
+from django.utils.crypto import constant_time_compare
 
 from mittab.apps.tab import models
+from mittab.apps.tab.admin_delete_scope import room_deletion_scope
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME, is_apda_board_user
 from mittab.libs.cacheing.cache_logic import refresh_rankings_after_commit
 from mittab.libs.cacheing.public_cache import invalidate_outround_public_pairings_cache
 from mittab.libs.outround_tab_logic.pairing import prepare_challenge_edits
 from mittab.apps.tab.board_operations import recompute_seeds
-from mittab.apps.tab.live_results import published_team_placements
+from mittab.apps.tab.live_results import lock_elimination_tournament, published_team_placements
 from mittab.apps.tab.board_audit import (
     pairing_snapshot, record_pairing_change, record_pairing_removal, with_pairing_snapshot_relations,
 )
@@ -99,7 +101,12 @@ class ProtectedDeletionMixin:
         deleted, counts, permissions, protected = super().get_deleted_objects(objs, request)
         if reason:
             protected.append(reason)
+        if not (permissions or protected):
+            self.review_deletion_scope(request, selected, deleted, counts, confirmed, protected)
         return deleted, counts, permissions, protected
+
+    def review_deletion_scope(self, request, selected, deleted, counts, confirmed, protected):
+        """Allow a model to require confirmation of the dependencies it showed."""
 
 
 class SchoolAdmin(ProtectedDeletionMixin, admin.ModelAdmin):
@@ -121,11 +128,11 @@ class DebaterAdmin(ProtectedDeletionMixin, admin.ModelAdmin):
 class RoomAdmin(ProtectedDeletionMixin, admin.ModelAdmin):
     def _lock_selection(self, selected):
         # Coordinate room deletion with staff and Board elimination writes.
-        settings = list(models.TabSettings.objects.using(selected.db).select_for_update()
-                        .filter(key__in=("cur_round", "tot_rounds"))
-                        .order_by("id").values_list("pk", flat=True))
+        tournament = lock_elimination_tournament(using=selected.db)
         ids = super()._lock_selection(selected)
-        if not settings and models.Outround.objects.using(selected.db).filter(room_id__in=ids).exists():
+        pairings = list(models.Outround.objects.using(selected.db).select_for_update()
+                        .filter(room_id__in=ids).order_by("pk").values_list("pk", flat=True))
+        if tournament is None and pairings:
             raise ProtectedAdminChange("Unable to complete this request.", status=503)
         return ids
 
@@ -139,6 +146,37 @@ class RoomAdmin(ProtectedDeletionMixin, admin.ModelAdmin):
         if removed.filter(Exists(later)).exists():
             return "Resolve the later stage before deleting this pairing."
         return None
+
+    def review_deletion_scope(self, request, selected, deleted, counts, confirmed, protected):
+        if not deleted:
+            return
+        scope = room_deletion_scope(request, selected, deleted, counts)
+        request.room_deletion_scope = scope
+        if confirmed and not constant_time_compare(scope, request.POST.get("mittab_delete_scope", "")):
+            request.room_deletion_scope_changed = True
+            # Stop Django's stock delete handling. The refreshed preview replaces this stop flag.
+            protected.append("Review updated deletion")
+
+    @staticmethod
+    def _show_deletion_scope(request, context):
+        context["delete_scope"] = getattr(request, "room_deletion_scope", None)
+        stale = getattr(request, "room_deletion_scope_changed", False)
+        if stale:
+            context.update(title="Review updated deletion", protected=[])
+        return stale
+
+    def render_delete_form(self, request, context):
+        stale = self._show_deletion_scope(request, context)
+        response = super().render_delete_form(request, context)
+        if stale:
+            response.status_code = 409
+        return response
+
+    def delete_selected_safely(self, request, queryset):
+        response = super().delete_selected_safely(request, queryset)
+        if hasattr(response, "context_data") and self._show_deletion_scope(request, response.context_data):
+            response.status_code = 409
+        return response
 
     @staticmethod
     def _pairings(rooms):
@@ -264,6 +302,22 @@ class RoundAdmin(PairingAuditAdminMixin, admin.ModelAdmin):
 class OutroundAdmin(PairingAuditAdminMixin, admin.ModelAdmin):
     form = OutroundAdminForm
     filter_horizontal = ("judges", )
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        try:
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        except AdminAccessChanged:
+            return redirect("/403/")
+        except ProtectedAdminChange as error:
+            return _protected_deletion_response(error, 409)
+
+    def save_model(self, request, obj, form, change):
+        database = router.db_for_write(self.model)
+        lock_elimination_tournament(using=database)
+        _require_current_admin(request)
+        if obj.room_id and not models.Room.objects.using(database).filter(pk=obj.room_id).exists():
+            raise ProtectedAdminChange("This room changed. Reload the form before saving.")
+        super().save_model(request, obj, form, change)
 
 
 class RankingInputAdmin(admin.ModelAdmin):

@@ -9309,7 +9309,8 @@ def test_admin_room_delete_preserves_later_elimination_stages(html_assets):
 
         allowed = f"{root}{last.id}/delete/"
         with transaction.atomic():
-            assert client.post(allowed, {"post": "yes"}).status_code == 302
+            scope = admin_delete_proof(client.get(allowed).content)
+            assert client.post(allowed, {"post": "yes", "mittab_delete_scope": scope}).status_code == 302
             assert_final_was_removed()
             transaction.set_rollback(True)
         status, _, page = request(port, allowed, extra_headers=headers)
@@ -9318,6 +9319,148 @@ def test_admin_room_delete_preserves_later_elimination_stages(html_assets):
             "post": "yes", "csrfmiddlewaretoken": csrf, "mittab_delete_scope": admin_delete_proof(page),
         })[0] == 302
         assert_final_was_removed()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("mode", ("direct", "bulk"))
+def test_room_deletion_requires_confirmation_of_current_dependencies(html_assets, mode):
+    staff = legacy_tab_session(f"room-scope-{mode}")
+    other_staff = legacy_tab_session(f"room-scope-other-{mode}")
+    TabSettings.set("cur_round", 4)
+    school = School.objects.create(name="Confirmation School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Government", "Opposition")]
+    room = Room.objects.create(name="Confirmation Hall", rank=1)
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = csrf
+    root = "/admin/tab/room/"
+    path = root if mode == "bulk" else f"{root}{room.id}/delete/"
+    selection = {"action": "delete_selected", "index": "0", "_selected_action": room.id} if mode == "bulk" else {}
+    confirmation = {**selection, "post": "yes"}
+
+    def native(port, fields=None, session=staff):
+        headers = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+        if fields is None:
+            return request(port, path, extra_headers=headers)
+        return request(port, path, method="POST", extra_headers=headers,
+                       form={**fields, "csrfmiddlewaretoken": csrf})
+
+    with rust_server(overrides=html_assets) as port:
+        if mode == "bulk":
+            round_obj = Outround.objects.create(num_teams=2, gov_team=gov, opp_team=opp, room=room)
+        preview = native(port, selection or None)
+        reference = client.post(path, selection) if selection else client.get(path)
+        native_scope = admin_delete_proof(preview[2])
+        django_scope = admin_delete_proof(reference.content)
+        assert preview[0] == reference.status_code == 200
+
+        if mode == "bulk":
+            # A result changes the deletion scope even though the preview label is unchanged.
+            Outround.objects.filter(pk=round_obj.pk).update(victor=Outround.GOV)
+        else:
+            round_obj = Outround.objects.create(num_teams=2, gov_team=gov, opp_team=opp, room=room)
+
+        def stale_reply(port, dj_proof, rs_proof):
+            status, _, body = native(port, {**confirmation, "mittab_delete_scope": rs_proof})
+            csrf_mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)[1][:32].decode()
+            with patch("django.middleware.csrf._get_new_csrf_string", return_value=csrf_mask):
+                expected = client.post(path, {**confirmation, "mittab_delete_scope": dj_proof})
+            assert status == expected.status_code == 409
+            assert b"Review updated deletion" in body and b"Outround 2 between" in body
+            actual_scope = admin_delete_proof(body)
+            expected_scope = admin_delete_proof(expected.content)
+            assert_html_bytes(body.replace(actual_scope.encode(), b"SCOPE"),
+                              expected.content.replace(expected_scope.encode(), b"SCOPE"))
+            assert Room.objects.filter(pk=room.pk).exists()
+            assert Outround.objects.filter(pk=round_obj.pk, room=room).exists()
+            return expected_scope, actual_scope
+
+        updated_django, updated_native = stale_reply(port, django_scope, native_scope)
+        assert updated_django != django_scope and updated_native != native_scope
+        assert stale_reply(port, "", "") == (updated_django, updated_native)
+        assert native(port, {**confirmation, "mittab_delete_scope": updated_native}, session=other_staff)[0] == 409
+        other = Client()
+        other.cookies["sessionid"] = other_staff
+        assert other.post(path, {**confirmation, "mittab_delete_scope": updated_django}).status_code == 409
+        assert Room.objects.filter(pk=room.pk).exists()
+
+        with transaction.atomic():
+            assert client.post(path, {**confirmation, "mittab_delete_scope": updated_django}).status_code == 302
+            assert not Room.objects.filter(pk=room.pk).exists()
+            assert not Outround.objects.filter(pk=round_obj.pk).exists()
+            transaction.set_rollback(True)
+        assert native(port, {**confirmation, "mittab_delete_scope": updated_native})[0] == 302
+        assert not Room.objects.filter(pk=room.pk).exists()
+        assert not Outround.objects.filter(pk=round_obj.pk).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_publication_waits_for_confirmed_admin_room_deletion():
+    from mittab.apps.tab.live_results import lock_elimination_tournament, published_team_placements
+    from mittab.apps.tab.models import PublishedOutroundStage
+
+    session = legacy_tab_session("room-delete-publication")
+    TabSettings.set("cur_round", 6)
+    TabSettings.set("var_teams_visible", 2)
+    school = School.objects.create(name="Publication School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Gov", "Opp")]
+    room = Room.objects.create(name="Published Room", rank=1)
+    Outround.objects.create(num_teams=2, gov_team=gov, opp_team=opp, room=room, victor=Outround.GOV)
+    assert published_team_placements(0) == {gov.id: 1, opp.id: 2}
+    path = f"/admin/tab/room/{room.id}/delete/"
+    client = Client()
+    client.cookies["sessionid"] = session
+    scope = admin_delete_proof(client.get(path).content)
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with transaction.atomic():
+            assert lock_elimination_tournament() is not None
+            pending = pool.submit(published_team_placements, 0)
+            with pytest.raises(FutureTimeout):
+                pending.result(timeout=0.5)
+            assert client.post(path, {"post": "yes", "mittab_delete_scope": scope}).status_code == 302
+        assert pending.result(timeout=6) == {}
+    assert not PublishedOutroundStage.objects.filter(type_of_round=0).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_outround_add_cannot_use_room_deleted_while_waiting():
+    from mittab.apps.tab.live_results import lock_elimination_tournament
+
+    session = legacy_tab_session("admin-outround-room-race")
+    TabSettings.set("cur_round", 6)
+    school = School.objects.create(name="Admin Room Race School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Gov", "Opp")]
+    room = Room.objects.create(name="Room Pending Deletion", rank=1)
+    judge = Judge.objects.create(name="Chair", rank=1)
+    delete_path = f"/admin/tab/room/{room.id}/delete/"
+    client = Client()
+    client.cookies["sessionid"] = session
+    scope = admin_delete_proof(client.get(delete_path).content)
+    room_id = room.id
+
+    def new_round():
+        other = Client()
+        other.cookies["sessionid"] = session
+        return other.post("/admin/tab/outround/add/", {
+            "num_teams": 2, "type_of_round": Outround.VARSITY,
+            "gov_team": gov.id, "opp_team": opp.id, "room": room_id,
+            "chair": judge.id, "judges": [judge.id],
+            "victor": Outround.UNKNOWN, "choice": Outround.UNKNOWN,
+        })
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with transaction.atomic():
+            assert lock_elimination_tournament() is not None
+            pending = pool.submit(new_round)
+            with pytest.raises(FutureTimeout):
+                pending.result(timeout=0.5)
+            assert client.post(delete_path, {"post": "yes", "mittab_delete_scope": scope}).status_code == 302
+        response = pending.result(timeout=6)
+    assert response.status_code == 409
+    assert b"This room changed." in response.content
+    assert not Outround.objects.exists()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -10068,9 +10211,13 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
     if status == 302:
         assert headers["Location"] == reference["Location"], path
     else:
+        expected_body = reference.content
         if deletion_scope:
-            body, metadata = re.subn(rb'<input type="hidden" name="mittab_delete_scope" value="[a-f0-9]{64}">', b"", body)
+            field = rb'<input type="hidden" name="mittab_delete_scope" value="[a-f0-9]{64}">'
+            marker = b"<DELETE_SCOPE>" if re.search(field, expected_body) else b""
+            body, metadata = re.subn(field, marker, body)
             assert metadata == 1
+            expected_body = re.sub(field, marker, expected_body)
         if pairing_revision:
             body, metadata = re.subn(rb'<input type="hidden" name="mittab_pairing_revision" value="[a-f0-9]{64}">', b"", body)
             assert metadata == 1
@@ -10137,7 +10284,7 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
         if scratch_revision:
             body, removed = re.subn(rb'<input type="hidden" name="mittab_scratch_revision" value="[a-f0-9]{64}">', b"", body)
             assert removed == 1
-        assert_html_bytes(body, reference.content)
+        assert_html_bytes(body, expected_body)
     return body
 
 

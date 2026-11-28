@@ -11,12 +11,24 @@ from mittab.apps.tab.models import (
 from mittab.apps.tab.public_pages import released_outrounds
 
 
+def lock_elimination_tournament(*, using=None):
+    settings = TabSettings.objects.using(using).select_for_update().order_by("id")
+    for key in ("cur_round", "tot_rounds"):
+        lock = settings.filter(key=key).values_list("pk", flat=True).first()
+        if lock is not None:
+            return lock
+    return None
+
+
+@transaction.atomic
 def published_team_placements(division):
     """Keep each released stage's points floor while later rounds are prepared.
 
     Store only public team IDs and placements, never pairings or judge data.
     Releasing a stage again replaces that stage's snapshot to permit corrections.
     """
+    # A room deletion can remove a stage while a public request refreshes placements.
+    lock_elimination_tournament()
     stages = PublishedOutroundStage.objects.filter(type_of_round=division)
     rounds = list(released_outrounds(division).values(
         "num_teams", "gov_team_id", "opp_team_id", "victor",
