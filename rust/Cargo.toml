@@ -1,0 +1,3 @@
+[workspace]
+members = ["server", "tabulation"]
+resolver = "3"

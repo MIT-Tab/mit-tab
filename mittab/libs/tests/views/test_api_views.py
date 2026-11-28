@@ -16,7 +16,6 @@ from mittab.apps.tab.models import (
 )
 from mittab.apps.tab.public_rankings import set_standings_publication_setting
 from mittab.apps.tab.views import api_views as api_views_module
-from mittab.apps.tab.views.outround_pairing_views import toggle_pairing_released
 
 
 @pytest.mark.django_db(transaction=True)
@@ -457,8 +456,11 @@ class TestApiViews(TestCase):
 
     def test_release_control_remembers_results_without_an_api_visit(self):
         _teams, outround = self._prepare_live_release()
-        toggle_pairing_released(None, Outround.VARSITY, 8)
-        toggle_pairing_released(None, Outround.VARSITY, 8)
+        self.client.force_login(self.user)
+        path = reverse("toggle_outround_pairing_released", args=[8, Outround.VARSITY])
+        self.assertTrue(self.client.post(path).json()["pairing_released"])
+        self.assertFalse(self.client.post(path).json()["pairing_released"])
+        self.client.logout()
         outround.delete()
         payload = self._live_payload()
         self.assertTrue(payload["availability"]["speakers"])
@@ -520,7 +522,7 @@ class TestApiViews(TestCase):
                     victor = (Outround.GOV if seed_by_team[debate["gov_team_id"]]
                               < seed_by_team[debate["opp_team_id"]] else Outround.OPP)
                     Outround.objects.filter(pk=debate["pk"]).update(victor=victor)
-                response = self.client.get(reverse(
+                response = self.client.post(reverse(
                     "toggle_outround_pairing_released", args=[size, Outround.VARSITY],
                 ))
                 self.assertEqual(response.status_code, 200)

@@ -1,0 +1,24 @@
+{% macro fields(rounds, csrf, selected, info_slide, motion_text) %}
+  <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+  <div class="form-group">
+    <label for="round_selection">Round</label>
+    <select name="round_selection" id="round_selection" class="form-control" required>
+      <option value="">-- Select Round --</option>
+      {% for section, options in rounds %}
+        <optgroup label="{{ section }}">
+          {% for value, label in options %}
+          <option value="{{ value }}"{% if value == selected %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </optgroup>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="info_slide">Info Slide <small class="text-muted">(optional)</small></label>
+    <textarea name="info_slide" id="info_slide" class="form-control" rows="4">{{ info_slide }}</textarea>
+  </div>
+  <div class="form-group">
+    <label for="motion_text">Motion Text</label>
+    <textarea name="motion_text" id="motion_text" class="form-control" rows="4" required>{{ motion_text }}</textarea>
+  </div>
+{% endmacro %}

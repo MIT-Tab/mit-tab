@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12">
+  <h1 class="h3">{{ title }}</h1>
+  <h2 class="h5">{{ item.name }}</h2>
+  <dl class="row">
+    <dt class="col-sm-4">Type</dt><dd class="col-sm-8">{{ item.category }}</dd>
+    <dt class="col-sm-4">Round</dt><dd class="col-sm-8">{{ item.round }}</dd>
+    <dt class="col-sm-4">Timestamp</dt><dd class="col-sm-8">{{ item.time }}</dd>
+    <dt class="col-sm-4">Includes scratches</dt><dd class="col-sm-8">{{ item.scratches }}</dd>
+  </dl>
+  {% if error %}<p class="alert alert-danger" role="alert">{{ error }}</p>{% endif %}
+  {% if restore %}
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <label class="d-block"><input type="checkbox" name="confirm" required> Replace tournament data with this backup</label>
+    <button type="submit" class="btn btn-danger">Restore Backup</button>
+    <a href="/backup/{{ item.url_key }}/" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+  {% else %}
+    <a href="/backup/download/{{ item.url_key }}/" class="btn btn-primary">Download</a>
+    <a href="/backup/restore/{{ item.url_key }}/" class="btn btn-outline-danger">Restore</a>
+    <a href="/pairing/view_backups/" class="btn btn-outline-secondary">All Backups</a>
+  {% endif %}
+</div>
+{% endblock %}

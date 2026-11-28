@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12">
+  <h1 class="h3">{{ title }}</h1>
+  {% if error %}<p class="alert alert-danger" role="alert">{{ error }}</p>{% endif %}
+  <p>Delete <strong>{{ name }}</strong> from the tournament?</p>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-danger">Delete {{ name }}</button>
+      <a href="/{{ key }}/{{ id }}/" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

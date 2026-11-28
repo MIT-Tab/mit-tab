@@ -1,0 +1,250 @@
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+use axum::{
+    Extension,
+    extract::{Path, State},
+    http::StatusCode,
+    response::Response,
+};
+use minijinja::context;
+use serde::Serialize;
+use sqlx::MySqlConnection;
+
+use crate::{
+    App, access, bracket_display, legacy_html,
+    legacy_session::Actor,
+    public_cache::{self, Page, PublicCache},
+    public_pairings::{Team, navigation, paired_teams},
+    settings::Settings,
+};
+
+const SETTINGS: &[&str] = &[
+    "var_teams_visible",
+    "nov_teams_visible",
+    "cur_round",
+    "debaters_public",
+    "gov_opp_display",
+    "sidelock",
+    "choice",
+    "outround_pairing_mode",
+    "show_outs_bracket",
+];
+
+#[derive(Clone, Serialize)]
+pub struct Judge {
+    pub name: String,
+    pub is_chair: bool,
+}
+
+pub struct Match<'a> {
+    pub id: i32,
+    pub size: i32,
+    pub gov: &'a Team,
+    pub opp: &'a Team,
+    pub room: Option<String>,
+    pub judges: Vec<Judge>,
+    pub victor: i32,
+    pub sidelock: bool,
+    pub choice: i32,
+}
+
+impl Match<'_> {
+    fn display(&self) -> minijinja::Value {
+        context! {
+            gov_team => self.gov, opp_team => self.opp, judges => &self.judges,
+            room => context! {name => &self.room}, sidelock => self.sidelock, choice => self.choice,
+        }
+    }
+}
+
+struct Metadata {
+    id: i32,
+    size: i32,
+    gov: i32,
+    opp: i32,
+    room: Option<String>,
+    judges: Vec<Judge>,
+    victor: i32,
+    sidelock: bool,
+    choice: i32,
+}
+
+impl Metadata {
+    fn with_teams(self, teams: &HashMap<i32, Team>) -> Option<Match<'_>> {
+        Some(Match {
+            id: self.id,
+            size: self.size,
+            gov: teams.get(&self.gov)?,
+            opp: teams.get(&self.opp)?,
+            judges: self.judges,
+            room: self.room,
+            victor: self.victor,
+            choice: self.choice,
+            sidelock: self.sidelock,
+        })
+    }
+}
+
+async fn matches(
+    db: &mut MySqlConnection,
+    division: i32,
+    visible: i32,
+) -> Result<Vec<Metadata>, sqlx::Error> {
+    let mut panels: HashMap<i32, Vec<Judge>> = HashMap::new();
+    for (pairing, name, chair) in sqlx::query_as::<_, (i32, String, bool)>(
+        "SELECT r.id, j.name, COALESCE(r.chair_id = j.id, FALSE)
+         FROM tab_outround r JOIN tab_outround_judges x ON x.outround_id = r.id
+         JOIN tab_judge j ON j.id = x.judge_id WHERE r.type_of_round = ? AND r.num_teams >= ?
+         ORDER BY j.name, j.id",
+    )
+    .bind(division)
+    .bind(visible)
+    .fetch_all(&mut *db)
+    .await?
+    {
+        panels.entry(pairing).or_default().push(Judge {
+            name,
+            is_chair: chair,
+        });
+    }
+    type Row = (i32, i32, i32, i32, Option<String>, i32, bool, i32);
+    Ok(sqlx::query_as::<_, Row>(
+        "SELECT r.id, r.num_teams, r.gov_team_id, r.opp_team_id, m.name, r.victor, r.sidelock, r.choice
+         FROM tab_outround r LEFT JOIN tab_room m ON m.id = r.room_id
+         WHERE r.type_of_round = ? AND r.num_teams >= ? ORDER BY r.num_teams DESC, r.id",
+    ).bind(division).bind(visible).fetch_all(db).await?.into_iter().map(
+        |(id, size, gov, opp, room, victor, sidelock, choice)| Metadata {
+            id, size, gov, opp, room, victor, sidelock, choice, judges: panels.remove(&id).unwrap_or_default(),
+        }
+    ).collect())
+}
+
+pub async fn page(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    Path(division): Path<i32>,
+) -> Response {
+    if !matches!(division, 0 | 1) {
+        return crate::private((StatusCode::NOT_FOUND, "Division not found."));
+    }
+    let cache = app.cache_public_pages.then_some(app.public_cache.as_ref());
+    public_cache::render(&app, actor, Page::Outrounds(division), async |db| {
+        render(db, actor, division, cache).await
+    })
+    .await
+}
+
+async fn render(
+    db: &mut MySqlConnection,
+    actor: Actor,
+    division: i32,
+    cache: Option<&PublicCache>,
+) -> Result<Response, sqlx::Error> {
+    let settings = Settings::load(db, SETTINGS).await?;
+    let varsity = settings.integer("var_teams_visible", 256);
+    let novice = settings.integer("nov_teams_visible", 256);
+    let metadata = matches(db, division, if division == 0 { varsity } else { novice }).await?;
+    if metadata.is_empty() {
+        return Ok(access::found("/public/access-error/"));
+    }
+    let names = settings.flag("debaters_public", true);
+    let teams = paired_teams(db, names).await?;
+    let breaking: Vec<_> = sqlx::query_as::<_, (i32, i32)>(
+        "SELECT seed, team_id FROM tab_breakingteam WHERE type_of_team = ? ORDER BY id",
+    )
+    .bind(division)
+    .fetch_all(&mut *db)
+    .await?
+    .into_iter()
+    .filter_map(|(seed, id)| teams.get(&id).map(|team| (seed, team)))
+    .collect();
+
+    let matches: Vec<_> = metadata
+        .into_iter()
+        .filter_map(|row| row.with_teams(&teams))
+        .collect();
+    let mut by_stage: BTreeMap<_, Vec<_>> = BTreeMap::new();
+    let mut eliminated = HashSet::new();
+    for row in &matches {
+        by_stage.entry(row.size).or_default().push(row);
+        let loser = match row.victor {
+            1 | 3 => Some(row.opp.id),
+            2 | 4 => Some(row.gov.id),
+            _ => None,
+        };
+        eliminated.extend(loser);
+    }
+    let mut advancing_by_stage = Vec::new();
+    let outround_pairings: Vec<_> = by_stage
+        .into_iter()
+        .rev()
+        .map(|(size, matches)| {
+            let present: HashSet<_> = matches
+                .iter()
+                .flat_map(|row| [row.gov.id, row.opp.id])
+                .collect();
+            // The public list must not move teams based on unreleased outcomes.
+            let excluded: Vec<_> = breaking
+                .iter()
+                .map(|(_, team)| *team)
+                .filter(|team| !present.contains(&team.id) && !eliminated.contains(&team.id))
+                .collect();
+            advancing_by_stage.push(excluded.iter().map(|team| team.id).collect::<Vec<_>>());
+            let rounds: Vec<_> = matches.into_iter().map(Match::display).collect();
+            let division_label = if division == 0 { 'V' } else { 'N' };
+            context! {label => format!("[{division_label}] Ro{size}"), rounds, excluded}
+        })
+        .collect();
+    let show_outrounds_bracket = settings.flag("show_outs_bracket", true)
+        && settings.integer("outround_pairing_mode", 0) != 1;
+    let bracket_data_json = if show_outrounds_bracket {
+        let seeded = breaking.into_iter().collect();
+        if let Some(cache) = cache {
+            // The embedded bracket has its own cache in Django. Keep outcome
+            // changes warm for the same draw, even when the surrounding page
+            // is re-rendered. Key public names and panels so stale data never
+            // bypasses changes to their visibility.
+            let matchups: Vec<_> = matches
+                .iter()
+                .map(|row| {
+                    (
+                        row.id,
+                        row.size,
+                        row.gov.id,
+                        row.opp.id,
+                        &row.room,
+                        &row.judges,
+                    )
+                })
+                .collect();
+            let revision = public_cache::bracket_revision(db).await?;
+            let key =
+                serde_json::to_string(&(division, revision, &seeded, matchups, advancing_by_stage))
+                    .map_err(|error| sqlx::Error::Protocol(error.to_string()))?;
+            cache.bracket_data(key, || bracket_display::data(&matches, &seeded))
+        } else {
+            bracket_display::data(&matches, &seeded)
+        }
+    } else {
+        None
+    };
+    let label = if division == 0 {
+        "Varsity Outrounds Pairings"
+    } else {
+        "Novice Outrounds Pairings"
+    };
+    let shell = legacy_html::shell(db, actor, &format!("/public/outrounds/{division}/")).await?;
+    let navigation = navigation(db, &settings).await?;
+    Ok(legacy_html::render(
+        "public/outround_pairing.html",
+        shell,
+        context! {
+            label, outround_pairings, show_outrounds_bracket, bracket_data_json,
+            debater_team_memberships_public => names,
+            gov_opp_display => settings.flag("gov_opp_display", false),
+            sidelock => settings.flag("sidelock", false), choice => settings.flag("choice", false),
+            ..navigation,
+        },
+        StatusCode::OK,
+    ))
+}

@@ -1,0 +1,2 @@
+# Preserve the locked Django JavaScriptCatalog response verbatim.
+rust/server/src/jsi18n.js -whitespace

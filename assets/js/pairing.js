@@ -2,13 +2,28 @@ import $ from "jquery";
 
 import quickSearchInit from "./quickSearch";
 
+export function pairingWrite(url, data) {
+  return {
+    url,
+    data,
+    type: "POST",
+    headers: { "X-CSRFToken": $("[name=csrfmiddlewaretoken]").first().val() },
+  };
+}
+
+export function savePairingRevision($card, result) {
+  if (result.revision) {
+    $card.attr("data-revision", result.revision);
+  }
+}
+
 function populateTabCards() {
   const roundNumber = $("#round-number").data("round-number");
   if (!roundNumber || !$(".tabcard").length) {
     return;
   }
   $.ajax({
-    url: `/round/${roundNumber}/stats`,
+    url: `/round/${roundNumber}/stats/`,
     success(result) {
       Object.entries(result).forEach(([teamId, stats]) => {
         const tabCardElement = $(`.tabcard[team-id=${teamId}]`);
@@ -21,7 +36,7 @@ function populateTabCards() {
         ].join(" / ");
         const debatersText = stats.debaters || "";
         tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
-        tabCardElement.attr("href", `/team/card/${teamId}`);
+        tabCardElement.attr("href", `/team/card/${teamId}/`);
         tabCardElement.empty();
         if (debatersText) {
           tabCardElement.append(document.createTextNode(debatersText));
@@ -38,14 +53,14 @@ function assignTeam(e) {
   const teamId = $(e.target).attr("team-id");
   const roundId = $(e.target).attr("round-id");
   const position = $(e.target).attr("position");
-  const url = `/pairings/assign_team/${roundId}/${position}/${teamId}`;
+  const url = `/pairings/assign_team/${roundId}/${position}/${teamId}/`;
   const alertMsg = `
     An error occured.
     Refresh the page and try to fix any inconsistencies you may notice.
   `;
 
   $.ajax({
-    url,
+    ...pairingWrite(url),
     success(result) {
       if (result.success) {
         const $container = $(`.row[round-id=${roundId}] .${position}-team`);
@@ -88,14 +103,17 @@ function handleSwitchSides(event) {
   const $target = $(event.currentTarget);
   const roundId = $target.attr("round-id");
   const isOutround = Boolean($target.data("outround"));
+  const $card = $target.closest(".pairing-card");
+  const revision = $target.attr("data-revision");
   const baseUrl = isOutround ? "/outround" : "/round";
   const url = `${baseUrl}/${roundId}/switch_sides/`;
   const alertMsg = "Unable to switch sides. Refresh and try again.";
 
   $.ajax({
-    url,
+    ...pairingWrite(url, revision ? { revision } : undefined),
     success(result) {
       if (result.success) {
+        savePairingRevision($card, result);
         updateTeamSection(roundId, "gov", result.gov_team);
         updateTeamSection(roundId, "opp", result.opp_team);
         if (isOutround) {
@@ -117,12 +135,13 @@ function handleSwitchSides(event) {
   });
 }
 
-function assignRoom(e) {
+function assignRoom(e, $card, revision) {
   e.preventDefault();
-  const $parent = $(this).parent().parent();
-  const roundId = $(e.target).attr("round-id");
-  const roomId = $(e.target).attr("room-id");
-  const curRoomId = $(e.target).attr("current-room-id");
+  const $item = $(e.currentTarget);
+  const $parent = $item.parent().parent();
+  const roundId = $item.attr("round-id");
+  const roomId = $item.attr("room-id");
+  const curRoomId = $item.attr("current-room-id");
   const outround = $parent.attr("outround") === "true";
   const baseUrl = outround ? "/outround" : "/round";
   const url = `${baseUrl}/${roundId}/assign_room/${roomId}/`;
@@ -140,16 +159,26 @@ function assignRoom(e) {
   $button.addClass("disabled");
 
   $.ajax({
-    url,
+    ...pairingWrite(url, revision ? { revision } : undefined),
     success(result) {
+      savePairingRevision($card, result);
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
       $buttonWrapper.attr("room-id", result.room_id);
-      $button.html(`<i class="far fa-building"></i> ${result.room_name}`);
+      $button
+        .empty()
+        .append(
+          $("<i>").addClass("far fa-building"),
+          document.createTextNode(` ${result.room_name}`),
+        );
       $(`.room span[round-id=${roundId}] .room-toggle`).css(
         "background-color",
         result.room_color,
       );
+    },
+    error() {
+      $button.removeClass("disabled");
+      window.alert("Unable to assign the room. Refresh and try again.");
     },
   });
 }
@@ -159,15 +188,20 @@ function populateAlternativeRooms() {
   const roomId = $parent.attr("room-id");
   const roundId = $parent.attr("round-id");
   const outround = $parent.attr("outround") === "true";
+  const $card = $parent.closest(".pairing-card");
+  const revision = $card.attr("data-revision");
   const baseUrl = outround ? "/outround" : "/round";
   const query = outround ? window.location.search || "" : "";
-  const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId || ""}${query}`;
+  const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId ? `${roomId}/` : ""}${query}`;
 
   $.ajax({
     url,
     success(result) {
       $parent.find(".dropdown-menu").html(result);
-      $parent.find(".dropdown-menu").find(".room-assign").click(assignRoom);
+      $parent
+        .find(".dropdown-menu")
+        .find(".room-assign")
+        .click((event) => assignRoom(event, $card, revision));
       quickSearchInit($parent.find("#quick-search"));
       $parent.find("#quick-search").focus();
     },
@@ -179,7 +213,7 @@ function populateAlternativeTeams() {
   const teamId = $parent.attr("team-id");
   const roundId = $parent.attr("round-id");
   const position = $parent.attr("position");
-  const url = `/round/${roundId}/${teamId}/alternative_teams/${position}`;
+  const url = `/round/${roundId}/${teamId}/alternative_teams/${position}/`;
 
   $.ajax({
     url,
@@ -197,7 +231,7 @@ function assignJudge(e) {
   const roundId = $(e.target).attr("round-id");
   const judgeId = $(e.target).attr("judge-id");
   const curJudgeId = $(e.target).attr("current-judge-id");
-  const url = `/round/${roundId}/assign_judge/${judgeId}/${curJudgeId || ""}`;
+  const url = `/round/${roundId}/assign_judge/${judgeId}/${curJudgeId ? `${curJudgeId}/` : ""}`;
 
   let $buttonWrapper;
   if (curJudgeId) {
@@ -209,7 +243,7 @@ function assignJudge(e) {
   $button.addClass("disabled");
 
   $.ajax({
-    url,
+    ...pairingWrite(url),
     success(result) {
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
@@ -218,7 +252,11 @@ function assignJudge(e) {
 
       const rank = result.judge_rank.toFixed(2);
       $button
-        .html(`${result.judge_name} <small>(${rank})</small>`)
+        .empty()
+        .append(
+          document.createTextNode(`${result.judge_name} `),
+          $("<small>").text(`(${rank})`),
+        )
         .attr("title", "Manually assigned judge");
       $(`.judges span[round-id=${roundId}] .judge-toggle`).removeClass("chair");
       $(`.judges span[round-id=${roundId}][judge-id=${result.chair_id}]
@@ -231,7 +269,7 @@ function populateAlternativeJudges() {
   const $parent = $(this).parent();
   const judgeId = $parent.attr("judge-id");
   const roundId = $parent.attr("round-id");
-  const url = `/round/${roundId}/alternative_judges/${judgeId || ""}`;
+  const url = `/round/${roundId}/alternative_judges/${judgeId ? `${judgeId}/` : ""}`;
 
   $.ajax({
     url,
@@ -267,7 +305,9 @@ function alertLink() {
 function togglePairingRelease(event) {
   event.preventDefault();
   $.ajax({
-    url: "/pairing/release",
+    ...pairingWrite("/pairing/release/", {
+      round: $("#round-number").data("round-number"),
+    }),
     success(result) {
       if (result.pairing_released) {
         $("#close-pairings-group").removeClass("d-none");
@@ -287,6 +327,7 @@ function handleJudgeRemoveClick(event) {
 
   const isOutround = $(this).hasClass("outround-judge-remove");
   const endpointPrefix = isOutround ? "outround" : "round";
+  const revision = $(this).attr("data-revision");
 
   function handleRemoveSuccess(response) {
     if (response.success) {
@@ -301,7 +342,10 @@ function handleJudgeRemoveClick(event) {
   }
 
   $.ajax({
-    url: `/${endpointPrefix}/${roundId}/remove_judge/${judgeId}/`,
+    ...pairingWrite(
+      `/${endpointPrefix}/${roundId}/remove_judge/${judgeId}/`,
+      revision ? { revision } : undefined,
+    ),
     dataType: "json",
     success: handleRemoveSuccess,
     error: handleRemoveError,
@@ -315,6 +359,7 @@ function handleChairClick(event) {
 
   const isOutround = $(this).hasClass("outround-judge-chair");
   const endpointPrefix = isOutround ? "outround" : "round";
+  const revision = $(this).attr("data-revision");
 
   function handleAssignSuccess(response) {
     if (response.success) {
@@ -329,7 +374,10 @@ function handleChairClick(event) {
   }
 
   $.ajax({
-    url: `/${endpointPrefix}/${roundId}/assign_chair/${judgeId}/`,
+    ...pairingWrite(
+      `/${endpointPrefix}/${roundId}/assign_chair/${judgeId}/`,
+      revision ? { revision } : undefined,
+    ),
     dataType: "json",
     success: handleAssignSuccess,
     error: handleAssignError,

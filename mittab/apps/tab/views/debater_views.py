@@ -1,4 +1,4 @@
-from django.db.models import Prefetch
+from django.db.models import Prefetch, prefetch_related_objects
 from django.shortcuts import render
 from django.utils.text import slugify
 
@@ -80,7 +80,7 @@ def view_debaters(request):
 def view_debater(request, debater_id):
     debater_id = int(debater_id)
     try:
-        debater = Debater.objects.prefetch_related("ranking_groups").get(pk=debater_id)
+        debater = Debater.objects.get(pk=debater_id)
     except Debater.DoesNotExist:
         return redirect_and_flash_error(request, "No such debater")
     if request.method == "POST":
@@ -97,9 +97,14 @@ def view_debater(request, debater_id):
             return redirect_and_flash_success(
                 request, f"Debater {updated_name} updated successfully")
     else:
-        rounds = RoundStats.objects.filter(debater=debater).select_related(
-            "round__room", "round__chair").prefetch_related("round__judges")
-        rounds = sorted(list(rounds), key=lambda x: x.round.round_number)
+        rounds = []
+        if request.user.is_superuser:
+            rounds = RoundStats.objects.filter(debater=debater).select_related(
+                "round__room", "round__chair"
+            ).prefetch_related("round__judges").order_by("round__round_number", "pk")
+            prefetch_related_objects(
+                [debater], Prefetch("ranking_groups", queryset=RankingGroup.objects.order_by("pk"))
+            )
         form = DebaterForm(instance=debater)
         teams = Team.objects.filter(debaters=debater).select_related(
             "school", "hybrid_school"
@@ -180,6 +185,7 @@ def rank_debaters_ajax(request):
                   {"title": "Debater Rankings"})
 
 
+@cache_logic.tabulation_cache_scope()
 def get_speaker_rankings(request=None):
     speakers = tab_logic.rank_speakers()
     debaters = []
@@ -208,10 +214,9 @@ def get_speaker_rankings(request=None):
 
 
 def rank_debaters(request):
-    debaters, nov_debaters = cache_logic.cache_fxn_key(
+    debaters, nov_debaters = cache_logic.cache_tabulation_result(
         get_speaker_rankings,
         "speaker_rankings",
-        cache_logic.DEFAULT,
         request
     )
 

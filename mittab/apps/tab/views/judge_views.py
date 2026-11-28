@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.db.models import Max, Q
+from django.db.models import Max, Prefetch, Q
 from django.utils import timezone
 
 from mittab.apps.tab.auth_roles import (
@@ -365,8 +365,10 @@ def view_judge(request, judge_id):
             instance=judge,
             allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
         )
-        judging_rounds = list(Round.objects.filter(judges=judge).select_related(
-            "gov_team", "opp_team", "room"))
+        if request.user.is_superuser:
+            judging_rounds = Round.objects.filter(judges=judge).select_related(
+                "gov_team", "opp_team", "room"
+            ).order_by("id")
     base_url = f"/judge/{judge_id}/"
     scratch_url = f"{base_url}scratches/view/"
     links = []
@@ -473,7 +475,7 @@ def view_scratches(request, judge_id):
         return redirect_and_flash_error(request, "Received invalid data")
 
     judge = Judge.objects.prefetch_related(
-        "scratches", "scratches__judge", "scratches__team"
+        Prefetch("scratches", queryset=Scratch.objects.select_related("team", "judge").order_by("id")),
     ).get(pk=judge_id)
     scratches = judge.scratches.all()
 

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12">
+  {% if not sections %}<a class="btn btn-outline-primary btn-sm mb-3" href="/admin/">Administration</a>{% endif %}
+  <h1 class="h3">{{ title }}</h1>
+  {% if sections %}
+    <div class="row">
+      {% for title, links in sections %}
+      <section class="col-12 col-md-4 mb-3">
+        <h2 class="h5">{{ title }}</h2>
+        <ul class="list-group">
+          {% for label, path in links %}<li class="list-group-item"><a href="{{ path }}">{{ label }}</a></li>{% endfor %}
+        </ul>
+      </section>
+      {% endfor %}
+    </div>
+  {% elif detail %}
+    <p>Record {{ id }}</p>
+    <dl>{% for label, value in detail %}
+      <dt>{{ label }}</dt><dd><pre class="text-wrap">{{ value if value is not none else '—' }}</pre></dd>
+    {% endfor %}</dl>
+    <a class="btn btn-outline-secondary" href="{{ back }}">Back</a>
+  {% else %}
+    <form method="get" class="d-flex gap-2 align-items-end mb-3">
+      <label class="form-label mb-0">Search<input type="search" name="q" value="{{ query }}" class="form-control"></label>
+      <button class="btn btn-outline-primary" type="submit">Search</button>
+    </form>
+    {% if records %}
+    <div class="table-responsive"><table class="table table-striped">
+      <thead><tr><th scope="col">ID</th>{% for label in keys %}<th scope="col">{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for id, cells in records %}
+        <tr><th scope="row"><a href="{{ id }}/change/">{{ id }}</a></th>{% for cell in cells %}<td>{{ cell if cell is not none else '—' }}</td>{% endfor %}</tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% else %}<p>No records found.</p>{% endif %}
+    {% if previous or next %}<nav class="d-flex gap-2" aria-label="Record pages">
+      {% if previous %}<a href="?{{ page_query }}&amp;page={{ previous }}">Previous</a>{% endif %}
+      <span>Page {{ number }}</span>
+      {% if next %}<a href="?{{ page_query }}&amp;page={{ next }}">Next</a>{% endif %}
+    </nav>{% endif %}
+  {% endif %}
+</div>
+{% endblock %}

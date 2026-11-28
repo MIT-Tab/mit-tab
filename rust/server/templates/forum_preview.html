@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import "ranking_tables.html" as tables %}
+{% block content %}
+<div class="col-12">
+  <h1 class="h3">{{ title }}</h1>
+  <p>Thank you for a great tournament! {% if dinos %}Special thanks to our dino judges, {{ dinos|join(", ") }}. {% endif %}We had <strong>{{ team_count }} teams</strong> and <strong>{{ novice_count }} novices</strong> participate for at least three rounds.</p>
+  {% for title, rows in [("Novice Speaker Awards", novice_speakers), ("Varsity Speaker Awards", varsity_speakers)] %}
+    {% if rows %}<section class="mb-4"><h2 class="h5">{{ title }}</h2>{{ tables.speakers(rows, false, false, false) }}</section>{% endif %}
+  {% endfor %}
+  {% for division, teams, results, champion in [("Novice", novice_teams, novice_results, novice_champ), ("Varsity", varsity_teams, varsity_results, varsity_champ)] %}
+    {% if teams %}<section class="mb-4"><h2 class="h5">{{ division }} Breaking Teams</h2>{{ tables.teams(teams, false) }}</section>{% endif %}
+    {% if results %}<section class="mb-4"><h2 class="h5">{{ division }} Results</h2>
+    {% for round, matches in results %}<h3 class="h6">{{ round }}</h3>{% for match in matches %}<pre class="text-wrap">{{ match }}</pre>{% endfor %}{% endfor %}
+    </section>{% endif %}
+    {% if champion %}<p>Congratulations to the {{ division }} Champions, <strong>{{ champion }}</strong>!</p>{% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

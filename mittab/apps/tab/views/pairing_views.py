@@ -21,6 +21,9 @@ from mittab.apps.tab.board_audit import (
     audit_pairing_change, audit_pairing_generation, manual_team_edits,
 )
 from mittab.apps.tab.judge_history import current_manual_judge_events
+from mittab.apps.tab.staff_pairing import (
+    correction_error, serialize_staff_pairing_post, staff_elimination_correction, stale_round_response,
+)
 from mittab.apps.tab.written_rfd import (
     round_allows_written_rfd,
     written_rfd_editing_open,
@@ -54,12 +57,15 @@ def invalidate_public_ballot_cache():
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_staff_pairing_post
 @audit_pairing_generation(Round, "staff pairing")
 def pair_round(request):
     cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
     current_round_number = current_round.value
     if request.method == "POST":
+        if (stale := stale_round_response(request, current_round_number)) is not None:
+            return stale
         # We should pair the round
         try:
             TabSettings.set("pairing_released", 0)
@@ -70,7 +76,7 @@ def pair_round(request):
                 invalidate_inround_public_pairings_cache()
                 current_round.value = current_round.value + 1
                 current_round.save()
-                invalidate_public_ballot_cache()
+                transaction.on_commit(invalidate_public_ballot_cache)
         except Exception as exp:
             emit_current_exception()
             return redirect_and_flash_error(
@@ -153,6 +159,7 @@ def pair_round(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_staff_pairing_post
 @audit_pairing_generation(Round, "staff re-pairing")
 def re_pair_round(request):
     """
@@ -175,6 +182,8 @@ def re_pair_round(request):
         )
 
     if request.method == "POST":
+        if (stale := stale_round_response(request, current_round_number)) is not None:
+            return stale
         try:
             backup_name = (
                 f"round_{current_round_number}_before_repairing"
@@ -217,10 +226,13 @@ def re_pair_round(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_staff_pairing_post
 @audit_pairing_generation(Round, "staff judge assignment")
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
+        if (stale := stale_round_response(request, current_round_number)) is not None:
+            return stale
         try:
             backup.backup_round(
                 round_number=current_round_number,
@@ -236,10 +248,13 @@ def assign_judges_to_pairing(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_staff_pairing_post
 @audit_pairing_generation(Round, "staff room assignment")
 def assign_rooms_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
+        if (stale := stale_round_response(request, current_round_number)) is not None:
+            return stale
         try:
             backup.backup_round(
                 round_number=current_round_number,
@@ -290,6 +305,7 @@ def alternative_rooms(request, round_id, current_room_id=None):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@staff_elimination_correction(shared=True)
 @audit_pairing_change(None, "staff room correction")
 def assign_room(request, round_id, new_room_id, outround=False):
     try:
@@ -816,6 +832,7 @@ def alternative_teams(request, round_id, current_team_id, position):
     return render(request, "pairing/team_dropdown.html", context)
 
 
+@cache_logic.tabulation_cache_scope()
 def team_stats(request, round_number, outround=False):
     """
     Returns the tab card data for all teams in the pairings of this given round number
@@ -868,6 +885,7 @@ def assign_team(request, round_id, position, team_id):
         else:
             raise ValueError("Got invalid position: " + position)
         round_obj.save()
+        cache_logic.refresh_rankings_after_commit(using=round_obj._state.db)
 
         data = {
             "success": True,
@@ -896,6 +914,7 @@ def switch_sides(request, round_id):
         elif round_obj.pullup == Round.OPP:
             round_obj.pullup = Round.GOV
         round_obj.save()
+        cache_logic.refresh_rankings_after_commit(using=round_obj._state.db)
         data = {
             "success": True,
             "round_id": round_obj.id,
@@ -1095,10 +1114,12 @@ def enter_multiple_results(request, round_id, num_entered):
                             round_instance=round_obj,
                             no_fill=True) for i in range(1, num_entered + 1)
         ]
-        all_good = True
-        for form in forms:
-            all_good = all_good and form.is_valid()
-        if all_good:
+        valid = [form.is_valid() for form in forms]
+        if any(form.cleaned_data.get("round_instance", round_obj.pk) != round_obj.pk for form in forms):
+            return HttpResponse("This ballot belongs to a different debate.", status=422,
+                                content_type="text/plain; charset=utf-8",
+                                headers={"Cache-Control": "private, no-store"})
+        if all(valid):
             # result is of the format:
             # winner_1 => [(debater, role, speaks, rank), ...]
             # winner_2 => [(debater, role, sp ...]
@@ -1112,10 +1133,6 @@ def enter_multiple_results(request, round_id, num_entered):
 
                 result[winner].append([])
                 for debater in debaters:
-                    old_stats = RoundStats.objects.filter(round=round_obj,
-                                                          debater_role=debater)
-                    if old_stats:
-                        old_stats.delete()
                     debater_obj = Debater.objects.get(
                         pk=cleaned_data[f"{debater}_debater"])
                     debater_role_obj = debater
@@ -1128,7 +1145,7 @@ def enter_multiple_results(request, round_id, num_entered):
             if all_good:
                 final_scores, final_winner = score_panel(
                     result, "discard_minority" in request.POST)
-                print(final_scores)
+                RoundStats.objects.filter(round=round_obj, debater_role__in=debaters).delete()
                 for (debater, role, speaks, ranks) in final_scores:
                     RoundStats.objects.create(debater=debater,
                                               round=round_obj,
@@ -1137,6 +1154,7 @@ def enter_multiple_results(request, round_id, num_entered):
                                               debater_role=role)
                 round_obj.victor = final_winner
                 round_obj.save()
+                cache_logic.refresh_rankings_after_commit(using=round_obj._state.db)
                 return redirect_and_flash_success(
                     request, "Round entered successfully")
             else:
@@ -1206,12 +1224,15 @@ def delete_obj(obj_type):
     for obj in objs:
         obj_type.delete(obj)
 
+@staff_elimination_correction(shared=True)
 def remove_judge(request, round_id, judge_id, is_outround=False):
     round_id, judge_id = int(round_id), int(judge_id)
     round_model = Outround if is_outround else Round
     round_obj = get_object_or_404(round_model, id=round_id)
-    judge = get_object_or_404(Judge, id=judge_id)
-    all_judges = list(round_obj.judges.all().order_by("-rank"))
+    all_judges = list(round_obj.judges.order_by("-rank", "name", "pk") if is_outround
+                      else round_obj.judges.order_by("-rank"))
+    judge = (next((member for member in all_judges if member.pk == judge_id), None)
+             if is_outround else get_object_or_404(Judge, id=judge_id))
     if judge in all_judges:
         round_obj.judges.remove(judge)
         all_judges.remove(judge)
@@ -1229,16 +1250,22 @@ def remove_judge(request, round_id, judge_id, is_outround=False):
                 round_obj.chair = None
             round_obj.save()
         return JsonResponse({"success": True})
+    if is_outround:
+        return correction_error("Judge not found on this panel.")
     return redirect_and_flash_error(request, "Judge not found in round")
 
+@staff_elimination_correction(shared=True)
 def assign_chair(request, round_id, chair_id, is_outround=False):
     round_id, chair_id = int(round_id), int(chair_id)
     round_model = Outround if is_outround else Round
     round_obj = get_object_or_404(round_model, id=round_id)
-    chair = get_object_or_404(Judge, id=chair_id)
-    if chair in round_obj.judges.all():
+    chair = (round_obj.judges.filter(pk=chair_id).first() if is_outround
+             else get_object_or_404(Judge, id=chair_id))
+    if chair and chair in round_obj.judges.all():
         try:
             old_chair = round_obj.chair
+            if is_outround and chair == old_chair:
+                return JsonResponse({"success": True})
             round_obj.chair = chair
             round_obj.save()
             AuditEvent.record(
@@ -1254,6 +1281,8 @@ def assign_chair(request, round_id, chair_id, is_outround=False):
             return JsonResponse({"success": True})
         except ValueError:
             return redirect_and_flash_error(request, "Chair could not be assigned")
+    if is_outround:
+        return correction_error("Choose a judge assigned to this panel.")
     return redirect_and_flash_error(request, "Judge not found in round")
 
 

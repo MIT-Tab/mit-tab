@@ -176,6 +176,14 @@ jobs:
   lint:
     docker:
       - image: cimg/python:3.10.16-node
+        environment:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PASSWORD: secret
+      - image: cimg/mysql:8.0
+        environment:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: mittab
+          MYSQL_ROOT_HOST: 127.0.0.1
     steps:
       - checkout
       - restore_cache:
@@ -215,6 +223,22 @@ jobs:
       - run:
           name: Lint -- JS
           command: npm run lint
+      - run:
+          name: Verify Rust tabulation and Django parity
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends default-mysql-client
+            curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- \
+              -y --no-modify-path --profile minimal --default-toolchain 1.100.0 --component rustfmt,clippy
+            export PATH="$HOME/.cargo/bin:$PATH"
+            manifest=rust/Cargo.toml
+            cargo fmt --manifest-path "$manifest" --all --check
+            cargo clippy --locked --workspace --all-targets --manifest-path "$manifest" -- -D warnings
+            cargo test --locked --workspace --all-targets --manifest-path "$manifest"
+            DJANGO_SETTINGS_MODULE=mittab.settings uv run --frozen python -m rust.tabulation.compare_with_django
+            cargo build --locked --manifest-path "$manifest" -p mittab-server
+            ./node_modules/.bin/webpack --config webpack.config.js --mode production
+            MITTAB_FAKE_WEBPACK_LOADER=1 uv run --frozen pytest rust/server/test_django_parity.py
   docs:
     docker:
       - image: cimg/python:3.10.16
@@ -255,19 +279,54 @@ jobs:
           name: Build and test Dockerfile
           command: |
             docker build -t mittab:test -f Dockerfile .
+            static_dockerfile=$(awk '/^static_sites:/{site=1} site && /dockerfile_path:/{print $NF; exit}' .do/deploy.template.yaml)
+            static_dir=$(awk '/^static_sites:/{site=1} site && /output_dir:/{print $NF; exit}' .do/deploy.template.yaml)
+            test -n "$static_dockerfile" && test -n "$static_dir"
+            docker build -t mittab-static:test -f "$static_dockerfile" .
+            docker run --rm -e STATIC_DIR="$static_dir" mittab-static:test sh -ec '
+              cd "$STATIC_DIR"
+              test -f img/favicon.ico
+              test -f webpack_bundles/main.css
+              test -f admin/css/base.css
+              test -f admin/js/jquery.init.js
+              find . -type f -exec sha256sum {} + | LC_ALL=C sort
+            ' > static-assets.sha256
+            docker run --rm mittab:test sh -ec '
+              cd staticfiles
+              find . -type f -exec sha256sum {} + | LC_ALL=C sort
+            ' > runtime-assets.sha256
+            diff -u static-assets.sha256 runtime-assets.sha256
       - run:
-          name: Verify Python version matches pyproject
+          name: Start the Rust runtime with a new MySQL database
           command: |
-            EXPECTED_VERSION=$(sed -n 's/requires-python = ">=\(.*\),<3.11"/\1/p' pyproject.toml)
-            ACTUAL_VERSION=$(docker run --rm mittab:test python --version | awk '{print $2}')
-            echo "Expected Python version: $EXPECTED_VERSION"
-            echo "Actual Python version: $ACTUAL_VERSION"
-            if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
-              echo "ERROR: Python version mismatch!"
-              echo "pyproject.toml requires $EXPECTED_VERSION but Dockerfile has $ACTUAL_VERSION"
-              exit 1
-            fi
-            echo "Python versions match!"
+            set -euo pipefail
+            docker run --rm mittab:test mittab-server --version
+            docker run --rm mittab:test sh -c '! command -v python && ! command -v node'
+            trap 'docker rm -f mittab-web mittab-mysql >/dev/null 2>&1 || true' EXIT
+            docker run -d --name mittab-mysql -e MYSQL_ROOT_PASSWORD=fixture-mysql \
+              -e MYSQL_DATABASE=mittab -p 127.0.0.1:18000:8000 mysql:8.4
+            for i in $(seq 1 90); do
+              if docker exec mittab-mysql env MYSQL_PWD=fixture-mysql mysql --protocol=tcp \
+                -h 127.0.0.1 -u root -D mittab -Nse 'SELECT 1' >/dev/null 2>&1; then break; fi
+              sleep 1
+            done
+            for attempt in 1 2; do
+              docker run -d --name mittab-web --network container:mittab-mysql \
+                -e MYSQL_PASSWORD=fixture-mysql -e TAB_PASSWORD=fixture-tab-password mittab:test
+              curl -fsS --retry 30 --retry-all-errors --retry-delay 1 http://127.0.0.1:18000/healthz
+              curl -fsS http://127.0.0.1:18000/public/ | grep -F 'MIT-TAB'
+              curl -fsS http://127.0.0.1:18000/static/webpack_bundles/main.css > /dev/null
+              cookies=$(mktemp)
+              curl -fsS -c "$cookies" http://127.0.0.1:18000/public/login/ > /dev/null
+              csrf=$(awk '$6 == "csrftoken" { print $7 }' "$cookies")
+              test -n "$csrf"
+              curl -fsS -c "$cookies" -b "$cookies" -d "username=tab&password=fixture-tab-password&csrfmiddlewaretoken=$csrf" \
+                http://127.0.0.1:18000/public/login/ > /dev/null
+              curl -fsS -b "$cookies" http://127.0.0.1:18000/setup/start-tournament/ | grep -F 'name="tournament_name"'
+              rm -f "$cookies"
+              docker stop mittab-web
+              docker rm mittab-web
+            done
 workflows:
   version: 2
   build_and_lint:

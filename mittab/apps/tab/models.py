@@ -194,9 +194,10 @@ class TabSettings(models.Model):
                         is not None else setting.value)
             return None
 
+        # An old release threshold must not refill the shared cache after a close.
         result = (
             cache_logic.cache_fxn_key(safe_get, f"tab_settings_{key}", cache_logic.PERSISTENT)
-            if use_cache else safe_get()
+            if use_cache and key not in {"var_teams_visible", "nov_teams_visible"} else safe_get()
         )
         if result is None and default is _TABSETTING_MISSING:
             raise ValueError(f"No TabSetting with key '{key}'")
@@ -233,9 +234,8 @@ class TabSettings(models.Model):
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
-        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
-            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).delete(using, keep_parents)
+        self._invalidate_ranking_settings_after_commit()
         self._invalidate_publication_caches()
 
     def save(self,
@@ -245,9 +245,8 @@ class TabSettings(models.Model):
              update_fields=None):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
-        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
-            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
+        self._invalidate_ranking_settings_after_commit()
         self._invalidate_publication_caches()
         if self.key == "judges_public":
             # A request during the transaction may have cached the old value.
@@ -255,6 +254,15 @@ class TabSettings(models.Model):
                 lambda: cache_logic.invalidate_cache("tab_settings_judges_public", cache_logic.PERSISTENT),
                 using=self._state.db,
             )
+
+    def _invalidate_ranking_settings_after_commit(self):
+        if self.key in {SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, "lenient_late", "cur_round"}:
+            key = f"tab_settings_{self.key}"
+            transaction.on_commit(
+                lambda: cache_logic.invalidate_cache(key, cache_logic.PERSISTENT),
+                using=self._state.db,
+            )
+            cache_logic.refresh_rankings_after_commit(using=self._state.db)
 
     def _invalidate_publication_caches(self):
         if self.key in {
@@ -616,7 +624,7 @@ class Team(AuditAttributionMixin):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
-            "ranking_groups",
+            models.Prefetch("ranking_groups", queryset=RankingGroup.objects.order_by("name")),
         )
 
     def set_unique_team_code(self):
@@ -981,7 +989,7 @@ class Outround(models.Model):
                                  choices=CHOICES)
 
     def clean(self):
-        if self.pk and self.chair not in self.judges.all():
+        if self.pk and not getattr(self, "_panel_validated_by_admin", False) and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")
 
     def __str__(self):
@@ -1120,7 +1128,7 @@ class Round(models.Model):
     rfd = models.TextField(blank=True, default="")
 
     def clean(self):
-        if self.pk and self.chair not in self.judges.all():
+        if self.pk and not getattr(self, "_panel_validated_by_admin", False) and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")
 
     def __str__(self):

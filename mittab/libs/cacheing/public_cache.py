@@ -22,16 +22,21 @@ def build_cache_key(view_name, kwargs, is_authenticated):
     return f"pv:{view_name}:{digest}"
 
 
-def _generation_key(view_name):
+def _generation_key(view_name, division=None):
+    if division is not None:
+        return f"pv:{view_name}:{division}:generation"
     return f"pv:{view_name}:generation"
 
 
-def _get_generation(cache, view_name):
-    return cache.get(_generation_key(view_name), 0)
+def _get_generation(cache, view_name, kwargs):
+    division = (
+        kwargs.get("type_of_round", 0) if view_name == "outround_pretty_pair" else None
+    )
+    return cache.get(_generation_key(view_name, division), 0)
 
 
-def _advance_generation(cache, view_name):
-    generation_key = _generation_key(view_name)
+def _advance_generation(cache, view_name, division=None):
+    generation_key = _generation_key(view_name, division)
     if cache.add(generation_key, 1, timeout=None):
         return
     try:
@@ -74,7 +79,7 @@ def cache_public_view(timeout=60):
             cache = caches[PUBLIC_CACHE_ALIAS]
             cache_kwargs = {
                 **kwargs,
-                "_cache_generation": _get_generation(cache, view_func.__name__),
+                "_cache_generation": _get_generation(cache, view_func.__name__, kwargs),
             }
             cache_key = build_cache_key(view_func.__name__, cache_kwargs,
                                          request.user.is_authenticated)
@@ -124,7 +129,7 @@ def cache_public_view(timeout=60):
 
 def _delete_key_for_all_auth_states(view_name, kwargs=None):
     cache = caches[PUBLIC_CACHE_ALIAS]
-    generation = _get_generation(cache, view_name)
+    generation = _get_generation(cache, view_name, kwargs or {})
     for is_authenticated in AUTH_STATES:
         cache_kwargs = {
             **(kwargs or {}),
@@ -156,10 +161,15 @@ def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
 
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
-    kwargs = {"type_of_round": type_of_round}
-    _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
-    _delete_key_for_all_auth_states("public_home")
-    _delete_key_for_all_auth_states("cached_public_tab_cards")
+    cache = caches[PUBLIC_CACHE_ALIAS]
+    _advance_generation(cache, "outround_pretty_pair", type_of_round)
+    _advance_generation(cache, "public_home")
+    invalidate_public_tab_cards_cache()
+
+
+def invalidate_public_tab_cards_cache():
+    """Advance the cache generation for public tab cards."""
+    _delete_all_keys_for_view("cached_public_tab_cards")
 
 
 def invalidate_public_judges_cache(*_args, **_kwargs):
@@ -186,10 +196,10 @@ def invalidate_public_rankings_cache(*_args, **_kwargs):
 
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
-    _delete_key_for_all_auth_states("rank_teams_public")
-    _delete_key_for_all_auth_states("public_speaker_rankings")
-    _delete_key_for_all_auth_states("public_ballots")
-    _delete_key_for_all_auth_states("public_home")
+    _delete_all_keys_for_view("rank_teams_public")
+    _delete_all_keys_for_view("public_speaker_rankings")
+    _delete_all_keys_for_view("public_ballots")
+    _delete_all_keys_for_view("public_home")
 
 
 def invalidate_public_motions_cache(*_args, **_kwargs):
@@ -222,6 +232,6 @@ def invalidate_all_public_caches(*_args, **_kwargs):
     _delete_key_for_all_auth_states("cached_public_tab_cards")
 
     # Invalidate outrounds for both divisions
+    cache = caches[PUBLIC_CACHE_ALIAS]
     for type_of_round in [0, 1]:  # VARSITY=0, NOVICE=1
-        kwargs = {"type_of_round": type_of_round}
-        _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
+        _advance_generation(cache, "outround_pretty_pair", type_of_round)

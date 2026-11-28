@@ -1,17 +1,92 @@
 # pylint: disable=W0212
+import random
+
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.core.cache import caches
-from django.test import TestCase, Client
+from django.http import HttpResponse
+from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 
 from mittab.apps.tab.models import (Room, TabSettings, Team, Round, Outround)
 from mittab.apps.tab.public_rankings import set_ranking_settings
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import (
+    cache_public_view,
     invalidate_all_public_caches,
     invalidate_outround_public_pairings_cache,
     invalidate_public_rankings_cache,
 )
+
+
+def test_cache_miss_preserves_the_pairing_random_state(settings):
+    settings.CACHES = {"default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "cache-miss-preserves-pairing-random-state",
+    }}
+
+    @cache_logic.cache(seconds=20, stampede=20)
+    def result():
+        return "cached"
+
+    state = random.getstate()
+    assert result() == "cached"
+    assert random.getstate() == state
+
+
+def test_rankings_invalidation_discards_a_calculation_completed_after_commit(settings):
+    settings.CACHES = {
+        **settings.CACHES,
+        **{
+            alias: {"BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                    "LOCATION": f"tabulation-cache-version-test-{alias}"}
+            for alias in ("default", "public")
+        },
+    }
+    scores = [27, 28]
+
+    @cache_logic.cache(tabulation=True)
+    def total():
+        old_score = scores.pop(0)
+        if scores:
+            cache_logic.invalidate_tabulation_cache()
+        return old_score
+
+    def rankings():
+        return total()
+
+    assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 27
+    assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 28
+    assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 28
+
+    # A pairing calculation can read its tentative data without publishing it.
+    scores.append(99)
+    with cache_logic.tabulation_cache_scope(isolated=True):
+        assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 99
+    assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 28
+
+
+def test_outround_invalidation_discards_in_flight_render_for_that_division(settings):
+    settings.CACHES = {**settings.CACHES, "public": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "outround-invalidation-discards-in-flight-render",
+    }}
+    request = RequestFactory().get("/public/outrounds/0/")
+    request.user = AnonymousUser()
+    renders = {0: 0, 1: 0}
+
+    @cache_public_view()
+    def outround_pretty_pair(_request, type_of_round):
+        renders[type_of_round] += 1
+        if type_of_round == 0 and renders[0] == 1:
+            # Complete an old render after publishing the new bracket.
+            invalidate_outround_public_pairings_cache(0)
+        return HttpResponse(str(renders[type_of_round]))
+
+    assert outround_pretty_pair(request, type_of_round=1).content == b"1"
+    assert outround_pretty_pair(request, type_of_round=0).content == b"1"
+    assert outround_pretty_pair(request, type_of_round=0).content == b"2"
+    assert outround_pretty_pair(request, type_of_round=1).content == b"1"
 
 
 @pytest.mark.django_db(transaction=True)

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12">
+  <h1 class="h3">{{ title }}</h1>
+  {% if rows %}
+  <div class="table-responsive"><table class="table table-striped">
+    <thead><tr><th scope="col">Method</th><th scope="col">Route</th><th scope="col">Status</th><th scope="col">Time (ms)</th></tr></thead>
+    <tbody>{% for row in rows %}<tr><td>{{ row.method }}</td><th scope="row">{{ row.route }}</th><td>{{ row.status }}</td><td>{{ row.milliseconds }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p>No request timings yet.</p>{% endif %}
+</div>
+{% endblock %}

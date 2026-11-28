@@ -332,8 +332,7 @@ def roster_membership_change(sender, instance, action, reverse, pk_set, **kwargs
 
 def public_changes(kind):
     changes = PublicRosterChange.objects.filter(list_kind=kind)
-    if kind == "teams":
-        if not TabSettings.get("debaters_public", 1):
-            changes = changes.filter(involves_debaters=False)
+    if not TabSettings.get("debaters_public", 1):
+        changes = changes.filter(involves_debaters=False)
     # Project the public schema; never send AuditEvent or unrestricted entities.
     return changes.only("message", "created_at").order_by("-created_at", "-pk")

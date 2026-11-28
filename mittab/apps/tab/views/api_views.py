@@ -14,6 +14,7 @@ from mittab.apps.tab.live_results import (
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.models import Debater, Team, Outround, Round, TabSettings
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.cacheing.cache_logic import tabulation_cache_scope
 from mittab.libs.tab_logic.stats import tot_wins
 
 
@@ -24,6 +25,7 @@ def _get_teams_with_min_rounds(min_rounds=3):
     ).filter(total_rounds__gte=min_rounds).values_list("pk", flat=True)
 
 
+@tabulation_cache_scope()
 def _get_team_placements_and_ids(team_type):
     """Return every team whose current outround placement is known."""
     outrounds = Outround.objects.filter(

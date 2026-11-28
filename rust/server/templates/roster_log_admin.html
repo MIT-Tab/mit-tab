@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12">
+  <h1 class="h3">{{ title }}</h1>
+  {% if row %}
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <label class="form-label d-block mb-3">Public list
+      <select name="list_kind" class="custom-select">
+        <option value="teams"{% if row.kind == "teams" %} selected{% endif %}>Teams</option>
+        <option value="judges"{% if row.kind == "judges" %} selected{% endif %}>Judges</option>
+      </select>
+    </label>
+    <label class="form-label d-block mb-3">Message<textarea name="message" rows="4" class="form-control" required>{{ row.message }}</textarea></label>
+    <label class="form-label d-block mb-3">Date and time (EST)
+      <input name="occurred_at" type="datetime-local" class="form-control" value="{{ row.local_time }}" required>
+      <span class="form-text">Fixed EST (UTC−5), including during daylight saving time.</span>
+    </label>
+    <label class="d-block mb-3"><input name="involves_debaters" type="checkbox"{% if row.involves_debaters %} checked{% endif %}> Contains debater names</label>
+    <button class="btn btn-primary" type="submit">Save Change</button>
+    <a class="btn btn-outline-secondary" href="/setup/public-change-log/">Cancel</a>
+  </form>
+  {% if may_delete %}
+  <form method="post" class="mt-3">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <button class="btn btn-outline-danger" name="action" value="delete" type="submit">Delete Entry</button>
+  </form>
+  {% endif %}
+  {% else %}
+  {% if logging %}<p>Recording public roster changes.</p>
+  {% elif not published %}<p>Logging starts after teams are first published and registration closes.</p>
+  {% elif not started %}<p>Logging starts after registration closes.</p>
+  {% else %}<p>Logging is paused while registration is open.</p>{% endif %}
+  <form method="get" class="d-flex gap-2 align-items-end mb-3">
+    <label class="form-label mb-0">Public list
+      <select name="kind" class="custom-select">
+        <option value="">All entries</option>
+        <option value="teams"{% if kind == "teams" %} selected{% endif %}>Teams</option>
+        <option value="judges"{% if kind == "judges" %} selected{% endif %}>Judges</option>
+      </select>
+    </label>
+    <button class="btn btn-outline-primary" type="submit">Filter</button>
+  </form>
+  {% if entries %}
+  <div class="table-responsive"><table class="table table-striped">
+    <thead><tr><th>Date and time (EST)</th><th>List</th><th>Message</th><th>Privacy</th><th></th></tr></thead>
+    <tbody>{% for entry in entries %}
+      <tr><td>{{ entry.timestamp }}</td><td>{{ entry.kind|capitalize }}</td><td>{{ entry.message }}</td>
+        <td>{% if entry.involves_debaters %}Contains debater names{% endif %}</td>
+        <td><a href="/setup/public-change-log/{{ entry.id }}/">Edit</a></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p>No public changes found.</p>{% endif %}
+  {% if pages > 1 %}
+  <nav class="d-flex gap-2 align-items-center" aria-label="Change log pages">
+    {% if previous %}<a href="?page={{ previous }}&amp;kind={{ kind or '' }}">Previous</a>{% endif %}
+    <span>Page {{ page }} of {{ pages }}</span>
+    {% if next %}<a href="?page={{ next }}&amp;kind={{ kind or '' }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -66,6 +66,7 @@ def view_teams(request):
         })
 
 
+@cache_logic.tabulation_cache_scope()
 def view_team(request, team_id):
     team_id = int(team_id)
     try:
@@ -236,7 +237,7 @@ def view_scratches(request, team_id):
         team_id = int(team_id)
     except ValueError:
         return redirect_and_flash_error(request, "Received invalid data")
-    scratches = Scratch.objects.filter(team=team_id)
+    scratches = Scratch.objects.filter(team=team_id).select_related("team", "judge").order_by("id")
     number_scratches = len(scratches)
     team = Team.objects.get(pk=team_id)
     all_teams = Team.objects.all()
@@ -331,10 +332,9 @@ def rank_teams_ajax(request):
     return render(request, "tab/rank_teams.html", {"title": "Team Rankings"})
 
 def rank_teams(request):
-    teams, nov_teams = cache_logic.cache_fxn_key(
+    teams, nov_teams = cache_logic.cache_tabulation_result(
         rankings.get_team_rankings,
         "team_rankings_private",
-        cache_logic.DEFAULT,
         request,
         public=False
     )

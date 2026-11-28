@@ -1,0 +1,133 @@
+use std::collections::HashMap;
+
+use sqlx::{MySql, MySqlConnection, QueryBuilder};
+
+enum Value {
+    Missing,
+    Integer(i32),
+    Text(String),
+}
+
+pub struct Settings(HashMap<String, Value>);
+
+impl Settings {
+    pub async fn load(db: &mut MySqlConnection, keys: &[&str]) -> Result<Self, sqlx::Error> {
+        Self::read(db, keys, false).await
+    }
+
+    pub async fn load_locked(db: &mut MySqlConnection, keys: &[&str]) -> Result<Self, sqlx::Error> {
+        Self::read(db, keys, true).await
+    }
+
+    async fn read(
+        db: &mut MySqlConnection,
+        keys: &[&str],
+        lock: bool,
+    ) -> Result<Self, sqlx::Error> {
+        if keys.is_empty() {
+            return Ok(Self(HashMap::new()));
+        }
+        let mut query = QueryBuilder::<MySql>::new(
+            "SELECT `key`, value, value_string FROM tab_tabsettings WHERE `key` IN (",
+        );
+        let mut fields = query.separated(", ");
+        for key in keys {
+            fields.push_bind(key);
+        }
+        query.push(") ORDER BY id");
+        if lock {
+            query.push(" FOR UPDATE");
+        }
+        let rows = query
+            .build_query_as::<(String, Option<i32>, Option<String>)>()
+            .fetch_all(db)
+            .await?;
+        let mut values = HashMap::new();
+        for (key, integer, text) in rows {
+            match text
+                .map(Value::Text)
+                .or_else(|| integer.map(Value::Integer))
+            {
+                Some(value) => {
+                    values.entry(key).or_insert(value);
+                }
+                None => {
+                    // A null first row still wins over duplicates of the key.
+                    values.entry(key).or_insert(Value::Missing);
+                }
+            }
+        }
+        Ok(Self(values))
+    }
+
+    pub fn integer(&self, name: &str, default: i32) -> i32 {
+        match self.0.get(name) {
+            Some(Value::Integer(value)) => *value,
+            Some(Value::Text(value)) => value.trim().parse().unwrap_or(default),
+            Some(Value::Missing) | None => default,
+        }
+    }
+
+    pub fn string(&self, name: &str, default: &str) -> String {
+        match self.0.get(name) {
+            Some(Value::Integer(value)) => value.to_string(),
+            Some(Value::Text(value)) => value.clone(),
+            Some(Value::Missing) | None => default.to_owned(),
+        }
+    }
+
+    pub fn flag(&self, name: &str, default: bool) -> bool {
+        match self.0.get(name) {
+            Some(Value::Integer(value)) => *value != 0,
+            Some(Value::Text(value)) => !value.is_empty(),
+            Some(Value::Missing) | None => default,
+        }
+    }
+
+    pub fn value(&self, name: &str) -> Option<SettingValue<'_>> {
+        match self.0.get(name) {
+            Some(Value::Integer(value)) => Some(SettingValue::Number(*value)),
+            Some(Value::Text(value)) => Some(SettingValue::Text(value)),
+            Some(Value::Missing) | None => None,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub enum SettingValue<'a> {
+    Number(i32),
+    Text(&'a str),
+}
+
+pub async fn put(
+    db: &mut MySqlConnection,
+    key: &str,
+    value: SettingValue<'_>,
+) -> Result<(), sqlx::Error> {
+    let id = sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM tab_tabsettings WHERE `key` = ? ORDER BY id LIMIT 1 FOR UPDATE",
+    )
+    .bind(key)
+    .fetch_optional(&mut *db)
+    .await?;
+    let (number, text) = match value {
+        SettingValue::Number(number) => (Some(number), None),
+        SettingValue::Text(text) => (None, Some(text)),
+    };
+    if let Some(id) = id {
+        sqlx::query("UPDATE tab_tabsettings SET value = ?, value_string = ? WHERE id = ?")
+            .bind(number)
+            .bind(text)
+            .bind(id)
+            .execute(db)
+            .await?;
+    } else {
+        sqlx::query("INSERT INTO tab_tabsettings (`key`, value, value_string) VALUES (?, ?, ?)")
+            .bind(key)
+            .bind(number)
+            .bind(text)
+            .execute(db)
+            .await?;
+    }
+    Ok(())
+}

@@ -123,6 +123,7 @@ class TestApdaBoardViews(TestCase):
     def test_apda_board_debater_detail_updates_only_apda_id(self):
         debater = Debater.objects.first()
         original_name = debater.name
+        original_tiebreaker = debater.tiebreaker
 
         response = self.client.post(
             reverse("apda_board_debater_detail", args=[debater.id]),
@@ -136,6 +137,7 @@ class TestApdaBoardViews(TestCase):
         debater.refresh_from_db()
         self.assertEqual(debater.apda_id, 13579)
         self.assertEqual(debater.name, original_name)
+        self.assertEqual(debater.tiebreaker, original_tiebreaker)
 
     def test_apda_board_login_allowed_when_final_round_is_paired(self):
         self.client.logout()

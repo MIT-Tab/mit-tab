@@ -16,9 +16,11 @@ def add_rooms():
         "cur_round") - 1).update(room=None)
     round_number = TabSettings.get("cur_round") - 1
 
-    rooms = RoomCheckIn.objects.filter(
-        round_number=round_number).select_related("room").prefetch_related("room__tags")
-    rooms = sorted((r.room for r in rooms), key=lambda r: r.rank, reverse=True)
+    rooms = (
+        RoomCheckIn.objects.filter(round_number=round_number)
+        .select_related("room").prefetch_related("room__tags")
+    )
+    rooms = sorted((r.room for r in rooms), key=lambda r: (-r.rank, r.id))
     pairings = tab_logic.sorted_pairings(round_number)
 
     pairing_to_tag = {
@@ -106,10 +108,11 @@ def add_outround_rooms(round_specs):
         OutroundRoundPriority.TOP_OF_BRACKET,
     )
 
-    rooms = RoomCheckIn.objects.filter(
-        round_number=0
-    ).select_related("room").prefetch_related("room__tags")
-    rooms = sorted((r.room for r in rooms), key=lambda r: r.rank, reverse=True)
+    rooms = (
+        RoomCheckIn.objects.filter(round_number=0)
+        .select_related("room").prefetch_related("room__tags")
+    )
+    rooms = sorted((r.room for r in rooms), key=lambda r: (-r.rank, r.id))
 
     pairings = []
     for round_type, num_teams in normalized_specs:

@@ -265,7 +265,7 @@ def public_view_teams(request):
     return render(
         request, "public/teams.html", {
             "teams": Team.objects
-                     .order_by("-checked_in", "school__name")
+                     .order_by("-checked_in", "school__name", "pk")
                      .prefetch_related("debaters", "school", "hybrid_school")
                      .all(),
             "num_checked_in": Team.objects.filter(checked_in=True).count(),
@@ -1125,7 +1125,7 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
         type_of_round=type_of_round,
     ).select_related("gov_team", "opp_team", "room", "chair").prefetch_related(
         "gov_team__debaters", "opp_team__debaters", "judges",
-    ))
+    ).order_by("id"))
     rounds_by_size = defaultdict(list)
     for pairing in round_pairing:
         rounds_by_size[pairing.num_teams].append(pairing)

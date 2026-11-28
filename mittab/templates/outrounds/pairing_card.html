@@ -1,4 +1,4 @@
-<div class="card bg-light pairing-card mb-3">
+<div class="card bg-light pairing-card mb-3"{% if pairing.revision %} data-revision="{{ pairing.revision }}"{% endif %}>
   <div class="card-body container-fluid">
     <div class="row" round-id="{{pairing.id}}">
 

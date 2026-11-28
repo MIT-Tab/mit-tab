@@ -50,6 +50,8 @@ This guide will help you set up a local development environment for MIT-Tab. The
 
 ### Prerequisites
 
+Install Rust 1.94 or later using rustup for the native server. Python and uv run the reference tests.
+
 Before you begin, ensure you have:
 - Git installed
 - A text editor or IDE
@@ -142,20 +144,23 @@ npm install
 
 #### Step 8: Initialize the Database
 
-Run migrations and load test data:
+Build the Rust server and load the development fixture into an empty database:
 
 ```bash
-uv run python manage.py migrate
-uv run python manage.py loaddata testing_db
+set -a
+. ./.env
+set +a
+cargo build --locked --manifest-path rust/Cargo.toml -p mittab-server
+TAB_PASSWORD=password TOURNAMENT_NAME=local-test ./rust/target/debug/mittab-server init
 ```
 
 #### Step 9: Start the Development Server
 
 ```bash
-uv run ./bin/dev-server
+./bin/dev-server
 ```
 
-The application should now be running at `http://0.0.0.0:8001`
+The application should now be running at `http://127.0.0.1:8001`
 
 Default login credentials:
 - **Username**: `tab`
@@ -272,20 +277,23 @@ npm install
 
 #### Step 7: Initialize the Database
 
-Run migrations and load test data:
+Build the Rust server and load the development fixture into an empty database:
 
 ```bash
-uv run python manage.py migrate
-uv run python manage.py loaddata testing_db
+set -a
+. ./.env
+set +a
+cargo build --locked --manifest-path rust/Cargo.toml -p mittab-server
+TAB_PASSWORD=password TOURNAMENT_NAME=local-test ./rust/target/debug/mittab-server init
 ```
 
 #### Step 8: Start the Development Server
 
 ```bash
-uv run ./bin/dev-server
+./bin/dev-server
 ```
 
-The application should now be running at `http://0.0.0.0:8001`
+The application should now be running at `http://127.0.0.1:8001`
 
 Default login credentials:
 - **Username**: `tab`
@@ -295,17 +303,7 @@ Default login credentials:
 
 ### Alternative: Docker Setup
 
-If you prefer to use Docker:
-
-```bash
-docker-compose build
-docker-compose up
-docker-compose run --rm web ./bin/setup password
-```
-
-Access the application at `http://localhost`.
-
-Note: Docker simulates the production environment, which can be less convenient for active development compared to the local setup above.
+Build the Rust application image with `docker build -t mittab:dev .`. Run it with the MySQL connection settings described in the README. The image includes the web assets and `mysqldump`. For a fresh database, set `TAB_PASSWORD` through the container environment.
 
 ## Development Guidelines
 
@@ -313,9 +311,12 @@ Note: Docker simulates the production environment, which can be less convenient 
 
 #### Linting and Formatting
 
-The project uses PyLint for linting. Before submitting a PR, format and check your code:
+Before submitting a PR, run the Rust, Python reference, and asset checks.
 
 ```bash
+cargo fmt --manifest-path rust/Cargo.toml --all --check
+cargo clippy --locked --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
+uv run python bin/check-dependency-age
 uv run pylint mittab
 npm run lint
 ```
@@ -333,30 +334,15 @@ Before submitting a PR:
 
 #### Library Versions
 
-Some libraries in this project may be several years behind their current versions. When searching for documentation:
-- Pay careful attention to version numbers
-- Check `pyproject.toml`, `uv.lock`, and `package.json` for exact versions
-- Older documentation may be more relevant than the latest guides
+The Rust workspace lockfile is `rust/Cargo.lock`. The JavaScript and Python reference dependency versions are in `package-lock.json` and `uv.lock`.
 
-#### Django ORM Best Practices
+#### Comparing Behavior
 
-Django abstracts database operations through its Object-Relational Mapper (ORM). While convenient, it's easy to accidentally create performance issues:
-
-**Avoid the N+1 Problem:**
-- Use `prefetch_related()` and `select_related()` to optimize queries
-- Read this [guide on N+1 problems in Django](https://medium.com/@RohitPatil18/n-1-problem-in-django-and-solution-3f5307039c06)
-
-**Profile Your Code:**
-- Enable [Django Silk](https://medium.com/@sharif-42/profiling-django-application-using-django-silk-62cdea83fb83) to monitor database queries
-- Verify you're only making the queries you intend to make
-- Aim to minimize the number of database queries per request
+Use the Django reference suite and the HTTP parity tests when changing schema compatibility, ranking, pairing, publication, or public payloads. Run database tests against a disposable MySQL database. Use synthetic data for screenshots and service fixtures.
 
 ### Code Style
 
-- Follow PEP 8 guidelines for Python code
-- Use meaningful variable and function names
-- Add comments for complex logic
-- Write docstrings for public functions and classes
+Follow the repository’s Rust formatting and Clippy checks. Use descriptive names and document behavior that is easy to change accidentally.
 
 ## Submitting Changes
 

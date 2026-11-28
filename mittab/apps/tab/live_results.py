@@ -11,12 +11,24 @@ from mittab.apps.tab.models import (
 from mittab.apps.tab.public_pages import released_outrounds
 
 
+def lock_elimination_tournament(*, using=None):
+    settings = TabSettings.objects.using(using).select_for_update().order_by("id")
+    for key in ("cur_round", "tot_rounds"):
+        lock = settings.filter(key=key).values_list("pk", flat=True).first()
+        if lock is not None:
+            return lock
+    return None
+
+
+@transaction.atomic
 def published_team_placements(division):
     """Keep each released stage's points floor while later rounds are prepared.
 
     Store only public team IDs and placements, never pairings or judge data.
     Releasing a stage again replaces that stage's snapshot to permit corrections.
     """
+    # A room deletion can remove a stage while a public request refreshes placements.
+    lock_elimination_tournament()
     stages = PublishedOutroundStage.objects.filter(type_of_round=division)
     rounds = list(released_outrounds(division).values(
         "num_teams", "gov_team_id", "opp_team_id", "victor",
@@ -40,9 +52,11 @@ def published_team_placements(division):
             for team_id in (round_obj["gov_team_id"], round_obj["opp_team_id"]):
                 placements[team_id] = winner_floor if team_id == winner_id else floor
         if size == opening_size:
-            bye_ids = BreakingTeam.objects.filter(type_of_team=division).exclude(
-                team_id__in=placements,
-            ).values_list("team_id", flat=True)
+            # In a padded seed bracket, only the leading seeds have vacant opponents.
+            # Missing matchups among the other seeds must never turn into byes.
+            entrants = list(BreakingTeam.objects.filter(type_of_team=division)
+                            .order_by("seed", "pk").values_list("team_id", flat=True))
+            bye_ids = set(entrants[:max(0, size - len(entrants))]) - placements.keys()
             for team_id in bye_ids:
                 placements[team_id] = 1 if size <= 2 else size // 4 + 1
         _save_stage(division, size, placements)

@@ -18,7 +18,7 @@ from mittab.libs.tab_logic.rankings import get_team_rankings
 
 def lock_board_tournament(actor):
     """Serialize board corrections and recheck access inside their transaction."""
-    list(TabSettings.objects.select_for_update().filter(key="tot_rounds"))
+    list(TabSettings.objects.select_for_update().filter(key__in=("cur_round", "tot_rounds")).order_by("id"))
     if not is_apda_board_user(actor) or not is_apda_board_access_open():
         raise ValidationError("Board access opens near the end of inrounds.")
 

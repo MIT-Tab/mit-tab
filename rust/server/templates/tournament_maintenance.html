@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12">
+  <h1 class="h3">{{ title }}</h1>
+  {% if reset or enabled %}
+  <form action="{{ action }}" method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    {% if reset %}
+    <p>MIT-Tab will back up {{ tournament }} and clear its roster, registration, pairings, results, and public pages.</p>
+    <input type="hidden" name="revision" value="{{ revision }}">
+    <label class="d-block mb-3"><input type="checkbox" name="confirm" required> I’m ready to start a new tournament.</label>
+    <button class="btn btn-danger" type="submit">Create New Tournament</button>
+    {% else %}
+    <p>Generate scores for the current inround’s outstanding ballots.</p>
+    <button class="btn btn-primary" type="submit">Simulate Round Results</button>
+    {% endif %}
+    <a href="/pairings/status/" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+  {% else %}<p>Simulated rounds are disabled.</p>{% endif %}
+</div>
+{% endblock %}

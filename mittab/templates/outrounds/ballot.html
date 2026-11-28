@@ -10,7 +10,15 @@
 <div class="col">
   <div class="container-fluid">
     <form action="{{ action }}" method="post" class="ballot-form single" enctype="multipart/form-data">{% csrf_token %}
-    {% return_to_input %}
+    <input type="hidden" name="revision" value="{{ pairing_revision }}">
+    {% return_to_input request.path %}
+    {% if pairing_error %}
+      <div class="alert alert-danger">
+        Please correct the error below.
+
+        {{ pairing_error }}
+      </div>
+    {% endif %}
     {% outround_form form %}
 
     <div class="row">

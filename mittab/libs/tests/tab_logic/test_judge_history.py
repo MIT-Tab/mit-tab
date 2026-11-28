@@ -120,13 +120,13 @@ class TestJudgeHistory(TestCase):
                  reverse("outround_pairing_view", args=[Outround.VARSITY, 4]))):
             with self.subTest(model=type(pairing).__name__):
                 replacement = self.other_inround.gov_team
-                response = self.client.get(reverse(
+                response = self.client.post(reverse(
                     assign_route, args=[pairing.pk, "gov", replacement.pk]))
                 self.assertTrue(response.json()["success"])
                 self.assertContains(self.client.get(page), 'gov-team manual-team')
                 AuditEvent.record(pairing, AuditEvent.JUDGES_PAIRED)
                 self.assertContains(self.client.get(page), 'gov-team manual-team')
-                response = self.client.get(reverse(side_route, args=[pairing.pk]))
+                response = self.client.post(reverse(side_route, args=[pairing.pk]))
                 self.assertTrue(response.json()["success"])
                 after = self.client.get(page)
                 self.assertContains(after, 'gov-team manual-team')

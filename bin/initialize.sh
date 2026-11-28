@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 set +x
-
-python manage.py migrate --no-input
-python manage.py initialize_tourney --tab-password $TAB_PASSWORD
+exec mittab-server init

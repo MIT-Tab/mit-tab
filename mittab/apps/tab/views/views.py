@@ -270,7 +270,7 @@ def apda_board_school_detail(request, school_id):
     if request.method == "POST":
         form = SchoolApdaIdForm(request.POST, instance=school)
         if form.is_valid():
-            form.save()
+            School.objects.filter(pk=school.pk).update(apda_id=form.cleaned_data["apda_id"])
             return redirect_and_flash_success(
                 request,
                 f"APDA ID updated for {school.name}.",
@@ -306,7 +306,7 @@ def apda_board_debater_detail(request, debater_id):
     if request.method == "POST":
         form = DebaterApdaIdForm(request.POST, instance=debater)
         if form.is_valid():
-            form.save()
+            Debater.objects.filter(pk=debater.pk).update(apda_id=form.cleaned_data["apda_id"])
             return redirect_and_flash_success(
                 request,
                 f"APDA ID updated for {debater.name}.",
@@ -366,26 +366,23 @@ def add_scratch(request):
                 with transaction.atomic():
                     form.save(actor=request.user)
             except IntegrityError:
-                if not can_view_scratches:
-                    return redirect_and_flash_success(
-                        request,
-                        "Scratch submitted.",
-                        path=reverse("add_scratch"),
-                    )
-                return redirect_and_flash_error(request,
-                                                "This scratch already exists.")
-        success_path = reverse("add_scratch") if not can_view_scratches else None
-        return redirect_and_flash_success(
-            request,
-            "Scratch created successfully",
-            path=success_path,
-        )
+                if not Scratch.objects.filter(
+                    team_id=form.cleaned_data["team"], judge_id=form.cleaned_data["judge"],
+                ).exists():
+                    raise
+                if can_view_scratches:
+                    return redirect_and_flash_error(request, "This scratch already exists.")
+            return redirect_and_flash_success(
+                request,
+                "Scratch created successfully" if can_view_scratches else "Scratch submitted.",
+                path=None if can_view_scratches else reverse("add_scratch"),
+            )
     else:
         form = ScratchForm(initial={"scratch_type": 0})
     return render(request, "common/data_entry.html", {
         "title": "Adding Scratch",
         "form": form
-    })
+    }, status=422 if request.method == "POST" else 200)
 
 
 #### BEGIN SCHOOL ###
@@ -546,11 +543,11 @@ def view_room(request, room_id):
 
         # Get all rounds that happened in this room with related judges
         rounds = Round.objects.filter(room=room).select_related(
-            "gov_team", "opp_team", "chair").prefetch_related("judges")
+            "gov_team", "opp_team", "chair").prefetch_related("judges").order_by("round_number", "pk")
 
         # Get all outrounds that happened in this room with related judges
         outrounds = Outround.objects.filter(room=room).select_related(
-            "gov_team", "opp_team", "chair").prefetch_related("judges")
+            "gov_team", "opp_team", "chair").prefetch_related("judges").order_by("pk")
 
     return render(request, "tab/room_detail.html", {
         "form": form,
@@ -721,12 +718,13 @@ def delete_scratch(request, _item_id, scratch_id):
 def view_scratches(request):
     # Get a list of (id,school_name) tuples
     c_scratches = [(s.team_id, str(s), 0, "")
-                   for s in Scratch.objects.select_related("team", "judge")]
+                   for s in Scratch.objects.select_related("team", "judge").order_by("id")]
     return render(
         request, "common/list_data.html", {
             "item_type": "team",
             "title": "Viewing All Scratches for Teams",
-            "item_list": c_scratches
+            "item_list": c_scratches,
+            "scoped_scratch_links": not request.user.is_superuser,
         })
 
 def get_settings_from_yaml():
@@ -953,7 +951,10 @@ def upload_data(request):
 def force_cache_refresh(request):
     key = request.GET.get("key", "")
 
-    cache_logic.invalidate_cache(key)
+    if key in {"team_rankings_private", "team_rankings", "speaker_rankings"}:
+        cache_logic.invalidate_tabulation_cache()
+    else:
+        cache_logic.invalidate_cache(key)
 
     redirect_to = request.GET.get("next", "/")
 

@@ -1,8 +1,7 @@
 # Setting up your server
 
 In order to run mit-tab for your tournament, it has to be accessible to all of
-your competitors on the internet. The
-[MIT-Tab Deploy application](https://github.com/benmusch/mit-tab) handles that
+your competitors on the internet. The MIT-Tab Deploy application handles that
 process.
 
 To set up a tournament, visit

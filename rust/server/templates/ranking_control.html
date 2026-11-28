@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>Public Rankings Control</h2>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <h3>Rankings</h3>
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr><th scope="col">List</th><th scope="col">Public</th><th scope="col">Include scores</th><th scope="col">Maximum visible</th><th scope="col">Through round</th></tr></thead>
+        <tbody>
+        {% for config in rankings %}
+        <tr>
+          <th scope="row">{{ config.label }}</th>
+          <td><input class="form-check-input" type="checkbox" aria-label="Publish {{ config.label }}" name="{{ config.slug }}_public"{% if config.visible %} checked{% endif %}></td>
+          <td><input class="form-check-input" type="checkbox" aria-label="Include scores for {{ config.label }}" name="{{ config.slug }}_include_speaks"{% if config.speaks %} checked{% endif %}></td>
+          <td><input class="form-control" type="number" min="1" aria-label="Maximum visible for {{ config.label }}" name="{{ config.slug }}_max_visible" value="{{ config.maximum }}"></td>
+          <td>{% if config.slug == "team" %}
+            <select class="custom-select" aria-label="Publish team rankings through round" name="{{ config.slug }}_up_to_round">
+              <option value="0">Before Round 1</option>
+              {% for round in paired_rounds %}<option value="{{ round }}"{% if round == config.round %} selected{% endif %}>Round {{ round }}</option>{% endfor %}
+            </select>
+          {% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <h3>Ballots</h3>
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr><th scope="col">Round</th><th scope="col">Public</th><th scope="col">Include speaker points</th><th scope="col">Include ranks</th></tr></thead>
+        <tbody>
+        {% for config in ballots %}
+        <tr>
+          <th scope="row">Round {{ config.round }}</th>
+          <td><input class="form-check-input" type="checkbox" aria-label="Publish Round {{ config.round }} ballots" name="round_{{ config.round }}_visible"{% if config.visible %} checked{% endif %}></td>
+          <td><input class="form-check-input" type="checkbox" aria-label="Include Round {{ config.round }} speaker points" name="round_{{ config.round }}_include_speaks"{% if config.speaks %} checked{% endif %}></td>
+          <td><input class="form-check-input" type="checkbox" aria-label="Include Round {{ config.round }} ranks" name="round_{{ config.round }}_include_ranks"{% if config.ranks %} checked{% endif %}></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button type="submit" class="btn btn-primary">Save Publication Settings</button>
+  </form>
+</div>
+{% endblock %}
