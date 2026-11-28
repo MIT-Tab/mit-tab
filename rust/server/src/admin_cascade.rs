@@ -385,6 +385,10 @@ impl Cascade {
                 | ("tab_judge_required_room_tags", "judge_id") => Some("roomtag_id"),
                 ("tab_judge_schools", "judge_id") => Some("school_id"),
                 ("tab_judge", "registration_id") => Some("name"),
+                ("django_admin_log", "user_id") => Some("action_time DESC"),
+                ("tab_scratch", "judge_id") => Some("team_id"),
+                ("tab_checkin" | "tab_judgeexpectedcheckin", "judge_id")
+                | ("tab_roomcheckin", "room_id") => Some("round_number"),
                 ("registration_registrationconfirmationemaillog", "registration_id") => {
                     Some("sent_at DESC")
                 }

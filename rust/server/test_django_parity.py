@@ -9101,6 +9101,7 @@ def test_admin_roster_forms_match_django_and_preserve_related_records(html_asset
     discarded_tag = RoomTag.objects.create(tag="Discarded", priority=3)
     room.tags.add(discarded_tag)
     room.tags.add(tag)
+    RoomCheckIn.objects.create(room=room, round_number=3)
     checkin = RoomCheckIn.objects.create(room=room, round_number=1)
     debater = Debater.objects.create(name="Ada & Debater", school=school, novice_status=0, tiebreaker=128)
     other_debater = Debater.objects.create(name="Grace", novice_status=1, tiebreaker=256)
@@ -9237,6 +9238,7 @@ def test_admin_roster_forms_match_django_and_preserve_related_records(html_asset
         assert audit.changes["public"]["after"]["scores"] == []
         assert not group.debaters.filter(id=debater.id).exists()
         room_deletion = f"{base}room/{room.id}/delete/"
+        compare_admin_page(port, room_deletion, client, deletion_scope=True)
         _, _, preview = request(port, room_deletion, cookie=session)
         assert submit(port, room_deletion, {"post": "yes", "mittab_delete_scope": admin_delete_proof(preview)})[0] == 302
         assert not RoomCheckIn.objects.filter(id=checkin.id).exists()
@@ -9288,10 +9290,13 @@ def test_admin_team_judge_forms_and_deletion_match_django(html_assets, subtests)
     final = Outround.objects.create(num_teams=2, type_of_round=0, gov_team=team, opp_team=opponent, chair=judge,
                                     victor=Outround.GOV)
     final.judges.add(judge, wing)
+    Scratch.objects.create(team=opponent, judge=judge, scratch_type=1)
     Scratch.objects.create(team=team, judge=judge, scratch_type=1)
     Bye.objects.create(bye_team=team, round_number=2)
     NoShow.objects.create(no_show_team=team, round_number=2)
+    CheckIn.objects.create(judge=judge, round_number=3)
     CheckIn.objects.create(judge=judge, round_number=1)
+    JudgeExpectedCheckIn.objects.create(judge=judge, round_number=2)
     JudgeExpectedCheckIn.objects.create(judge=judge, round_number=1)
     BreakingTeam.objects.create(team=team, seed=1, effective_seed=1, type_of_team=0)
     TeamCodeEmailLog.objects.create(team=team, email="code@example.org")
@@ -9715,9 +9720,13 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
     account.groups.add(chosen)
     account.user_permissions.add(permission)
     preference = UserTournamentSetupPreference.objects.create(user=account, hide_tournament_todo=True)
-    LogEntry.objects.log_action(user_id=account.id, content_type_id=permission.content_type_id,
-        object_id=gov.id, object_repr="Fixture & object", action_flag=CHANGE,
-        change_message=[{"changed": {"fields": ["Fixture"]}}])
+    for day in (2, 1, 3):
+        LogEntry.objects.create(
+            user_id=account.id, content_type_id=permission.content_type_id,
+            object_id=gov.id, object_repr=f"Fixture & object for day {day}", action_flag=CHANGE,
+            change_message=[{"changed": {"fields": ["Fixture"]}}],
+            action_time=timezone.make_aware(datetime(2026, 10, day, 12)),
+        )
 
     client = Client()
     csrf = "a" * 32
