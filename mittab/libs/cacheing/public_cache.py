@@ -164,7 +164,12 @@ def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
     cache = caches[PUBLIC_CACHE_ALIAS]
     _advance_generation(cache, "outround_pretty_pair", type_of_round)
     _advance_generation(cache, "public_home")
-    _advance_generation(cache, "cached_public_tab_cards")
+    invalidate_public_tab_cards_cache()
+
+
+def invalidate_public_tab_cards_cache():
+    """Advance the cache generation for public tab cards."""
+    _delete_all_keys_for_view("cached_public_tab_cards")
 
 
 def invalidate_public_judges_cache(*_args, **_kwargs):

@@ -9797,9 +9797,14 @@ def test_admin_team_judge_forms_and_deletion_match_django(html_assets, subtests)
 
         compare_admin_page(port, team_root, client, post={"action": "delete_selected", "index": 0,
                                                           "_selected_action": [team.id, new_team.id]})
-        assert submit(port, f"{team_url}delete/", {"post": "yes"})[0] == 403
-        assert submit(port, team_root, {"action": "delete_selected", "post": "yes",
-                                       "_selected_action": [team.id, new_team.id]})[0] == 403
+        for path, fields in (
+            (f"{team_url}delete/", {"post": "yes"}),
+            (team_root, {"action": "delete_selected", "post": "yes",
+                         "_selected_action": [team.id, new_team.id]}),
+        ):
+            rust = submit(port, path, fields)
+            reference = client.post(path, fields)
+            assert rust[0] == reference.status_code == 403 and rust[2] == reference.content
         assert Team.objects.filter(id__in=[team.id, new_team.id]).count() == 2
         assert ManualJudgeAssignment.objects.filter(id=assignment.id).exists()
         assignment.delete()
@@ -9815,7 +9820,10 @@ def test_admin_team_judge_forms_and_deletion_match_django(html_assets, subtests)
         earlier_path = f"{judge_root}{new_judge.id}/delete/"
         status, _, preview = request(port, earlier_path, cookie=session)
         assert status == 200 and b"Resolve the later stage before deleting this pairing." in preview
-        assert submit(port, earlier_path, {"post": "yes"})[0] == 409
+        blocked = submit(port, earlier_path, {"post": "yes"})
+        reference = client.post(earlier_path, {"post": "yes"})
+        assert blocked[0] == reference.status_code == 409 and blocked[2] == reference.content
+        compare_admin_page(port, earlier_path, client)
         assert Outround.objects.filter(id__in=[semifinal.id, final.id]).count() == 2
         semifinal.delete()
 
@@ -9837,10 +9845,32 @@ def test_admin_team_judge_forms_and_deletion_match_django(html_assets, subtests)
         preserved = PublishedTeamPlacement.objects.create(team=opponent, place=1, stage=other_stage)
         assert submit(port, judge_deletion, {"post": "yes"}, preview=before_publication)[0] == 409
         before_result = deletion_preview(port, judge_deletion)
+        reference_proof = admin_delete_proof(client.get(judge_deletion).content)
         RoundStats.objects.filter(round=debate).update(speaks=28)
         Outround.objects.filter(id=final.id).update(victor=Outround.OPP)
-        assert submit(port, judge_deletion, {"post": "yes"}, preview=before_result)[0] == 409
+        stale = submit(port, judge_deletion, {"post": "yes"}, preview=before_result)
+        csrf_mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', stale[2])[1][:32].decode()
+        with patch("django.middleware.csrf._get_new_csrf_string", return_value=csrf_mask):
+            refreshed = client.post(judge_deletion, {"post": "yes", "mittab_delete_scope": reference_proof})
+        assert stale[0] == refreshed.status_code == 409
+        assert_html_bytes(stale[2].replace(scope(stale[2]).encode(), b"SCOPE"),
+                          refreshed.content.replace(scope(refreshed.content).encode(), b"SCOPE"))
         assert Judge.objects.filter(id=judge.id).exists() and Outround.objects.filter(id=final.id).exists()
+        reference_client = Client()
+        reference_client.cookies["sessionid"] = session
+        with transaction.atomic():
+            assert reference_client.post(judge_deletion, {
+                "post": "yes", "mittab_delete_scope": scope(refreshed.content),
+            }).status_code == 302
+            assert not Judge.objects.filter(pk=judge.pk).exists()
+            assert not Round.objects.filter(pk=debate.pk).exists()
+            assert not Outround.objects.filter(pk=final.pk).exists()
+            assert not PublishedOutroundStage.objects.filter(pk=published_final.pk).exists()
+            assert PublishedTeamPlacement.objects.filter(pk=preserved.pk).exists()
+            for kind, key in (("round", debate.pk), ("outround", final.pk)):
+                evidence = AuditEvent.objects.get(content_type__model=kind, object_id=key, user=user).changes["public"]
+                assert evidence["before"]["chair"] == judge.pk and evidence["after"] is None
+            transaction.set_rollback(True)
         preview = deletion_preview(port, judge_deletion)
         assert submit(port, judge_deletion, {"post": "yes"}, preview=preview)[0] == 302
         assert not Judge.objects.filter(id=judge.id).exists()
@@ -9859,6 +9889,16 @@ def test_admin_team_judge_forms_and_deletion_match_django(html_assets, subtests)
         bulk = {"action": "delete_selected", "_selected_action": [team.id, new_team.id]}
         status, _, html = submit(port, team_root, {**bulk, "index": 0})
         assert status == 200
+        with transaction.atomic():
+            team_scope = scope(reference_client.post(team_root, {**bulk, "index": "0"}).content)
+            assert reference_client.post(team_root, {
+                **bulk, "post": "yes", "mittab_delete_scope": team_scope,
+            }).status_code == 302
+            assert not Team.objects.filter(pk__in=[team.pk, new_team.pk]).exists()
+            assert not group.teams.filter(pk=team.pk).exists()
+            assert Team.objects.filter(pk=opponent.pk).exists()
+            assert Registration.objects.filter(pk=registration.pk).exists()
+            transaction.set_rollback(True)
         assert submit(port, team_root, {**bulk, "post": "yes"}, preview=scope(html))[0] == 302
         assert not Team.objects.filter(id=new_team.id).exists()
         assert not Team.objects.filter(id=team.id).exists()
@@ -9866,6 +9906,169 @@ def test_admin_team_judge_forms_and_deletion_match_django(html_assets, subtests)
         assert Debater.objects.filter(id__in=[member.id for member in members]).count() == 3
         assert Registration.objects.filter(id=registration.id).exists()
         assert not group.teams.filter(id=team.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("backend", ("django", "rust"))
+def test_judge_wing_deletion_preserves_debates_and_refreshes_public_panels(backend, html_assets):
+    staff = legacy_tab_session("wing-delete-admin")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("pairing_released", 1)
+    TabSettings.set("var_teams_visible", 2)
+    school = School.objects.create(name="Panel Fixture School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Government", "Opposition")]
+    chair = Judge.objects.create(name="Fixture Presiding Judge", rank=5)
+    wing = Judge.objects.create(name="Fixture Wing Judge", rank=3)
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, chair=chair)
+    final = Outround.objects.create(num_teams=2, type_of_round=0, gov_team=gov, opp_team=opp, chair=chair)
+    Round.judges.through.objects.bulk_create([
+        Round.judges.through(round=debate, judge=judge) for judge in (chair, wing)
+    ])
+    final.judges.add(chair, wing)
+    root = "/admin/tab/judge/"
+    path = f"{root}{wing.pk}/delete/"
+    public_pages = ("/public/pairings/", "/public/outrounds/0/")
+    csrf = "a" * 32
+    headers = {"Cookie": f"sessionid={staff}; csrftoken={csrf}"}
+
+    with rust_server(overrides=html_assets) as port:
+        client = Client()
+        client.cookies["sessionid"] = staff
+        public = Client()
+
+        def submit(fields):
+            if backend == "django":
+                response = client.post(path, fields)
+                return response.status_code, response.content
+            status, _, body = request(port, path, method="POST", extra_headers=headers,
+                                      form={**fields, "csrfmiddlewaretoken": csrf})
+            return status, body
+
+        def public_body(url):
+            if backend == "django":
+                response = public.get(url)
+                assert response.status_code == 200
+                return response.content
+            status, _, body = request(port, url)
+            assert status == 200
+            return body
+
+        for url in public_pages:
+            assert b"Fixture Wing Judge" in public_body(url)
+        body = client.get(path).content if backend == "django" else request(port, path, extra_headers=headers)[2]
+        original = admin_delete_proof(body)
+        Outround.objects.filter(pk=final.pk).update(choice=Outround.GOV)
+        status, updated = submit({"post": "yes", "mittab_delete_scope": original})
+        assert status == 409 and admin_delete_proof(updated) != original
+        assert wing.pk in final.judges.values_list("pk", flat=True)
+        assert submit({"post": "yes", "mittab_delete_scope": admin_delete_proof(updated)})[0] == 302
+
+        for url in public_pages:
+            body = public_body(url)
+            assert b"Fixture Wing Judge" not in body and b"Fixture Presiding Judge" in body
+        for match in (debate, final):
+            match.refresh_from_db()
+            assert match.chair_id == chair.pk and list(match.judges.values_list("pk", flat=True)) == [chair.pk]
+            evidence = AuditEvent.objects.get(content_type__model=match._meta.model_name, object_id=match.pk).changes["public"]
+            assert evidence["source"] == "admin deletion"
+            assert {judge["id"] for judge in evidence["before"]["judges"]} == {chair.pk, wing.pk}
+            assert [judge["id"] for judge in evidence["after"]["judges"]] == [chair.pk]
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("model", ("team", "judge"))
+def test_queued_roster_admin_edit_cannot_restore_deleted_object(model):
+    staff = legacy_tab_session("roster-edit-queued")
+    school = School.objects.create(name="Queued Roster School")
+    target = (Team.objects.create(name="Fixture queued entry", school=school, seed=0) if model == "team"
+              else Judge.objects.create(name="Fixture queued entry", rank=3))
+    target_pk = target.pk
+    path = f"/admin/tab/{model}/{target_pk}/"
+    TabSettings.set("cur_round", 2)
+    client = Client()
+    client.cookies["sessionid"] = staff
+    token = admin_delete_proof(client.get(path + "delete/").content)
+
+    def edit():
+        queued = Client()
+        queued.cookies["sessionid"] = staff
+        return queued.post(path + "change/", {"name": "Renamed entry", "school": school.pk, "rank": 4,
+                                             "seed": 0, "break_preference": 0})
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with transaction.atomic():
+            TabSettings.objects.select_for_update().get(key="cur_round")
+            pending = pool.submit(edit)
+            with pytest.raises(FutureTimeout):
+                pending.result(timeout=0.5)
+            assert client.post(path + "delete/", {"post": "yes", "mittab_delete_scope": token}).status_code == 302
+        response = pending.result(timeout=6)
+    assert (response.status_code, response["Location"]) == (302, "/admin/")
+    assert not type(target).objects.filter(pk=target_pk).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("backend", ("django", "rust"))
+@pytest.mark.parametrize("revoked", (False, True))
+def test_queued_judge_deletion_checks_current_ballot_and_access(backend, revoked):
+    from time import monotonic, sleep
+
+    staff = legacy_tab_session("judge-delete-queued")
+    administrator = get_user_model().objects.get(username="judge-delete-queued")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Queued Ballot School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Government", "Opposition")]
+    chair = Judge.objects.create(name="Fixture queued chair", rank=4)
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, chair=chair, rfd="Original fixture comment")
+    path = f"/admin/tab/judge/{chair.pk}/delete/"
+    csrf = "a" * 32
+    headers = {"Cookie": f"sessionid={staff}; csrftoken={csrf}"}
+
+    with rust_server() as port:
+        def django_client():
+            client = Client()
+            client.cookies["sessionid"] = staff
+            return client
+
+        preview = (django_client().get(path).content if backend == "django"
+                   else request(port, path, extra_headers=headers)[2])
+        proof = admin_delete_proof(preview)
+
+        def submit():
+            form = {"post": "yes", "mittab_delete_scope": proof, "csrfmiddlewaretoken": csrf}
+            if backend == "django":
+                response = django_client().post(path, form)
+                return response.status_code, response.headers, response.content
+            return request(port, path, method="POST", form=form, extra_headers=headers)
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with transaction.atomic():
+                Round.objects.select_for_update().get(pk=debate.pk)
+                pending = pool.submit(submit)
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "tab_round" in row[7] and "FOR UPDATE" in row[7]
+                                      for row in cursor.fetchall())
+                    if waiting:
+                        break
+                    sleep(0.025)
+                assert waiting, "Judge deletion did not reach the affected debate lock"
+                if revoked:
+                    administrator.groups.add(Group.objects.create(name="APDA Board"))
+                Round.objects.filter(pk=debate.pk).update(rfd="Updated private fixture comment")
+            status, response_headers, body = pending.result(timeout=6)
+        if revoked:
+            assert (status, response_headers["Location"]) == (302, "/403/")
+        else:
+            assert status == 409 and admin_delete_proof(body) != proof
+            assert b"Updated private fixture comment" not in body
+        assert Judge.objects.filter(pk=chair.pk).exists()
+        assert Round.objects.filter(pk=debate.pk, chair=chair).exists()
 
 
 @pytest.mark.django_db(transaction=True)

@@ -9,7 +9,7 @@ from django.contrib.auth.models import Group, User
 from django.contrib.admin.utils import unquote
 from django.contrib.sessions.models import Session
 from django.db import router, transaction
-from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.db.models import Q, QuerySet
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -19,14 +19,13 @@ from django.views.decorators.debug import sensitive_post_parameters
 
 from mittab.apps.tab import models
 from mittab.apps.tab.admin_delete_scope import (
-    account_deletion_records, account_deletion_scope, room_deletion_scope,
+    account_deletion_records, account_deletion_scope, room_deletion_scope, roster_deletion_scope,
 )
+from mittab.apps.tab.admin_pairing_deletion import LATER_STAGE, RosterCascade, later_stage_survives, repair_removed_outrounds
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME, is_apda_board_user
 from mittab.libs.cacheing.cache_logic import refresh_rankings_after_commit
-from mittab.libs.cacheing.public_cache import invalidate_outround_public_pairings_cache
 from mittab.libs.outround_tab_logic.pairing import prepare_challenge_edits
-from mittab.apps.tab.board_operations import recompute_seeds
-from mittab.apps.tab.live_results import lock_elimination_tournament, published_team_placements
+from mittab.apps.tab.live_results import lock_elimination_tournament
 from mittab.apps.tab.board_audit import (
     pairing_snapshot, record_pairing_change, record_pairing_removal, with_pairing_snapshot_relations,
 )
@@ -53,6 +52,15 @@ def _require_current_admin(request):
     request.user = actor
 
 
+def _lock_current_admin_session(request, database):
+    if not User.objects.using(database).select_for_update().filter(pk=request.user.pk, is_superuser=True).exists():
+        raise AdminAccessChanged
+    sessions = Session.objects.using(database).select_for_update()
+    if not sessions.filter(session_key=request.session.session_key, expire_date__gt=timezone.now()).exists():
+        raise AdminAccessChanged
+    _require_current_admin(request)
+
+
 def _protected_deletion_response(error, status):
     return HttpResponse(str(error), status=error.status or status, content_type="text/plain; charset=utf-8",
                         headers={"Cache-Control": "private, no-store"})
@@ -60,6 +68,7 @@ def _protected_deletion_response(error, status):
 
 class ProtectedDeletionMixin:
     blocked_status = 409
+    related_permission_message = None
 
     def delete_view(self, request, object_id, extra_context=None):
         try:
@@ -103,12 +112,14 @@ class ProtectedDeletionMixin:
             self._lock_selection(selected)
             _require_current_admin(request)
         reason = self.deletion_rejection(selected, request)
-        if reason and confirmed:
-            raise ProtectedAdminChange(reason)
         if not reason:
             self.prepare_deletion_scope(request, selected, confirmed)
         deleted, counts, permissions, protected = super().get_deleted_objects(objs, request)
+        if confirmed and permissions and self.related_permission_message:
+            raise ProtectedAdminChange(self.related_permission_message, status=403)
         if reason:
+            if confirmed:
+                raise ProtectedAdminChange(reason)
             protected.append(reason)
         if not (permissions or protected):
             self.review_deletion_scope(request, selected, deleted, counts, confirmed, protected)
@@ -147,11 +158,23 @@ class SignedDeletionMixin(ProtectedDeletionMixin):
             response.status_code = 409
         return response
 
+    def _apply_bulk_confirmation(self, request, queryset):
+        if request.POST.get("post") in (None, "", "yes"):
+            return super().delete_selected_safely(request, queryset)
+        submitted = request.POST
+        request.POST = submitted.copy()
+        request.POST.pop("post")
+        try:
+            return super().delete_selected_safely(request, queryset)
+        finally:
+            request.POST = submitted
+
     def delete_selected_safely(self, request, queryset):
-        response = super().delete_selected_safely(request, queryset)
+        response = self._apply_bulk_confirmation(request, queryset)
         if hasattr(response, "context_data") and self._show_deletion_scope(request, response.context_data):
             response.status_code = 409
         return response
+
 
 class SchoolAdmin(ProtectedDeletionMixin, admin.ModelAdmin):
     def deletion_rejection(self, selected, request):
@@ -186,11 +209,8 @@ class RoomAdmin(SignedDeletionMixin, admin.ModelAdmin):
         if models.Round.objects.using(selected.db).filter(room__in=selected).exists():
             return "This room is assigned to a round."
         removed = models.Outround.objects.using(selected.db).filter(room__in=selected)
-        later = models.Outround.objects.using(selected.db).exclude(pk__in=removed).filter(
-            type_of_round=OuterRef("type_of_round"), num_teams__lt=OuterRef("num_teams"),
-        )
-        if removed.filter(Exists(later)).exists():
-            return "Resolve the later stage before deleting this pairing."
+        if later_stage_survives(removed):
+            return LATER_STAGE
         return None
 
     @staticmethod
@@ -199,39 +219,15 @@ class RoomAdmin(SignedDeletionMixin, admin.ModelAdmin):
             models.Outround.objects.filter(room__in=rooms),
         )]
 
-    @staticmethod
-    def _after_delete(actor, pairings):
-        removed = {}
-        for pairing, before in pairings:
-            record_pairing_removal(models.Outround, pairing.pk, before, actor)
-            removed.setdefault((pairing.type_of_round, pairing.num_teams), set()).update(
-                (pairing.gov_team_id, pairing.opp_team_id),
-            )
-        for (division, size), teams in removed.items():
-            stages = models.PublishedOutroundStage.objects.filter(type_of_round=division, num_teams=size)
-            remaining = list(models.Outround.objects.filter(type_of_round=division, num_teams=size)
-                             .values_list("gov_team_id", "opp_team_id"))
-            if remaining:
-                survivors = {team for match in remaining for team in match}
-                models.PublishedTeamPlacement.objects.filter(
-                    stage__in=stages, team_id__in=teams - survivors,
-                ).delete()
-            else:
-                stages.delete()
-        for division in sorted({division for division, _ in removed}):
-            recompute_seeds(division, actor)
-            published_team_placements(division)
-            transaction.on_commit(lambda division=division: invalidate_outround_public_pairings_cache(division))
-
     def delete_model(self, request, obj):
         pairings = self._pairings([obj])
         super().delete_model(request, obj)
-        self._after_delete(request.user, pairings)
+        repair_removed_outrounds(request.user, pairings)
 
     def delete_queryset(self, request, queryset):
         pairings = self._pairings(queryset)
         super().delete_queryset(request, queryset)
-        self._after_delete(request.user, pairings)
+        repair_removed_outrounds(request.user, pairings)
 
 
 class AccountDeletionMixin(SignedDeletionMixin):
@@ -257,28 +253,13 @@ class AccountDeletionMixin(SignedDeletionMixin):
             self._lock_administrators(database)
             return super().delete_view(request, object_id, extra_context)
 
-    def delete_selected_safely(self, request, queryset):
-        if request.POST.get("post") in (None, "", "yes"):
-            return super().delete_selected_safely(request, queryset)
-        submitted = request.POST
-        request.POST = submitted.copy()
-        request.POST.pop("post")
-        try:
-            return super().delete_selected_safely(request, queryset)
-        finally:
-            request.POST = submitted
-
     def prepare_deletion_scope(self, request, selected, confirmed):
         request.admin_account_deletion_records = account_deletion_records(selected, confirmed)
 
     def review_deletion_scope(self, request, selected, deleted, counts, confirmed, protected):
         super().review_deletion_scope(request, selected, deleted, counts, confirmed, protected)
         if confirmed:
-            session_key = request.session.session_key
-            sessions = Session.objects.using(selected.db).select_for_update()
-            if not sessions.filter(session_key=session_key, expire_date__gt=timezone.now()).exists():
-                raise AdminAccessChanged
-            _require_current_admin(request)
+            _lock_current_admin_session(request, selected.db)
 
 
 class TournamentUserAdmin(AccountDeletionMixin, UserAdmin):
@@ -474,12 +455,70 @@ class AttributionAdminMixin:
         models.AuditEvent.record(obj, event_type, request.user, changes=changes)
 
 
-class TeamAdmin(AttributionAdminMixin, admin.ModelAdmin):
+class RosterDeletionMixin(SignedDeletionMixin):
+    deletion_scope = staticmethod(roster_deletion_scope)
+    related_permission_message = "You do not have permission to delete related records."
+
+    def _lock_selection(self, selected):
+        tournament = lock_elimination_tournament(using=selected.db)
+        ids = super()._lock_selection(selected)
+        if tournament is None and self._affected_outrounds(selected.filter(pk__in=ids)).exists():
+            raise ProtectedAdminChange("Unable to complete this request.", status=503)
+        return ids
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        if request.method != "POST" or object_id is None:
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        database = router.db_for_write(self.model)
+        try:
+            with transaction.atomic(using=database):
+                lock_elimination_tournament(using=database)
+                target = self.get_object(request, unquote(object_id))
+                if target is None or not self.model.objects.using(database).select_for_update().filter(pk=target.pk).exists():
+                    return redirect("/admin/")
+                _require_current_admin(request)
+                return super().changeform_view(request, object_id, form_url, extra_context)
+        except AdminAccessChanged:
+            return redirect("/403/")
+
+    def delete_view(self, request, object_id, extra_context=None):
+        if request.method == "POST" and request.POST.get("post") != "yes":
+            return _protected_deletion_response(ProtectedAdminChange("Confirm the deletion first."), 400)
+        return super().delete_view(request, object_id, extra_context)
+
+    def _affected_outrounds(self, selected, *, include_panel=True):
+        rows = models.Outround.objects.using(selected.db)
+        if self.model is models.Team:
+            return rows.filter(Q(gov_team__in=selected) | Q(opp_team__in=selected))
+        links = Q(chair__in=selected)
+        if include_panel:
+            links |= Q(judges__in=selected)
+        return rows.filter(links)
+
+    def deletion_rejection(self, selected, request):
+        removed = self._affected_outrounds(selected, include_panel=False)
+        return LATER_STAGE if later_stage_survives(removed) else None
+
+    def prepare_deletion_scope(self, request, selected, confirmed):
+        request.admin_roster_deletion = RosterCascade.capture(selected, confirmed)
+        if confirmed:
+            _lock_current_admin_session(request, selected.db)
+
+    def delete_model(self, request, obj):
+        super().delete_model(request, obj)
+        request.admin_roster_deletion.finish(request.user)
+
+    def delete_queryset(self, request, queryset):
+        super().delete_queryset(request, queryset)
+        request.admin_roster_deletion.finish(request.user)
+
+
+class TeamAdmin(RosterDeletionMixin, AttributionAdminMixin, admin.ModelAdmin):
     exclude = ("team_code",)
     filter_horizontal = ("debaters", )
 
 
-class JudgeAdmin(AttributionAdminMixin, admin.ModelAdmin):
+class JudgeAdmin(RosterDeletionMixin, AttributionAdminMixin, admin.ModelAdmin):
     filter_horizontal = ("schools", "required_room_tags")
 
 

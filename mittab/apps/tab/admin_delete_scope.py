@@ -56,15 +56,9 @@ def account_deletion_scope(request, selected, preview, counts, _confirmed):
     return _sign(request, selected, preview, counts, request.admin_account_deletion_records)
 
 
-def room_deletion_scope(request, rooms, preview, counts, _confirmed):
-    """Bind the visible cascade and the data used to repair the bracket."""
-    database = rooms.db
-    rounds = with_pairing_snapshot_relations(
-        Outround.objects.using(database).filter(room__in=rooms).order_by("pk"),
-    )
-    pairings = [(round_obj.pk, pairing_snapshot(round_obj)) for round_obj in rounds]
-    divisions = {snapshot["division"] for _, snapshot in pairings}
-
+def _publication_records(database, divisions):
+    if not divisions:
+        return ()
     stages = PublishedOutroundStage.objects.using(database).filter(type_of_round__in=divisions).order_by("pk")
     placements = (PublishedTeamPlacement.objects.using(database)
                   .filter(stage__in=stages).order_by("pk")
@@ -74,9 +68,29 @@ def room_deletion_scope(request, rooms, preview, counts, _confirmed):
     settings = (TabSettings.objects.using(database)
                 .filter(key__in=("var_teams_visible", "nov_teams_visible"))
                 .order_by("pk").values_list("key", "value", "value_string"))
+    return (list(stages.values_list("pk", "type_of_round", "num_teams")),
+            list(placements), list(seeds), list(settings))
+
+
+def roster_deletion_scope(request, selected, preview, counts, _confirmed):
+    cascade = request.admin_roster_deletion
+    divisions = {cascade.before[Outround][pk]["division"] for pk in cascade.removed[Outround]}
+    identity = list(selected.order_by("pk").values_list("pk", "name"))
+    return _sign(request, selected, preview, counts,
+                 (identity, cascade.signature(), _publication_records(selected.db, divisions)))
+
+
+def room_deletion_scope(request, rooms, preview, counts, _confirmed):
+    """Bind the visible cascade and the data used to repair the bracket."""
+    database = rooms.db
+    rounds = with_pairing_snapshot_relations(
+        Outround.objects.using(database).filter(room__in=rooms).order_by("pk"),
+    )
+    pairings = [(round_obj.pk, pairing_snapshot(round_obj)) for round_obj in rounds]
+    divisions = {snapshot["division"] for _, snapshot in pairings}
+
     state = (
         list(rooms.order_by("pk").values_list("pk", "name", "rank")),
-        pairings, list(stages.values_list("pk", "type_of_round", "num_teams")),
-        list(placements), list(seeds), list(settings) if divisions else [],
+        pairings, _publication_records(database, divisions),
     )
     return _sign(request, rooms, preview, counts, state)

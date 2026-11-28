@@ -11,7 +11,7 @@ use axum::{
 use chrono::NaiveDateTime;
 use minijinja::{Value, context};
 use ring::hmac;
-use sqlx::{AssertSqlSafe, MySqlConnection, QueryBuilder};
+use sqlx::{Acquire, AssertSqlSafe, MySql, MySqlConnection, QueryBuilder, Transaction};
 
 use crate::{
     App, access,
@@ -26,7 +26,7 @@ use crate::{
     admin_scores::score_audit,
     board_snapshot, entity_store,
     legacy_html::{self, DjangoJson, escape},
-    legacy_session::{Actor, cookie},
+    legacy_session::{self, Actor, cookie},
     login, private, publication,
     registration_form::Fields,
     roster_log, round_audit,
@@ -1226,6 +1226,7 @@ type PublicationScope = (i32, i32, i32, Vec<Placement>);
 pub(super) struct CascadePairings {
     outrounds: Option<BTreeMap<i32, board_snapshot::Snapshot>>,
     removed_outrounds: BTreeSet<i32>,
+    affected_outrounds: BTreeSet<i32>,
     inrounds: BTreeMap<i32, round_audit::Snapshot>,
     publications: Vec<PublicationScope>,
     deleted_round_details: Vec<(i32, i32, Option<NaiveDateTime>, String)>,
@@ -1242,7 +1243,25 @@ impl CascadePairings {
         if model == "outround" {
             removed_outrounds.extend(rows.iter().map(|(id, _)| *id));
         }
-        let outrounds = if !removed_outrounds.is_empty() || cascade.touches("tab_outround_judges") {
+        let mut affected_outrounds = removed_outrounds.clone();
+        let judge_links = cascade.ids("tab_outround_judges");
+        if !judge_links.is_empty() {
+            let mut query = QueryBuilder::new(
+                "SELECT DISTINCT outround_id FROM tab_outround_judges WHERE id IN (",
+            );
+            let mut selected = query.separated(", ");
+            for id in judge_links {
+                selected.push_bind(id);
+            }
+            affected_outrounds.extend(
+                query
+                    .push(")")
+                    .build_query_scalar::<i32>()
+                    .fetch_all(&mut *db)
+                    .await?,
+            );
+        }
+        let outrounds = if !affected_outrounds.is_empty() {
             Some(board_snapshot::capture(db, board_snapshot::Pairings::Outround).await?)
         } else {
             None
@@ -1320,6 +1339,7 @@ impl CascadePairings {
         Ok(Self {
             outrounds,
             removed_outrounds,
+            affected_outrounds,
             inrounds,
             publications,
             deleted_round_details,
@@ -1327,15 +1347,15 @@ impl CascadePairings {
     }
 
     pub(super) fn scope(&self) -> impl serde::Serialize + '_ {
-        let removed = self
+        let affected = self
             .outrounds
             .iter()
             .flatten()
-            .filter(|(id, _)| self.removed_outrounds.contains(id))
+            .filter(|(id, _)| self.affected_outrounds.contains(id))
             .collect::<Vec<_>>();
         (
             &self.inrounds,
-            removed,
+            affected,
             &self.publications,
             &self.deleted_round_details,
         )
@@ -1744,17 +1764,83 @@ impl Removed {
     }
 }
 
+fn is_roster_deletion(page: &Page<'_>) -> bool {
+    matches!(page.resource.list.model.name, "team" | "judge")
+}
+
+async fn begin_deletion<'db>(
+    db: &'db mut MySqlConnection,
+    page: &Page<'_>,
+    confirmed: bool,
+) -> Result<Transaction<'db, MySql>, sqlx::Error> {
+    if confirmed && is_roster_deletion(page) {
+        // The graph and session must reflect commits made while locking dependencies.
+        sqlx::query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            .execute(&mut *db)
+            .await?;
+    }
+    db.begin().await
+}
+
+async fn lock_deletion_tournament(
+    db: &mut MySqlConnection,
+    page: &Page<'_>,
+) -> Result<bool, sqlx::Error> {
+    if lock_round_if_configured(db).await?.is_some() {
+        return Ok(true);
+    }
+    if !is_roster_deletion(page) {
+        return Ok(false);
+    }
+    let fallback = sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM tab_tabsettings WHERE `key` = 'tot_rounds' ORDER BY id LIMIT 1 FOR UPDATE",
+    )
+    .fetch_optional(db)
+    .await?;
+    Ok(fallback.is_some())
+}
+
+async fn roster_delete_still_allowed(
+    db: &mut MySqlConnection,
+    app: &App,
+    page: &Page<'_>,
+) -> Result<bool, sqlx::Error> {
+    if !is_roster_deletion(page) {
+        return Ok(true);
+    }
+    sqlx::query("SELECT id FROM auth_user WHERE id = ? FOR UPDATE")
+        .bind(page.user)
+        .execute(&mut *db)
+        .await?;
+    if !legacy_session::lock_active(db, cookie(page.headers, "sessionid").unwrap_or_default())
+        .await?
+    {
+        return Ok(false);
+    }
+    match access::refreshed_user(db, app, page.actor, page.headers).await {
+        Ok(Actor::User {
+            board: false,
+            staff: true,
+            superuser: true,
+            ..
+        }) => Ok(true),
+        Err(access::PortalAccessError::Database) => Err(sqlx::Error::Protocol(
+            "Could not validate the administrator session".into(),
+        )),
+        _ => Ok(false),
+    }
+}
+
 async fn delete(
     app: &App,
     page: Page<'_>,
     id: i32,
     post: Option<&Fields>,
 ) -> Result<Response, sqlx::Error> {
-    let mut db = app.db.begin().await?;
     let confirm = post.is_some_and(|form| form.get("post") == "yes");
-    if confirm {
-        lock_round_if_configured(&mut db).await?;
-    }
+    let mut connection = app.db.acquire().await?;
+    let mut db = begin_deletion(&mut connection, &page, confirm).await?;
+    let tournament_locked = confirm && lock_deletion_tournament(&mut db, &page).await?;
     if !admin_html::model_enabled(
         &mut db,
         page.resource.list.model.application(),
@@ -1792,6 +1878,15 @@ async fn delete(
             !preview.verified(app, post.map_or("", |post| post.get("mittab_delete_scope")))
         });
     if confirm {
+        if !roster_delete_still_allowed(&mut db, app, &page).await? {
+            return Ok(access::access_denied());
+        }
+        if is_roster_deletion(&page)
+            && !tournament_locked
+            && !pairings.affected_outrounds.is_empty()
+        {
+            return Ok(unavailable());
+        }
         if !permissions.is_empty() {
             return Ok(private((
                 StatusCode::FORBIDDEN,
@@ -1849,10 +1944,9 @@ async fn delete(
 
 async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx::Error> {
     let confirm = post.get("post") == "yes";
-    let mut db = app.db.begin().await?;
-    if confirm {
-        lock_round_if_configured(&mut db).await?;
-    }
+    let mut connection = app.db.acquire().await?;
+    let mut db = begin_deletion(&mut connection, &page, confirm).await?;
+    let tournament_locked = confirm && lock_deletion_tournament(&mut db, &page).await?;
     if !admin_html::model_enabled(
         &mut db,
         page.resource.list.model.application(),
@@ -1914,6 +2008,15 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
             .as_ref()
             .is_some_and(|preview| !preview.verified(app, post.get("mittab_delete_scope")));
     if confirm {
+        if !roster_delete_still_allowed(&mut db, app, &page).await? {
+            return Ok(access::access_denied());
+        }
+        if is_roster_deletion(&page)
+            && !tournament_locked
+            && !pairings.affected_outrounds.is_empty()
+        {
+            return Ok(unavailable());
+        }
         if !permissions.is_empty() {
             return Ok(private((
                 StatusCode::FORBIDDEN,
