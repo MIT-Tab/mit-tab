@@ -1,6 +1,7 @@
 """Parity, allocation, tournament and pre-feature compatibility coverage."""
 import json
 from pathlib import Path
+import random
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -290,6 +291,7 @@ class TestMinByes(TestCase):
     def test_zero_matches_pre_feature_tournaments(self):
         # Golden data generated from c41a23e's unmodified pairing module, using
         # zero_snapshot's deterministic results and the same testing_db fixture.
+        # Reproduce the historical cache RNG for this pre-feature comparison.
         golden = json.loads(
             Path(__file__).with_name("min_byes_legacy.json").read_text(encoding="utf-8")
         )
@@ -297,6 +299,7 @@ class TestMinByes(TestCase):
             size, policy, random_r2 = map(int, scenario.split("-"))
             for explicit_zero in (False, True):
                 with self.subTest(scenario=scenario, explicit_zero=explicit_zero), \
+                        mock.patch.object(cache_logic, "_cache_random", random), \
                         transaction.atomic():
                     self.prepare(size, 0)
                     if not explicit_zero:
