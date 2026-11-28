@@ -7183,7 +7183,18 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path,
             ballot = f"/outround/{row.id}/result/"
             assert request(port, ballot, cookie=tab)[0] == 200
             assert post(ballot, {"winner": 1, "round_instance": 9999})[0] == 422
-            assert post(ballot, {"winner": 1, "round_instance": row.id})[0] == 302
+            boundary = "mittab-elimination-ballot"
+            multipart = "".join(
+                f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'
+                for key, value in {"winner": 1, "round_instance": row.id, "csrfmiddlewaretoken": csrf}.items()
+            ) + f"--{boundary}--\r\n"
+            saved = request(port, ballot, method="POST", raw_body=multipart.encode(),
+                            extra_headers={**jar, "Content-Type": f"multipart/form-data; boundary={boundary}"})
+            assert saved[0] == 302 and saved[1]["Location"] == "/outround_pairing/0/4"
+            notice = load_cookies(saved[1])["mittab_roster_notice"].value
+            ballot_redirect = request(port, saved[1]["Location"],
+                                      extra_headers={"Cookie": jar["Cookie"] + f"; mittab_roster_notice={notice}"})
+            assert b"Result entered successfully" in ballot_redirect[2]
         assert b"drops to" in request(port, "/outround_result/0", cookie=tab)[2]
         # A replayed stage can already be covered by the imported release threshold.
         TabSettings.set("var_teams_visible", 2)
@@ -7411,7 +7422,23 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
                            extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
                            form={"csrfmiddlewaretoken": csrf, **(fields or {})})
 
-        assert post("/break/")[0] == 302
+        def follow_notice(result, expected_path, message, *, forwarded=False, success=True):
+            assert result[0] == 302 and result[1]["Location"] == expected_path
+            cookie = load_cookies(result[1])["mittab_roster_notice"].value
+            jar = f"sessionid={tab}; csrftoken={csrf}"
+            page = request(port, expected_path, extra_headers={"Cookie": f"{jar}; mittab_roster_notice={cookie}"})
+            if forwarded:
+                assert page[0] == 302 and page[1]["Location"] == "/outround_pairing/0/4"
+                cookie = load_cookies(page[1])["mittab_roster_notice"].value
+                expected_path = page[1]["Location"]
+                page = request(port, expected_path, extra_headers={"Cookie": f"{jar}; mittab_roster_notice={cookie}"})
+            style = b"success" if success else b"danger"
+            assert page[0] == 200
+            assert re.search(rb'<div class="alert alert-' + style + rb'">\s*' + re.escape(message), page[2])
+            assert load_cookies(page[1])["mittab_roster_notice"]["max-age"] == "0"
+            assert message not in request(port, expected_path, extra_headers={"Cookie": jar})[2]
+
+        follow_notice(post("/break/"), "/outround_pairing", b"Success!", forwarded=True)
         assert BreakingTeam.objects.filter(type_of_team=0).count() == 4 and not Outround.objects.exists()
         assert b"Enter Challenge Outs" in request(port, "/outround_pairing/0/4", cookie=tab)[2]
         path = "/outround_pairing/pair/0/8/"
@@ -7419,11 +7446,14 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
         a, b, c, d = [seed.team_id for seed in seeds]
         assert b"Recorded matchups" in request(port, path, cookie=tab)[2]
         action = {"action": "set_challenge", "challenger_id": a, "challenged_id": c}
-        assert post(path, {**action, "challenged_id": a})[0] == 422
-        assert post(path, action)[0] == 302
-        assert post(path, {**action, "challenger_id": b})[0] == 422
+        follow_notice(post(path, {**action, "challenged_id": a}), path,
+                      b"A team cannot challenge itself.", success=False)
+        follow_notice(post(path, action), path, b"Challenge updated.")
+        follow_notice(post(path, {**action, "challenger_id": b}), path,
+                      b"One of these teams already has a challenge pick.", success=False)
         assert OutroundChallenge.objects.count() == 1
-        assert post(path, {"action": "delete_challenge", "challenger_id": a})[0] == 302
+        follow_notice(post(path, {"action": "delete_challenge", "challenger_id": a}),
+                      path, b"Challenge removed.")
         assert not OutroundChallenge.objects.exists()
         assert post(path, action)[0] == 302
         before_rebreak = list(BreakingTeam.objects.order_by("pk").values_list("id", "team_id", "seed"))
@@ -7435,17 +7465,17 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
         outsider = Team.objects.create(name="Outside Challenge Field", school=school, seed=0)
         OutroundChallenge.objects.create(type_of_round=0, num_teams=4, challenger=outsider, challenged_id=b)
         conflict = post(path, {**action, "challenged_id": b})
-        assert conflict[0] == 422 and b"One of these teams already has a challenge pick." in conflict[2]
+        follow_notice(conflict, path, b"One of these teams already has a challenge pick.", success=False)
         assert OutroundChallenge.objects.get(challenger_id=a).challenged_id == c
         assert OutroundChallenge.objects.get(challenger=outsider).challenged_id == b
         result = post(path)
-        assert result[0] == 302 and result[1]["Location"] == "/outround_pairing/0/4", result
+        follow_notice(result, "/outround_pairing/0/4", b"Success!")
         assert {frozenset((row.gov_team_id, row.opp_team_id)) for row in Outround.objects.all()} == {
             frozenset((a, c)), frozenset((b, d)),
         }
         assert BreakingTeam.objects.get(team_id=c).effective_seed == 4
         assert TabSettings.get(f"challenge_once_applied_0_{min(seed.id for seed in seeds)}", use_cache=False) == 1
-        assert post(path, action)[0] == 422
+        follow_notice(post(path, action), path, b"Challenge entries are not available for this round.", success=False)
         if imported:
             TabSettings.objects.filter(key__startswith="rust_seed_").delete()
         judge = Judge.objects.create(name="Challenge protected judge", rank=9, wing_only=True)

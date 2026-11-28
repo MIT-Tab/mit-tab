@@ -531,17 +531,28 @@ pub async fn set_pick(
     challenger: i32,
     opponent: Option<i32>,
 ) -> Result<(), Error> {
+    if opponent == Some(challenger) {
+        return Err(Error::Invalid("A team cannot challenge itself."));
+    }
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
-    let state = prepare(&mut db, &settings, prior).await?;
-    if !state.enabled {
-        return Err(Error::Invalid(
-            "Challenge entries are unavailable for this stage.",
-        ));
-    }
-    if !state.entries.iter().any(|entry| entry.team == challenger) {
-        return Err(Error::Invalid("Choose a team in this stage."));
+    let state = match prepare(&mut db, &settings, prior).await {
+        Ok(state) if state.enabled => state,
+        Ok(_) | Err(Error::Invalid(_)) => {
+            return Err(Error::Invalid(
+                "Challenge entries are not available for this round.",
+            ));
+        }
+        Err(error) => return Err(error),
+    };
+    let active: BTreeSet<_> = state.entries.iter().map(|entry| entry.team).collect();
+    if !active.contains(&challenger) || opponent.is_some_and(|id| !active.contains(&id)) {
+        return Err(Error::Invalid(if opponent.is_some() {
+            "Selected teams are not in this challenge pool."
+        } else {
+            "Selected team is not in this challenge pool."
+        }));
     }
     prepare_challenge_edits(&mut db, prior.division, state.generation, None).await?;
     if let Some(opponent) = opponent {
@@ -555,7 +566,6 @@ pub async fn set_pick(
             ));
         }
         let updating = picks.contains_key(&challenger);
-        let active: BTreeSet<_> = state.entries.iter().map(|entry| entry.team).collect();
         picks.retain(|owner, _| active.contains(owner));
         picks.insert(challenger, opponent);
         let seeds = seeds(&state.entries);

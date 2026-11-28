@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use axum::{
     Extension, Json, Router,
     body::Bytes,
-    extract::{Path, Query, State},
+    extract::{Path, Query, Request, State},
     http::{HeaderMap, StatusCode, Uri},
     response::Response,
     routing::{get, post},
@@ -23,7 +23,7 @@ use crate::{
     staff_elimination_assign::{self, Assignment},
     staff_elimination_page::{self, Selection},
     staff_elimination_store::{self as store, Error, Stage},
-    staff_roster::form_return_target,
+    staff_roster::{form_return_target, submitted_fields},
     staff_roster_notice, unavailable,
 };
 
@@ -216,13 +216,13 @@ async fn break_submit(
     };
     let confirmation = fields.flag("confirm").then(|| fields.get("break_revision"));
     match store::break_tournament(&app, user, confirmation).await {
-        Ok(()) => access::found(ROOT),
+        Ok(()) => staff_roster_notice::saved(&app, &headers, ROOT, "Success!"),
         Err(Error::Invalid(message)) => show_break(&app, actor, &headers, Some(message)).await,
         Err(issue) => error(issue),
     }
 }
 
-async fn default_stage(State(app): State<App>) -> Response {
+async fn default_stage(State(app): State<App>, headers: HeaderMap) -> Response {
     let Ok(mut db) = app.db.acquire().await else {
         return unavailable();
     };
@@ -236,10 +236,8 @@ async fn default_stage(State(app): State<App>) -> Response {
     let stage = counts.into_iter().enumerate().find_map(|(kind, count)| {
         store::stage_size(count).and_then(|size| Stage::new(kind as i32, size))
     });
-    match stage {
-        Some(stage) => access::found(stage.url()),
-        None => access::found("/"),
-    }
+    let target = stage.map_or_else(|| "/".into(), Stage::url);
+    staff_roster_notice::forward(&app, &headers, ROOT, &target)
 }
 
 async fn stage_page(
@@ -331,28 +329,42 @@ async fn pair_submit(
     let Some(prior) = Stage::new(division, previous) else {
         return error(Error::Missing);
     };
-    let result = match fields.get("action") {
-        "set_challenge" | "delete_challenge" => {
-            let challenger = fields.get("challenger_id").parse::<i32>().ok();
-            let opponent = fields.get("challenged_id").parse::<i32>().ok();
-            let remove = fields.get("action") == "delete_challenge";
-            if let Some(challenger) = challenger.filter(|_| remove || opponent.is_some()) {
-                store::set_pick(
-                    &app,
-                    prior,
-                    challenger,
-                    if remove { None } else { opponent },
-                )
-                .await
-                .map(|_| format!("/outround_pairing/pair/{division}/{previous}/"))
-            } else {
-                Err(Error::Invalid("Choose valid teams for the challenge."))
+    let action = fields.get("action");
+    if matches!(action, "set_challenge" | "delete_challenge") {
+        let remove = action == "delete_challenge";
+        let challenger = fields.get("challenger_id").parse::<i32>().ok();
+        let opponent = fields.get("challenged_id").parse::<i32>().ok();
+        let result = if let Some(challenger) = challenger.filter(|_| remove || opponent.is_some()) {
+            store::set_pick(
+                &app,
+                prior,
+                challenger,
+                if remove { None } else { opponent },
+            )
+            .await
+        } else {
+            Err(Error::Invalid("Choose valid teams for the challenge."))
+        };
+        let target = format!("/outround_pairing/pair/{division}/{previous}/");
+        return match result {
+            Ok(()) => staff_roster_notice::saved(
+                &app,
+                &headers,
+                &target,
+                if remove {
+                    "Challenge removed."
+                } else {
+                    "Challenge updated."
+                },
+            ),
+            Err(Error::Invalid(message)) => {
+                staff_roster_notice::failed(&app, &headers, &target, message)
             }
-        }
-        _ => store::pair_next(&app, user, prior).await.map(Stage::url),
-    };
-    match result {
-        Ok(url) => access::found(url),
+            Err(issue) => error(issue),
+        };
+    }
+    match store::pair_next(&app, user, prior).await {
+        Ok(stage) => staff_roster_notice::saved(&app, &headers, &stage.url(), "Success!"),
         Err(Error::Invalid(message)) => {
             show_pair(&app, actor, &headers, prior, false, Some(message), None).await
         }
@@ -501,10 +513,13 @@ async fn ballot_submit(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<i32>,
-    headers: HeaderMap,
-    body: Bytes,
+    request: Request,
 ) -> Response {
-    let fields = Fields::parse(&body);
+    let headers = request.headers().clone();
+    let fields = match submitted_fields(&app, request).await {
+        Ok(fields) => fields,
+        Err(response) => return *response,
+    };
     if !checked(&headers, &fields) {
         return login::csrf_error();
     }
@@ -526,7 +541,9 @@ async fn ballot_submit(
         Err(Error::Invalid("The ballot specifies a different debate."))
     };
     match result {
-        Ok(stage) => access::found(stage.url()),
+        Ok(stage) => {
+            staff_roster_notice::saved(&app, &headers, &stage.url(), "Result entered successfully")
+        }
         Err(Error::Invalid(message)) => show_ballot(&app, actor, &headers, id, Some(message)).await,
         Err(issue) => error(issue),
     }

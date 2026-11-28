@@ -41,6 +41,14 @@ pub fn failed(app: &App, headers: &HeaderMap, target: &str, text: &str) -> Respo
     )
 }
 
+pub fn forward(app: &App, headers: &HeaderMap, from: &str, target: &str) -> Response {
+    match message(app, headers, from) {
+        Some(notice) if notice.error => failed(app, headers, target, &notice.text),
+        Some(notice) => saved(app, headers, target, &notice.text),
+        None => access::found(target),
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum Portal {
     Team,
