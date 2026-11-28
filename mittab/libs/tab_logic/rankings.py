@@ -7,6 +7,7 @@ from mittab.apps.tab.models import (
     TabSettings,
     Team,
 )
+from mittab.libs.cacheing.cache_logic import tabulation_cache_scope
 from mittab.libs.tab_logic.stats import *
 
 
@@ -166,6 +167,7 @@ class TeamScore(Score):
         )
         self.stats[COIN_FLIP] = team.tiebreaker
 
+@tabulation_cache_scope()
 def get_team_rankings(request, public=False, up_to_round=None):
     exclude_round = None
     if public and up_to_round is None:

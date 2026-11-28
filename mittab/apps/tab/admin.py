@@ -3,6 +3,7 @@ from django.contrib import admin
 from django import forms
 
 from mittab.apps.tab import models
+from mittab.libs.cacheing.cache_logic import refresh_rankings_after_commit
 from mittab.libs.outround_tab_logic.pairing import prepare_challenge_edits
 from mittab.apps.tab.board_audit import (
     pairing_snapshot, record_pairing_change, record_pairing_removal,
@@ -18,11 +19,15 @@ class PairingAuditAdminMixin:
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
         record_pairing_change(form.instance, form.pairing_before, request.user, "admin correction")
+        if isinstance(form.instance, models.Round):
+            refresh_rankings_after_commit(using=form.instance._state.db)
 
     def delete_model(self, request, obj):
         model, object_id, before = type(obj), obj.pk, pairing_snapshot(obj)
         super().delete_model(request, obj)
         record_pairing_removal(model, object_id, before, request.user)
+        if model is models.Round:
+            refresh_rankings_after_commit(using=obj._state.db)
 
     def delete_queryset(self, request, queryset):
         model = queryset.model
@@ -30,6 +35,8 @@ class PairingAuditAdminMixin:
         super().delete_queryset(request, queryset)
         for object_id, snapshot in before.items():
             record_pairing_removal(model, object_id, snapshot, request.user)
+        if model is models.Round:
+            refresh_rankings_after_commit(using=queryset.db)
 
 
 class RoundAdminForm(forms.ModelForm):
@@ -58,7 +65,21 @@ class OutroundAdmin(PairingAuditAdminMixin, admin.ModelAdmin):
     filter_horizontal = ("judges", )
 
 
-class RoundStatsAdmin(admin.ModelAdmin):
+class RankingInputAdmin(admin.ModelAdmin):
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        refresh_rankings_after_commit(using=obj._state.db)
+
+    def delete_model(self, request, obj):
+        super().delete_model(request, obj)
+        refresh_rankings_after_commit(using=obj._state.db)
+
+    def delete_queryset(self, request, queryset):
+        super().delete_queryset(request, queryset)
+        refresh_rankings_after_commit(using=queryset.db)
+
+
+class RoundStatsAdmin(RankingInputAdmin):
     def save_model(self, request, obj, form, change):
         round_ids = {obj.round_id}
         if change:
@@ -219,8 +240,8 @@ admin.site.register(models.UserTournamentSetupPreference)
 admin.site.register(models.Room)
 admin.site.register(models.RoomTag)
 admin.site.register(models.RankingGroup)
-admin.site.register(models.Bye)
-admin.site.register(models.NoShow)
+admin.site.register(models.Bye, RankingInputAdmin)
+admin.site.register(models.NoShow, RankingInputAdmin)
 admin.site.register(models.BreakingTeam)
 admin.site.register(models.Outround, OutroundAdmin)
 admin.site.register(models.OutroundChallenge, OutroundChallengeAdmin)

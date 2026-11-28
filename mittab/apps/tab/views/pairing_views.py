@@ -76,7 +76,7 @@ def pair_round(request):
                 invalidate_inround_public_pairings_cache()
                 current_round.value = current_round.value + 1
                 current_round.save()
-                invalidate_public_ballot_cache()
+                transaction.on_commit(invalidate_public_ballot_cache)
         except Exception as exp:
             emit_current_exception()
             return redirect_and_flash_error(
@@ -832,6 +832,7 @@ def alternative_teams(request, round_id, current_team_id, position):
     return render(request, "pairing/team_dropdown.html", context)
 
 
+@cache_logic.tabulation_cache_scope()
 def team_stats(request, round_number, outround=False):
     """
     Returns the tab card data for all teams in the pairings of this given round number
@@ -884,6 +885,7 @@ def assign_team(request, round_id, position, team_id):
         else:
             raise ValueError("Got invalid position: " + position)
         round_obj.save()
+        cache_logic.refresh_rankings_after_commit(using=round_obj._state.db)
 
         data = {
             "success": True,
@@ -912,6 +914,7 @@ def switch_sides(request, round_id):
         elif round_obj.pullup == Round.OPP:
             round_obj.pullup = Round.GOV
         round_obj.save()
+        cache_logic.refresh_rankings_after_commit(using=round_obj._state.db)
         data = {
             "success": True,
             "round_id": round_obj.id,
@@ -1111,10 +1114,12 @@ def enter_multiple_results(request, round_id, num_entered):
                             round_instance=round_obj,
                             no_fill=True) for i in range(1, num_entered + 1)
         ]
-        all_good = True
-        for form in forms:
-            all_good = all_good and form.is_valid()
-        if all_good:
+        valid = [form.is_valid() for form in forms]
+        if any(form.cleaned_data.get("round_instance", round_obj.pk) != round_obj.pk for form in forms):
+            return HttpResponse("This ballot belongs to a different debate.", status=422,
+                                content_type="text/plain; charset=utf-8",
+                                headers={"Cache-Control": "private, no-store"})
+        if all(valid):
             # result is of the format:
             # winner_1 => [(debater, role, speaks, rank), ...]
             # winner_2 => [(debater, role, sp ...]
@@ -1128,10 +1133,6 @@ def enter_multiple_results(request, round_id, num_entered):
 
                 result[winner].append([])
                 for debater in debaters:
-                    old_stats = RoundStats.objects.filter(round=round_obj,
-                                                          debater_role=debater)
-                    if old_stats:
-                        old_stats.delete()
                     debater_obj = Debater.objects.get(
                         pk=cleaned_data[f"{debater}_debater"])
                     debater_role_obj = debater
@@ -1144,7 +1145,7 @@ def enter_multiple_results(request, round_id, num_entered):
             if all_good:
                 final_scores, final_winner = score_panel(
                     result, "discard_minority" in request.POST)
-                print(final_scores)
+                RoundStats.objects.filter(round=round_obj, debater_role__in=debaters).delete()
                 for (debater, role, speaks, ranks) in final_scores:
                     RoundStats.objects.create(debater=debater,
                                               round=round_obj,
@@ -1153,6 +1154,7 @@ def enter_multiple_results(request, round_id, num_entered):
                                               debater_role=role)
                 round_obj.victor = final_winner
                 round_obj.save()
+                cache_logic.refresh_rankings_after_commit(using=round_obj._state.db)
                 return redirect_and_flash_success(
                     request, "Round entered successfully")
             else:

@@ -1,7 +1,8 @@
-from django.db.models.signals import m2m_changed
+from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
-from mittab.apps.tab.models import ManualJudgeAssignment, Round
+from mittab.apps.tab.models import Debater, ManualJudgeAssignment, Round, Team
+from mittab.libs.cacheing.cache_logic import refresh_rankings_after_commit
 
 
 @receiver(m2m_changed, sender=Round.judges.through)
@@ -51,3 +52,25 @@ def track_manual_judge_assignments(instance, action, reverse, pk_set, **kwargs):
         else:
             round_obj = instance
             ManualJudgeAssignment.objects.filter(round=round_obj).delete()
+
+
+
+@receiver(m2m_changed, sender=Team.debaters.through)
+def invalidate_ranking_team_membership(action, using, **kwargs):
+    if action in {"post_add", "post_remove", "post_clear"}:
+        refresh_rankings_after_commit(using=using)
+
+
+@receiver(post_save, sender=Team)
+@receiver(post_save, sender=Debater)
+def invalidate_ranking_roster_edits(sender, raw, using, update_fields, **kwargs):
+    fields = ({"name", "tiebreaker", "ranking_public"} if sender is Team
+              else {"name", "tiebreaker", "novice_status"})
+    if not raw and (update_fields is None or fields.intersection(update_fields)):
+        refresh_rankings_after_commit(using=using)
+
+
+@receiver(post_delete, sender=Team)
+@receiver(post_delete, sender=Debater)
+def invalidate_ranking_roster_removal(using, **kwargs):
+    refresh_rankings_after_commit(using=using)

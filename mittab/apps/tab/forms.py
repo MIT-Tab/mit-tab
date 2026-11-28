@@ -2,7 +2,6 @@ from decimal import Decimal
 from datetime import datetime
 import os
 import itertools
-import pprint
 
 from django.db import transaction
 from django import forms
@@ -572,10 +571,6 @@ class ResultEntryForm(forms.Form):
             raise ValueError("Ballot target does not match the requested round")
         round_obj = Round.objects.get(pk=self.round_object.pk)
 
-        if not round_obj.victor == cleaned_data["winner"]:
-            cache_logic.invalidate_cache("team_rankings")
-            cache_logic.invalidate_cache("speaker_rankings")
-
         round_obj.victor = cleaned_data["winner"]
 
         with transaction.atomic():
@@ -591,21 +586,13 @@ class ResultEntryForm(forms.Form):
                     ranks=self.deb_attr_val(debater, "ranks", int),
                     debater_role=debater)
 
-                if old_stats.exists():
-                    for old_stat in old_stats:
-                        if (old_stat.debater != stats.debater) or \
-                           (old_stat.speaks != stats.speaks) or \
-                           (old_stat.ranks != stats.ranks) or \
-                           (old_stat.debater_role != stats.debater_role) or \
-                           (old_stat.round != stats.round):
-                            cache_logic.invalidate_cache("team_rankings")
-                            cache_logic.invalidate_cache("speaker_rankings")
-                    old_stats.delete()
+                old_stats.delete()
                 stats.save()
             round_obj.save()
             if "rfd" in self.cleaned_data and written_rfd_editing_open(round_obj):
                 round_obj.rfd = self.cleaned_data.get("rfd", "")
                 round_obj.save(update_fields=["rfd"])
+            cache_logic.refresh_rankings_after_commit(using=round_obj._state.db)
         return round_obj
 
     def deb_attr_val(self, position, attr, cast=None):
@@ -1141,9 +1128,6 @@ def score_panel(result, discard_minority):
     ranked = [(deb, role, speak, rank + 1)
               for (rank, (deb, role, speak, _)) in enumerate(ranked)]
 
-    print("Ranked Debaters")
-    pprint.pprint(ranked)
-
     # Break any ties by taking the average of the tied ranks
     ties = {}
     for (score_i, score) in enumerate(ranked):
@@ -1156,9 +1140,6 @@ def score_panel(result, discard_minority):
         else:
             ties[tie_key] = [(score_i, score[3])]
 
-    print("Ties")
-    pprint.pprint(ties)
-
     # Average over the tied ranks
     for val in ties.values():
         if len(val) > 1:
@@ -1168,9 +1149,6 @@ def score_panel(result, discard_minority):
                 final_score = ranked[i]
                 ranked[i] = (final_score[0], final_score[1], final_score[2],
                              avg)
-    print("Final scores")
-    pprint.pprint(ranked)
-
     return ranked, final_winner
 
 

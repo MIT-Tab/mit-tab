@@ -331,10 +331,9 @@ def perform_the_break():
 
 
 def _perform_the_break_experimental():
-    teams, nov_teams = cache_logic.cache_fxn_key(
+    teams, nov_teams = cache_logic.cache_tabulation_result(
         get_team_rankings,
         "team_rankings",
-        cache_logic.DEFAULT,
         None
     )
 
@@ -595,10 +594,9 @@ def _pair_standard(type_of_break=BreakingTeam.VARSITY):
 
 
 def _perform_the_break_standard():
-    teams, nov_teams = cache_logic.cache_fxn_key(
+    teams, nov_teams = cache_logic.cache_tabulation_result(
         get_team_rankings,
         "team_rankings",
-        cache_logic.DEFAULT,
         None
     )
 

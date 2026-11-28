@@ -416,6 +416,7 @@ def get_middle_and_non_middle_teams(all_teams):
     return middle_of_bracket, non_middle_of_bracket
 
 
+@cache_logic.tabulation_cache_scope()
 def sorted_pairings(round_number, outround=False):
     """
     Helper function to get the sorted pairings for a round while minimizing the

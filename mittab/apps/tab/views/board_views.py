@@ -25,6 +25,7 @@ from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.apps.tab.models import (
     AuditEvent, BreakingTeam, Bye, Judge, NoShow, Outround, Room, Round, Team,
 )
+from mittab.libs.cacheing.cache_logic import tabulation_cache_scope
 from mittab.libs.tab_logic.stats import (
     tot_ranks, tot_ranks_deb, tot_speaks, tot_speaks_deb,
 )
@@ -219,6 +220,7 @@ def judges(request):
 
 @board_required
 @require_safe
+@tabulation_cache_scope()
 def tab_cards(request, team_id=None):
     teams = list(Team.objects.order_by("name", "id").values("id", "name"))
     team = get_object_or_404(Team.objects.only("id", "name"),

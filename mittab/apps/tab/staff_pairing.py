@@ -11,6 +11,7 @@ from django.shortcuts import redirect
 from mittab.apps.tab.auth_roles import is_apda_board_user, is_restricted_staff_user
 from mittab.apps.tab.board_audit import pairing_revision
 from mittab.apps.tab.models import Outround, TabSettings
+from mittab.libs.cacheing.cache_logic import tabulation_cache_scope
 
 
 STALE_PAIRING = "This pairing changed. Reload it before saving."
@@ -36,7 +37,8 @@ def serialize_staff_pairing_post(view):
                     or not actor.has_perm("tab.tab_settings.can_change")):
                 return redirect("/403/")
             request.user = actor
-            return view(request, *args, **kwargs)
+            with tabulation_cache_scope(isolated=True):
+                return view(request, *args, **kwargs)
     return wrapped
 
 

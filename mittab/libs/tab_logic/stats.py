@@ -119,7 +119,7 @@ def had_bye(team, round_number=None):
 ##############
 
 
-@cache()
+@cache(tabulation=True)
 def tot_wins(team, exclude_round=None, up_to_round=None):
     """
     Calculate total wins, using in-memory iteration rather than db queries to avoid n+1
@@ -149,13 +149,13 @@ def tot_wins(team, exclude_round=None, up_to_round=None):
 ################
 
 
-@cache()
+@cache(tabulation=True)
 def tot_speaks(team, exclude_round=None, up_to_round=None):
     return sum([tot_speaks_deb(deb, False, exclude_round, up_to_round)
                 for deb in team.debaters.all()])
 
 
-@cache()
+@cache(tabulation=True)
 def single_adjusted_speaks(team, exclude_round=None, up_to_round=None):
     speaks = [speaks_for_debater(deb, False, exclude_round, up_to_round)
               for deb in team.debaters.all()]
@@ -163,7 +163,7 @@ def single_adjusted_speaks(team, exclude_round=None, up_to_round=None):
     return sum(speaks[1:-1])
 
 
-@cache()
+@cache(tabulation=True)
 def double_adjusted_speaks(team, exclude_round=None, up_to_round=None):
     speaks = [speaks_for_debater(deb, False, exclude_round, up_to_round)
               for deb in team.debaters.all()]
@@ -176,13 +176,13 @@ def double_adjusted_speaks(team, exclude_round=None, up_to_round=None):
 ###############
 
 
-@cache()
+@cache(tabulation=True)
 def tot_ranks(team, exclude_round=None, up_to_round=None):
     return sum([tot_ranks_deb(deb, False, exclude_round, up_to_round)
                 for deb in team.debaters.all()])
 
 
-@cache()
+@cache(tabulation=True)
 def single_adjusted_ranks(team, exclude_round=None, up_to_round=None):
     ranks = [ranks_for_debater(deb, False, exclude_round, up_to_round)
              for deb in team.debaters.all()]
@@ -190,7 +190,7 @@ def single_adjusted_ranks(team, exclude_round=None, up_to_round=None):
     return sum(ranks[1:-1])
 
 
-@cache()
+@cache(tabulation=True)
 def double_adjusted_ranks(team, exclude_round=None, up_to_round=None):
     ranks = [ranks_for_debater(deb, False, exclude_round, up_to_round)
              for deb in team.debaters.all()]
@@ -198,7 +198,7 @@ def double_adjusted_ranks(team, exclude_round=None, up_to_round=None):
     return sum(ranks[2:-2])
 
 
-@cache()
+@cache(tabulation=True)
 def opp_strength(team, exclude_round=None, up_to_round=None):
     """
     Average number of wins per opponent
@@ -234,7 +234,7 @@ def opp_strength(team, exclude_round=None, up_to_round=None):
 ###################
 
 
-@cache()
+@cache(tabulation=True)
 def avg_deb_speaks(debater):
     """ Computes the average debater speaks for the supplied debater
 
@@ -282,7 +282,7 @@ def debater_forfeit_speaks(_debater):
     return 0.0
 
 
-@cache()
+@cache(tabulation=True)
 def speaks_for_debater(
     debater, average_ironmen=True, exclude_round=None, up_to_round=None
 ):
@@ -398,7 +398,7 @@ def double_adjusted_speaks_deb(debater):
     return sum(debater_speaks[2:-2])
 
 
-@cache()
+@cache(tabulation=True)
 def tot_speaks_deb(
     debater, average_ironmen=True, exclude_round=None, up_to_round=None
 ):
@@ -414,7 +414,7 @@ def tot_speaks_deb(
 ##################
 
 
-@cache()
+@cache(tabulation=True)
 def avg_deb_ranks(debater):
     """ Computes the average debater ranks for the supplied debater
 
@@ -453,7 +453,7 @@ def avg_deb_ranks(debater):
         return float(sum(real_ranks)) / float(len(real_ranks))
 
 
-@cache()
+@cache(tabulation=True)
 def ranks_for_debater(
     debater, average_ironmen=True, exclude_round=None, up_to_round=None
 ):
@@ -523,7 +523,7 @@ def ranks_for_debater(
     return debater_ranks
 
 
-@cache()
+@cache(tabulation=True)
 def debater_abnormal_round_ranks(debater, round_number):
     """
     Calculate the ranks for a bye/forfeit round
@@ -550,21 +550,21 @@ def debater_abnormal_round_ranks(debater, round_number):
         return MAXIMUM_DEBATER_RANKS
 
 
-@cache()
+@cache(tabulation=True)
 def single_adjusted_ranks_deb(debater):
     debater_ranks = ranks_for_debater(debater)
     debater_ranks.sort()
     return sum(debater_ranks[1:-1])
 
 
-@cache()
+@cache(tabulation=True)
 def double_adjusted_ranks_deb(debater):
     debater_ranks = ranks_for_debater(debater)
     debater_ranks.sort()
     return sum(debater_ranks[2:-2])
 
 
-@cache()
+@cache(tabulation=True)
 def tot_ranks_deb(debater, average_ironmen=True, exclude_round=None, up_to_round=None):
     debater_ranks = ranks_for_debater(debater,
                                       average_ironmen=average_ironmen,

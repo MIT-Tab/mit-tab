@@ -34,6 +34,38 @@ def test_cache_miss_preserves_the_pairing_random_state(settings):
     assert random.getstate() == state
 
 
+def test_rankings_invalidation_discards_a_calculation_completed_after_commit(settings):
+    settings.CACHES = {
+        **settings.CACHES,
+        **{
+            alias: {"BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                    "LOCATION": f"tabulation-cache-version-test-{alias}"}
+            for alias in ("default", "public")
+        },
+    }
+    scores = [27, 28]
+
+    @cache_logic.cache(tabulation=True)
+    def total():
+        old_score = scores.pop(0)
+        if scores:
+            cache_logic.invalidate_tabulation_cache()
+        return old_score
+
+    def rankings():
+        return total()
+
+    assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 27
+    assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 28
+    assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 28
+
+    # A pairing calculation can read its tentative data without publishing it.
+    scores.append(99)
+    with cache_logic.tabulation_cache_scope(isolated=True):
+        assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 99
+    assert cache_logic.cache_tabulation_result(rankings, "test_rankings") == 28
+
+
 def test_outround_invalidation_discards_in_flight_render_for_that_division(settings):
     settings.CACHES = {**settings.CACHES, "public": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",

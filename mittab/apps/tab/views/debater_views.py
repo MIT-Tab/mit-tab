@@ -185,6 +185,7 @@ def rank_debaters_ajax(request):
                   {"title": "Debater Rankings"})
 
 
+@cache_logic.tabulation_cache_scope()
 def get_speaker_rankings(request=None):
     speakers = tab_logic.rank_speakers()
     debaters = []
@@ -213,10 +214,9 @@ def get_speaker_rankings(request=None):
 
 
 def rank_debaters(request):
-    debaters, nov_debaters = cache_logic.cache_fxn_key(
+    debaters, nov_debaters = cache_logic.cache_tabulation_result(
         get_speaker_rankings,
         "speaker_rankings",
-        cache_logic.DEFAULT,
         request
     )
 

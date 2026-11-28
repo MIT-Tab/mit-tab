@@ -233,9 +233,8 @@ class TabSettings(models.Model):
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
-        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
-            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).delete(using, keep_parents)
+        self._invalidate_ranking_settings_after_commit()
         self._invalidate_publication_caches()
 
     def save(self,
@@ -245,9 +244,8 @@ class TabSettings(models.Model):
              update_fields=None):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
-        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
-            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
+        self._invalidate_ranking_settings_after_commit()
         self._invalidate_publication_caches()
         if self.key == "judges_public":
             # A request during the transaction may have cached the old value.
@@ -255,6 +253,15 @@ class TabSettings(models.Model):
                 lambda: cache_logic.invalidate_cache("tab_settings_judges_public", cache_logic.PERSISTENT),
                 using=self._state.db,
             )
+
+    def _invalidate_ranking_settings_after_commit(self):
+        if self.key in {SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, "lenient_late", "cur_round"}:
+            key = f"tab_settings_{self.key}"
+            transaction.on_commit(
+                lambda: cache_logic.invalidate_cache(key, cache_logic.PERSISTENT),
+                using=self._state.db,
+            )
+            cache_logic.refresh_rankings_after_commit(using=self._state.db)
 
     def _invalidate_publication_caches(self):
         if self.key in {

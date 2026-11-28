@@ -951,7 +951,10 @@ def upload_data(request):
 def force_cache_refresh(request):
     key = request.GET.get("key", "")
 
-    cache_logic.invalidate_cache(key)
+    if key in {"team_rankings_private", "team_rankings", "speaker_rankings"}:
+        cache_logic.invalidate_tabulation_cache()
+    else:
+        cache_logic.invalidate_cache(key)
 
     redirect_to = request.GET.get("next", "/")
 

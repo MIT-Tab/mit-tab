@@ -2097,10 +2097,7 @@ def test_staff_ballot_forms_match_django_bytes(html_assets):
             match = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
             assert match
             with patch("django.middleware.csrf._get_new_csrf_string", return_value=match[1][:32].decode()):
-                with transaction.atomic():
-                    reference = client.get(path) if values is None else client.post(path, values)
-                    # The reference may delete existing scores when rejecting an inconsistent panel.
-                    transaction.set_rollback(True)
+                reference = client.get(path) if values is None else client.post(path, values)
             assert reference.status_code == 200
             assert_html_bytes(body, reference.content)
 
@@ -8416,6 +8413,88 @@ def test_staff_ranking_shells_and_fragments_match_django(html_assets, subtests):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_warm_rankings_follow_committed_ballots_without_manual_refresh(html_assets):
+    from mittab.libs.cacheing.cache_logic import tabulation_cache_scope
+
+    client = Client()
+    client.force_login(get_user_model().objects.create_superuser(username="fresh-ranked-staff"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    school = School.objects.create(name="Ranked School")
+    gov = Team.objects.create(name="Ranked Government", school=school, seed=0)
+    opp = Team.objects.create(name="Ranked Opposition", school=school, seed=0)
+    speakers = [Debater.objects.create(name=f"Ranked Debater {i}", novice_status=0) for i in range(4)]
+    gov.debaters.add(*speakers[:2])
+    opp.debaters.add(*speakers[2:])
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp)
+    ballot = f"/round/{debate.id}/result/"
+    panel = f"{ballot}3/"
+
+    def scores(top):
+        return {
+            "round_instance": debate.id,
+            "winner": Round.GOV,
+            **{
+                f"{role}_{field}": value
+                for i, (role, speaker) in enumerate(zip(("pm", "mg", "lo", "mo"), speakers))
+                for field, value in (("debater", speaker.id), ("speaks", top - i), ("ranks", i + 1))
+            },
+        }
+
+    client.cookies["csrftoken"] = "a" * 32
+    paths = ("/team/rank/", "/debater/rank/")
+    with rust_server(overrides=html_assets) as port:
+        before = {path: compare_admin_page(port, path, client) for path in paths}
+        with tabulation_cache_scope() as version:
+            warmed_version = version
+        with transaction.atomic():
+            assert client.post(ballot, scores(30)).status_code == 302
+            transaction.set_rollback(True)
+        with tabulation_cache_scope() as version:
+            assert version == warmed_version
+        assert not debate.roundstats_set.exists()
+        assert {path: compare_admin_page(port, path, client) for path in paths} == before
+
+        assert client.post(ballot, scores(30)).status_code == 302
+        team, speaker = (compare_admin_page(port, path, client) for path in paths)
+        assert b"59.00" in team and b"30.00" in speaker
+        assert compare_admin_page(port, paths[0], client) == team
+
+        revised = {
+            f"{i}-{key}": value
+            for i in (1, 2, 3)
+            for key, value in scores(32).items()
+        }
+        assert client.post(panel, revised).status_code == 302
+        team, speaker = (compare_admin_page(port, path, client) for path in paths)
+        assert b"63.00" in team and b"32.00" in speaker
+
+        debate.refresh_from_db()
+        assert debate.victor == Round.GOV
+        snapshot = list(debate.roundstats_set.order_by("pk").values_list("pk", "speaks", "ranks"))
+        invalid = {**revised, "2-round_instance": debate.id + 1}
+        reference = client.post(panel, invalid)
+        session = client.cookies["sessionid"].value
+        csrf = client.cookies["csrftoken"].value
+        status, _, body = request(
+            port, panel, method="POST", extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+            form={"csrfmiddlewaretoken": csrf, **invalid},
+        )
+        assert status == reference.status_code == 422
+        assert body == reference.content == b"This ballot belongs to a different debate."
+        assert list(debate.roundstats_set.order_by("pk").values_list("pk", "speaks", "ranks")) == snapshot
+
+        stat = debate.roundstats_set.get(debater_role="pm")
+        admin = f"/admin/tab/roundstats/{stat.id}/change/"
+        assert client.post(admin, {
+            "debater": stat.debater_id, "round": debate.id, "speaks": "35",
+            "ranks": stat.ranks, "debater_role": "pm",
+        }).status_code == 302
+        team, speaker = (compare_admin_page(port, path, client) for path in paths)
+        assert b"66.00" in team and b"35.00" in speaker
+
+
+@pytest.mark.django_db(transaction=True)
 def test_native_staff_rankings_and_report_match_reference():
     from mittab.apps.tab.judge_speaker_points import judge_speaker_metrics
     from mittab.apps.tab.models import RankingGroup
@@ -9908,6 +9987,7 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
             body, removed = re.subn(rb'<input type="hidden" name="mittab_scratch_revision" value="[a-f0-9]{64}">', b"", body)
             assert removed == 1
         assert_html_bytes(body, reference.content)
+    return body
 
 
 def scratch_proof(body):
