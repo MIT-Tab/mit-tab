@@ -39,6 +39,7 @@ const PAIRING_PUBLIC: [&str; 2] = ["var_outrounds_public", "nov_outrounds_public
 #[derive(Debug)]
 pub enum Error {
     Invalid(&'static str),
+    Assignment(String),
     Missing,
     Database,
 }

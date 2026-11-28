@@ -7125,6 +7125,53 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path,
         assert post(room_endpoint, scope)[0] == 302
         assert len(set(Outround.objects.values_list("room_id", flat=True))) == 3
         assert dict(Outround.objects.values_list("id", "room_id")) == expected_rooms
+
+        def compare_assignment_notice(path, post_fields, expected_message):
+            from mittab.libs import backup
+
+            stage_url = "/outround_pairing/0/4?select_varsity=4&select_novice=2"
+            fields = {**post_fields, "return_to": stage_url}
+            with patch.object(backup, "backup_round"):
+                django_response = reference.post(path, fields)
+            result = post(path, fields)
+            assert result[0] == django_response.status_code == 302
+            assert result[1]["Location"] == django_response["Location"] == stage_url
+            notice = load_cookies(result[1])["mittab_roster_notice"].value
+            rust_headers = {**jar, "Cookie": jar["Cookie"] + f"; mittab_roster_notice={notice}"}
+            status, headers, rust_body = request(port, stage_url, extra_headers=rust_headers)
+            django_body = reference.get(stage_url).content
+            alert = rb'<div class="alert alert-(?:danger|success)">.*?</div>'
+            rust_alerts = re.findall(alert, rust_body, re.S)
+            django_alerts = re.findall(alert, django_body, re.S)
+            assert status == 200
+            assert rust_alerts == django_alerts
+            assert any(expected_message in item for item in rust_alerts)
+            assert load_cookies(headers)["mittab_roster_notice"]["max-age"] == "0"
+            assert expected_message not in request(port, stage_url, extra_headers=jar)[2]
+
+        compare_assignment_notice(room_endpoint, scope, b"Outround rooms assigned successfully.")
+        compare_assignment_notice(endpoint, {"selected_varsity": 32},
+                                  b"No valid outround scope selected for judge assignment.")
+        CheckIn.objects.filter(round_number=0).delete()
+        denied = post(endpoint, scope, session=board)
+        assert denied[1]["Location"] == "/403/"
+        assert "mittab_roster_notice" not in load_cookies(denied[1])
+        assert b"Impossible to assign judges." not in denied[2]
+        compare_assignment_notice(endpoint, scope, b"Impossible to assign judges.")
+        eligible = judges[0]
+        CheckIn.objects.create(round_number=0, judge=eligible)
+        unavailable = Outround.objects.filter(type_of_round=0).order_by("id").first()
+        Scratch.objects.create(judge=eligible, team=unavailable.gov_team, scratch_type=Scratch.TAB_SCRATCH)
+        compare_assignment_notice(endpoint, scope, b"Could not find a judge for:")
+        assert {row.id: (row.chair_id, set(row.judges.values_list("id", flat=True)))
+                for row in Outround.objects.all()} == expected
+        CheckIn.objects.bulk_create(CheckIn(round_number=0, judge=judge) for judge in judges[1:])
+
+        RoomCheckIn.objects.filter(round_number=0).delete()
+        compare_assignment_notice(room_endpoint, scope, b"Not enough rooms. Found 3 rounds and only 0 rooms")
+        assert dict(Outround.objects.values_list("id", "room_id")) == expected_rooms
+        RoomCheckIn.objects.bulk_create(RoomCheckIn(round_number=0, room=room) for room in rooms)
+
         assert json.loads(post("/outround_pairing/release/4/0/")[2])["pairing_released"]
         assert TabSettings.get("var_teams_visible", use_cache=False) == 4
         status, _, csv_data = request(port, "/outround_pairings/export_csv/0/", cookie=tab)

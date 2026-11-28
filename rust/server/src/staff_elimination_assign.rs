@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use mittab_tabulation::{
-    judges::{self, Debate, Judge, OutroundGroup, OutroundPolicy, Panel, RankingMode},
+    judges::{self, Debate, Judge, JudgeError, OutroundGroup, OutroundPolicy, Panel, RankingMode},
     legacy_random::LegacyRandom,
     rooms::{Room, Tag, assign_rooms},
 };
@@ -16,6 +16,7 @@ use crate::{
     staff_pairing::lock_round,
 };
 
+#[derive(Clone, Copy)]
 pub enum Assignment {
     Rooms,
     Judges,
@@ -47,7 +48,13 @@ pub async fn assign(
         .filter(|stage| before.values().any(|pairing| stage.matches(pairing)))
         .collect();
     if active.is_empty() {
-        return Err(Error::Invalid("Choose an existing elimination stage."));
+        let resource = match assignment {
+            Assignment::Judges => "judge",
+            Assignment::Rooms => "room",
+        };
+        return Err(Error::Assignment(format!(
+            "No valid outround scope selected for {resource} assignment."
+        )));
     }
     let groups = groups(&mut db, &before, &active, &settings).await?;
     if groups.iter().all(|(_, debates)| debates.is_empty()) {
@@ -71,7 +78,7 @@ pub async fn assign(
         .await
         .map_err(Error::Invalid)?;
     match assignment {
-        Assignment::Judges => judge_assignments(&mut db, &groups, &settings).await?,
+        Assignment::Judges => judge_assignments(&mut db, &groups, &settings, &before).await?,
         Assignment::Rooms => room_assignments(&mut db, &groups, &settings).await?,
     }
     let after = board_snapshot::capture(&mut db, Pairings::Outround).await?;
@@ -129,6 +136,7 @@ async fn judge_assignments(
     db: &mut MySqlConnection,
     groups: &[(Stage, Vec<Debate>)],
     settings: &Settings,
+    snapshots: &BTreeMap<i32, Snapshot>,
 ) -> Result<(), Error> {
     let mut conflicts: HashMap<i32, std::collections::HashSet<i32>> = HashMap::new();
     for (judge, team) in sqlx::query_as::<_, (i32, i32)>(
@@ -183,11 +191,30 @@ async fn judge_assignments(
         snake: settings.integer("outs_judge_pairing_mode", 0) == 0,
         novice_chairs_first: settings.integer("outround_judge_priority", 0) == 1,
     };
-    let assignments = judges::assign_outrounds(&groups, &judges, &policy).map_err(|_| {
-        Error::Invalid(
-            "There are not enough eligible judges for every panel in the selected stages.",
-        )
-    })?;
+    let assignments =
+        judges::assign_outrounds(&groups, &judges, &policy).map_err(|issue| match issue {
+            JudgeError::NoEligibleOutroundJudges => {
+                Error::Assignment("Impossible to assign judges.".into())
+            }
+            JudgeError::UnfilledOutroundPanel(id) => snapshots
+                .get(&id)
+                .and_then(|round| {
+                    Some((
+                        round.num_teams?,
+                        &round.gov_team.as_ref()?.name,
+                        &round.opp_team.as_ref()?.name,
+                    ))
+                })
+                .map_or(Error::Database, |(size, gov, opp)| {
+                    Error::Assignment(
+                        format!(
+                            "Could not find a judge for: Outround {size} between {gov} and {opp}"
+                        )
+                        .replace('\'', ""),
+                    )
+                }),
+            _ => Error::Database,
+        })?;
     let ids: Vec<_> = groups
         .iter()
         .flat_map(|group| group.debates.iter().map(|debate| debate.id))
@@ -293,8 +320,14 @@ async fn room_assignments(
         })
         .collect();
     let required = requirements.iter().map(Vec::as_slice).collect::<Vec<_>>();
-    let plan = assign_rooms(&required, &rooms, seeding)
-        .map_err(|_| Error::Invalid("Check in enough rooms for the selected stages."))?;
+    if active.len() > rooms.len() {
+        return Err(Error::Assignment(format!(
+            "Not enough rooms. Found {} rounds and only {} rooms",
+            active.len(),
+            rooms.len()
+        )));
+    }
+    let plan = assign_rooms(&required, &rooms, seeding).map_err(|_| Error::Database)?;
     for (debate, room) in active.into_iter().zip(plan) {
         sqlx::query("UPDATE tab_outround SET room_id = ? WHERE id = ?")
             .bind(available[room].0)

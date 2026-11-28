@@ -23,7 +23,8 @@ use crate::{
     staff_elimination_assign::{self, Assignment},
     staff_elimination_page::{self, Selection},
     staff_elimination_store::{self as store, Error, Stage},
-    unavailable,
+    staff_roster::form_return_target,
+    staff_roster_notice, unavailable,
 };
 
 const ROOT: &str = "/outround_pairing";
@@ -72,6 +73,7 @@ fn user(actor: Actor) -> Option<i32> {
 fn error(error: Error) -> Response {
     match error {
         Error::Invalid(message) => private((StatusCode::UNPROCESSABLE_ENTITY, message)),
+        Error::Assignment(message) => private((StatusCode::UNPROCESSABLE_ENTITY, message)),
         Error::Missing => private((StatusCode::NOT_FOUND, "Elimination stage not found.")),
         Error::Database => unavailable(),
     }
@@ -362,21 +364,24 @@ async fn assign_judges(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
+    uri: Uri,
     body: Bytes,
 ) -> Response {
-    assign(&app, actor, &headers, &body, Assignment::Judges, None).await
+    assign(&app, actor, &headers, &uri, &body, Assignment::Judges, None).await
 }
 async fn assign_judges_legacy(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     Path(division): Path<i32>,
     headers: HeaderMap,
+    uri: Uri,
     body: Bytes,
 ) -> Response {
     assign(
         &app,
         actor,
         &headers,
+        &uri,
         &body,
         Assignment::Judges,
         Some(division),
@@ -387,15 +392,17 @@ async fn assign_rooms(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
+    uri: Uri,
     body: Bytes,
 ) -> Response {
-    assign(&app, actor, &headers, &body, Assignment::Rooms, None).await
+    assign(&app, actor, &headers, &uri, &body, Assignment::Rooms, None).await
 }
 
 async fn assign(
     app: &App,
     actor: Actor,
     headers: &HeaderMap,
+    uri: &Uri,
     body: &[u8],
     assignment: Assignment,
     fallback: Option<i32>,
@@ -428,25 +435,23 @@ async fn assign(
             stages.push(stage);
         }
     }
+    let target = form_return_target(uri, headers, Some(&fields)).unwrap_or_else(|| "/".into());
+    let (success, failure) = match assignment {
+        Assignment::Judges => (
+            "Outround judges assigned successfully.",
+            "Got error during judge assignment",
+        ),
+        Assignment::Rooms => (
+            "Outround rooms assigned successfully.",
+            "Got error during room assignment",
+        ),
+    };
     match staff_elimination_assign::assign(app, user, &stages, assignment).await {
-        Ok(()) => {
-            let back = login::local_next(fields.get("return_to"));
-            if back.starts_with("/outround_pairing/") {
-                return access::found(back);
-            }
-            let Some(first) = stages.first() else {
-                return access::found(ROOT);
-            };
-            let mut url = first.url();
-            if stages.len() == 2 {
-                url.push_str(&format!(
-                    "?select_varsity={}&select_novice={}",
-                    stages[0].size, stages[1].size
-                ));
-            }
-            access::found(url)
+        Ok(()) => staff_roster_notice::saved(app, headers, &target, success),
+        Err(Error::Assignment(message)) => {
+            staff_roster_notice::failed(app, headers, &target, &message)
         }
-        Err(issue) => error(issue),
+        Err(_) => staff_roster_notice::failed(app, headers, &target, failure),
     }
 }
 

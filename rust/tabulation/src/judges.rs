@@ -57,6 +57,8 @@ pub struct Panel {
 #[derive(Debug, Eq, PartialEq)]
 pub enum JudgeError {
     IncompleteChairs,
+    NoEligibleOutroundJudges,
+    UnfilledOutroundPanel(i32),
     Matching(MatchError),
 }
 
@@ -367,10 +369,14 @@ pub fn assign_outrounds(
                     }
                 }
             }
+            if edges.is_empty() {
+                return Err(JudgeError::NoEligibleOutroundJudges);
+            }
             let mates = maximum_matching(rounds + judges.len(), &edges, true)
                 .map_err(JudgeError::Matching)?;
             for (position, debate) in active.iter().enumerate() {
-                let index = mates[position].ok_or(JudgeError::IncompleteChairs)? - rounds;
+                let index =
+                    mates[position].ok_or(JudgeError::UnfilledOutroundPanel(debate.id))? - rounds;
                 reserved.insert(index);
                 let panel = result
                     .get_mut(&debate.id)
