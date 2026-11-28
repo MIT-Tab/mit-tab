@@ -145,6 +145,23 @@ pub(super) async fn actor_on(
     })
 }
 
+pub(super) async fn lock_active(db: &mut MySqlConnection, key: &str) -> Result<bool, sqlx::Error> {
+    if crate::native_session::is_native_key(key) {
+        return crate::native_session::lock_active(db, key).await;
+    }
+    if !is_legacy_key(key) {
+        return Ok(false);
+    }
+    let session = sqlx::query_scalar::<_, String>(
+        "SELECT session_key FROM django_session
+         WHERE session_key = ? AND expire_date > UTC_TIMESTAMP(6) FOR UPDATE",
+    )
+    .bind(key)
+    .fetch_optional(db)
+    .await?;
+    Ok(session.is_some())
+}
+
 pub fn cookie<'a>(headers: &'a HeaderMap, target: &str) -> Option<&'a str> {
     // Django overwrites an earlier cookie if another cookie of the same name
     // appears later in the header.

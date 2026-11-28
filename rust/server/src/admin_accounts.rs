@@ -998,6 +998,11 @@ async fn delete(
             })
         });
     if confirmed && !stale {
+        // A logout can revoke the session while this request waits on a dependent row.
+        let session = cookie(page.headers, "sessionid").unwrap_or_default();
+        if !legacy_session::lock_active(&mut db, session).await? {
+            return Ok(access::access_denied());
+        }
         let empty = Fields::default();
         let mut log = 0;
         for (id, name) in &rows {

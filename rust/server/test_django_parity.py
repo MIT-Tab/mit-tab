@@ -10147,6 +10147,194 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
         assert admin.password == replacement
 
 
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("model", ("user", "group"))
+@pytest.mark.parametrize("mode", ("direct", "bulk"))
+def test_auth_admin_deletion_requires_current_confirmation(html_assets, model, mode):
+    from django.contrib.admin.models import ADDITION, LogEntry
+    from django.contrib.auth.models import Permission
+
+    user_model = get_user_model()
+    staff = legacy_tab_session("account-scope")
+    other_staff = legacy_tab_session("other-account-scope")
+    actor = user_model.objects.get(username="account-scope")
+    board = legacy_tab_session("board-account-scope")
+    user_model.objects.get(username="board-account-scope").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Account scope school")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Government", "Opposition")]
+    Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+    account = user_model.objects.create(username="fixture-account")
+    group = Group.objects.create(name="Fixture group")
+    account.groups.add(group)
+    target = account if model == "user" else group
+    records = type(target).objects
+    client = Client()
+    csrf = "a" * 32
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = csrf
+    root = f"/admin/auth/{model}/"
+    path = root if mode == "bulk" else f"{root}{target.pk}/delete/"
+    selection = {"action": "delete_selected", "index": "0", "_selected_action": target.pk} if mode == "bulk" else {}
+    confirmation = {**selection, "post": "yes"}
+
+    def native(port, fields=None, session=staff):
+        headers = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+        if fields is None:
+            return request(port, path, extra_headers=headers)
+        return request(port, path, method="POST", extra_headers=headers,
+                       form={**fields, "csrfmiddlewaretoken": csrf})
+
+    with rust_server(overrides=html_assets) as port:
+        if model == "user" and mode == "bulk":
+            fields = {"user": account, "object_repr": "Identical log text", "action_flag": ADDITION}
+            old_log = LogEntry.objects.create(**fields)
+        preview = native(port, selection or None)
+        reference = client.post(path, selection) if selection else client.get(path)
+        assert preview[0] == reference.status_code == 200
+        rust_scope = admin_delete_proof(preview[2])
+        django_scope = admin_delete_proof(reference.content)
+
+        if model == "user" and mode == "bulk":
+            old_log.delete()
+            replacement_log = LogEntry.objects.create(**fields)
+        elif model == "user":
+            # Attribution changes the effect of deletion without changing the visible cascade.
+            audit = AuditEvent.record(group, AuditEvent.EDIT, account)
+        else:
+            group.permissions.add(Permission.objects.get(codename="view_room"))
+
+        status, _, body = native(port, {**confirmation, "mittab_delete_scope": rust_scope})
+        mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)[1][:32].decode()
+        with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
+            expected = client.post(path, {**confirmation, "mittab_delete_scope": django_scope})
+        assert status == expected.status_code == 409
+        assert b"Review updated deletion" in body
+        refreshed_rust, refreshed_django = admin_delete_proof(body), admin_delete_proof(expected.content)
+        assert refreshed_rust != rust_scope and refreshed_django != django_scope
+        assert_html_bytes(body.replace(refreshed_rust.encode(), b"SCOPE"),
+                          expected.content.replace(refreshed_django.encode(), b"SCOPE"))
+        assert native(port, confirmation)[0] == client.post(path, confirmation).status_code == 409
+        declined = {**confirmation, "post": "no", "mittab_delete_scope": refreshed_rust}
+        expected_status = 200 if mode == "bulk" else 422
+        assert native(port, declined)[0] == expected_status
+        assert client.post(path, {**declined, "mittab_delete_scope": refreshed_django}).status_code == expected_status
+        other = Client()
+        other.cookies["sessionid"] = other_staff
+        assert native(port, {**confirmation, "mittab_delete_scope": refreshed_rust}, other_staff)[0] == 409
+        assert other.post(path, {**confirmation, "mittab_delete_scope": refreshed_django}).status_code == 409
+        assert native(port, {**confirmation, "mittab_delete_scope": refreshed_rust}, board)[1]["Location"] == "/403/"
+        assert records.filter(pk=target.pk).exists()
+
+        def check_removal():
+            assert not records.filter(pk=target.pk).exists()
+            if model == "user" and mode == "bulk":
+                assert not LogEntry.objects.filter(pk=replacement_log.pk).exists()
+            elif model == "user":
+                assert AuditEvent.objects.get(pk=audit.pk).user_id is None
+            else:
+                assert user_model.objects.filter(pk=account.pk).exists()
+                assert not account.groups.exists()
+
+        with transaction.atomic():
+            response = client.post(path, {**confirmation, "mittab_delete_scope": refreshed_django})
+            assert response.status_code == 302 and response["Location"] == root
+            check_removal()
+            transaction.set_rollback(True)
+        response = native(port, {**confirmation, "mittab_delete_scope": refreshed_rust})
+        assert response[0] == 302 and response[1]["Location"] == root
+        check_removal()
+        if model == "user":
+            own_path = root if mode == "bulk" else f"{root}{actor.pk}/delete/"
+            self_selection = {**selection, "_selected_action": actor.pk} if selection else None
+            compare_admin_page(port, own_path, client, post=self_selection)
+            assert client.post(own_path, {**(self_selection or {}), "post": "yes"}).status_code == 422
+            assert user_model.objects.filter(pk=actor.pk).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("edit", ("change", "password"))
+def test_queued_django_user_edit_cannot_restore_deleted_user(edit):
+    staff = legacy_tab_session("queued-account-edit")
+    user_model = get_user_model()
+    user = user_model.objects.create(username="Removed user")
+    target_id = user.pk
+    root = f"/admin/auth/user/{target_id}/"
+    client = Client()
+    client.cookies["sessionid"] = staff
+    scope = admin_delete_proof(client.get(root + "delete/").content)
+
+    def submit_edit():
+        other = Client()
+        other.cookies["sessionid"] = staff
+        return other.post(root + edit + "/", {
+            "username": "Restored user", "password1": "fixture-new-password", "password2": "fixture-new-password",
+        })
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with transaction.atomic():
+            list(user_model.objects.filter(is_superuser=True).select_for_update())
+            pending = pool.submit(submit_edit)
+            with pytest.raises(FutureTimeout):
+                pending.result(timeout=0.5)
+            assert client.post(root + "delete/", {"post": "yes", "mittab_delete_scope": scope}).status_code == 302
+        assert pending.result(timeout=6).status_code == 404
+    assert not user_model.objects.filter(pk=target_id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("backend", ("django", "rust"))
+def test_account_deletion_rechecks_revocation_after_dependency_wait(backend, html_assets):
+    from time import monotonic, sleep
+    from django.contrib.sessions.models import Session
+
+    staff = legacy_tab_session("waiting-scope-admin")
+    user_model = get_user_model()
+    account = user_model.objects.create(username="target-account")
+    group = Group.objects.create(name="Audit group")
+    audit = AuditEvent.record(group, AuditEvent.EDIT, account)
+    path = f"/admin/auth/user/{account.pk}/delete/"
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = csrf
+    headers = {"Cookie": f"sessionid={staff}; csrftoken={csrf}"}
+
+    with rust_server(overrides=html_assets) as port:
+        preview = client.get(path).content if backend == "django" else request(port, path, extra_headers=headers)[2]
+        scope = admin_delete_proof(preview)
+
+        def submit():
+            form = {"post": "yes", "mittab_delete_scope": scope, "csrfmiddlewaretoken": csrf}
+            if backend == "django":
+                response = client.post(path, form)
+                return response.status_code, response["Location"]
+            status, response_headers, _ = request(port, path, method="POST", form=form, extra_headers=headers)
+            return status, response_headers["Location"]
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with transaction.atomic():
+                AuditEvent.objects.select_for_update().get(pk=audit.pk)
+                pending = pool.submit(submit)
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "tab_auditevent" in row[7] and "FOR UPDATE" in row[7]
+                                      for row in cursor.fetchall())
+                    if waiting:
+                        break
+                    sleep(0.025)
+                assert waiting, "Account deletion did not reach the dependency lock"
+                Session.objects.filter(session_key=staff).delete()
+            assert pending.result(timeout=6) == (302, "/403/")
+        assert user_model.objects.filter(pk=account.pk).exists()
+        assert AuditEvent.objects.filter(pk=audit.pk, user=account).exists()
+
+
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
                        registration_revision=False, configuration_revision=False, list_revision=False,
                        content_revision=False, motion_revision=False, staff_motion_revision=False,

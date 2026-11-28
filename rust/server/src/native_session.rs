@@ -84,6 +84,20 @@ pub async fn actor(db: &mut MySqlConnection, token: &str) -> Result<Actor, sqlx:
     })
 }
 
+pub(super) async fn lock_active(
+    db: &mut MySqlConnection,
+    token: &str,
+) -> Result<bool, sqlx::Error> {
+    let session = sqlx::query_scalar::<_, i32>(
+        "SELECT user_id FROM mittab_rust_session
+         WHERE token_hash = ? AND expires_at > UTC_TIMESTAMP(6) FOR UPDATE",
+    )
+    .bind(hash(token).as_ref())
+    .fetch_optional(db)
+    .await?;
+    Ok(session.is_some())
+}
+
 pub async fn remove(db: &MySqlPool, token: &str) -> Result<(), sqlx::Error> {
     if is_native_key(token) {
         sqlx::query("DELETE FROM mittab_rust_session WHERE token_hash = ?")
