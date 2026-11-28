@@ -633,14 +633,9 @@ pub async fn release(
     }
     .await;
     match result {
-        Ok(released)
-            if headers
-                .get("x-requested-with")
-                .is_some_and(|value| value == "XMLHttpRequest") =>
-        {
-            private(Json(serde_json::json!({ "pairing_released": released })))
-        }
-        Ok(_) => access::found(STATUS),
+        Ok(released) => private(Json(serde_json::json!({
+            "success": true, "pairing_released": released,
+        }))),
         Err(issue) => error(actor, issue),
     }
 }

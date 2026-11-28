@@ -249,7 +249,7 @@ async fn room_assignments(
     }
     let available = sqlx::query_as::<_, (i32, i32)>(
         "SELECT r.id, CAST(r.`rank` * 100 AS SIGNED) FROM tab_room r JOIN tab_roomcheckin c
-         ON c.room_id = r.id AND c.round_number = 0 ORDER BY r.`rank` DESC, c.id",
+         ON c.room_id = r.id AND c.round_number = 0 ORDER BY r.`rank` DESC, r.id",
     )
     .fetch_all(&mut *db)
     .await?;

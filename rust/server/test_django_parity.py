@@ -1487,7 +1487,7 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
             for speaker in range(2)
         ])
     judges = [Judge.objects.create(name=f"Pairing Judge {i}", rank=i + 2) for i in range(2)]
-    rooms = [Room.objects.create(name=f"Pairing Room {i}", rank=Decimal(5 - i)) for i in range(2)]
+    rooms = [Room.objects.create(name=f"Pairing Room {i}", rank=Decimal(5)) for i in range(2)]
     pair_page = "/pairing/pair_round/"
     repair_page = "/pairing/re_pair_round/"
     room_page = "/pairing/assign_rooms_to_pairing/"
@@ -1510,8 +1510,10 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
         assert post(pair_page, session=board)[0] == 403
         assert not backup_dir.exists()
         for number in (1, 2):
-            for judge, room in zip(judges, rooms):
+            for judge in judges:
                 CheckIn.objects.create(judge=judge, round_number=number)
+            # Equal-ranked room ties follow room IDs, independent of check-in order.
+            for room in reversed(rooms):
                 RoomCheckIn.objects.create(room=room, round_number=number)
 
         with transaction.atomic():
@@ -1542,6 +1544,15 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
         assert request(port, status_page, cookie=tab)[2].count(b"Assign Room") >= 2
 
         first, second = list(Round.objects.filter(round_number=1).order_by("id"))
+        from mittab.libs.assign_rooms import add_rooms
+        with transaction.atomic():
+            caches["default"].clear()
+            caches["filesystem"].clear()
+            add_rooms()
+            reference_rooms = list(Round.objects.filter(round_number=1).order_by("id").values_list("room_id", flat=True))
+            transaction.set_rollback(True)
+        assert post(room_page)[1]["Location"] == status_page
+        assert list(Round.objects.filter(round_number=1).order_by("id").values_list("room_id", flat=True)) == reference_rooms
         tag = RoomTag.objects.create(tag="Accessible Room", priority=Decimal("4.75"))
         judges[0].required_room_tags.add(tag)
         second.judges.add(judges[0])
@@ -1557,7 +1568,8 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
         assert second.room_id == rooms[1].id
         RoomCheckIn.objects.create(room=rooms[1], round_number=1)
 
-        assert post(release_page)[0] == 302
+        status, _, result = post(release_page)
+        assert status == 200 and json.loads(result) == {"success": True, "pairing_released": True}
         assert b"Pairing Room 1" in request(port, "/public/pairings/")[2]
         status, _, body = request(
             port, release_page, method="POST",
@@ -1565,7 +1577,7 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
                            "X-CSRFToken": csrf, "X-Requested-With": "XMLHttpRequest"},
             form={"round": 1},
         )
-        assert status == 200 and json.loads(body) == {"pairing_released": False}
+        assert status == 200 and json.loads(body) == {"success": True, "pairing_released": False}
         assert b"Pairing Room 1" not in request(port, "/public/pairings/")[2]
 
         RoundStats.objects.create(round=first, debater=first.gov_team.debaters.first(),
@@ -1618,7 +1630,7 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
             assert post(path, session=board, round_number=2)[1]["Location"] == "/403/"
 
     backups = list(backup_dir.glob("*.dump.sql"))
-    assert len(backups) == 5
+    assert len(backups) == 6
     assert not list(backup_dir.glob(".backup-*"))
     assert all(path.stat().st_mode & 0o777 == 0o600 for path in backups)
     for path in backups:
@@ -6992,8 +7004,8 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path,
     preliminary = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1])
     Round.objects.create(round_number=1, gov_team=teams[2], opp_team=teams[3], victor=Round.OPP)
     Round.objects.create(round_number=1, gov_team=teams[4], opp_team=teams[5], victor=Round.GOV)
-    for index in range(3):
-        room = Room.objects.create(name=f"Elim Room {index + 1}", rank=index + 1)
+    rooms = [Room.objects.create(name=f"Elim Room {index + 1}", rank=5) for index in range(3)]
+    for room in reversed(rooms):
         RoomCheckIn.objects.create(room=room, round_number=0)
     judges = []
     for index in range(6):
@@ -7054,9 +7066,15 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path,
         assert result[0] == 302, result
         actual = {row.id: (row.chair_id, set(row.judges.values_list("id", flat=True))) for row in Outround.objects.all()}
         assert actual == expected
+        from mittab.libs.assign_rooms import add_outround_rooms
+        with transaction.atomic():
+            add_outround_rooms([(0, 4), (1, 2)])
+            expected_rooms = dict(Outround.objects.values_list("id", "room_id"))
+            transaction.set_rollback(True)
         room_endpoint = "/outround_pairing/assign_rooms/"
         assert post(room_endpoint, scope)[0] == 302
         assert len(set(Outround.objects.values_list("room_id", flat=True))) == 3
+        assert dict(Outround.objects.values_list("id", "room_id")) == expected_rooms
         assert json.loads(post("/outround_pairing/release/4/0/")[2])["pairing_released"]
         assert TabSettings.get("var_teams_visible", use_cache=False) == 4
         status, _, csv_data = request(port, "/outround_pairings/export_csv/0/", cookie=tab)

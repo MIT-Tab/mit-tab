@@ -64,7 +64,7 @@ pub async fn plan(
 
     let rooms = sqlx::query_as::<_, (i32, i32)>(
         "SELECT r.id, CAST(r.rank * 100 AS SIGNED) FROM tab_room r
-         JOIN tab_roomcheckin c ON c.room_id = r.id WHERE c.round_number = ? ORDER BY c.id",
+         JOIN tab_roomcheckin c ON c.room_id = r.id WHERE c.round_number = ? ORDER BY r.id",
     )
     .bind(round)
     .fetch_all(&mut *db)
