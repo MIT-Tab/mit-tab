@@ -7138,13 +7138,15 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path,
             assert post(ballot, {"winner": 1, "round_instance": 9999})[0] == 422
             assert post(ballot, {"winner": 1, "round_instance": row.id})[0] == 302
         assert b"drops to" in request(port, "/outround_result/0", cookie=tab)[2]
+        # A replayed stage can already be covered by the imported release threshold.
+        TabSettings.set("var_teams_visible", 2)
         result = post(hop)
         assert result[0] == 302 and result[1]["Location"] == "/outround_pairing/0/2", result
         final = Outround.objects.get(type_of_round=0, num_teams=2)
         assert {final.gov_team_id, final.opp_team_id} == {row.gov_team_id for row in rows}
         assert not final.judges.exists() and final.chair_id is None
         assert set(Outround.objects.filter(type_of_round=0, num_teams=4).values_list("id", flat=True)) == {row.id for row in rows}
-        assert TabSettings.get("var_teams_visible", use_cache=False) == 4
+        assert TabSettings.get("var_teams_visible", use_cache=False) == 2
         def replacement_token(body):
             return re.search(rb'name="break_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
@@ -7161,7 +7163,35 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path,
         assert confirmed != updated_revision
         assert post(start, {"confirm": "on", "break_revision": confirmed})[0] == 302
         assert not Outround.objects.filter(pk=final.id).exists()
+        assert TabSettings.get("var_teams_visible", use_cache=False) == 2
+        assert TabSettings.get("nov_teams_visible", use_cache=False) == 2
         assert post(start, {"confirm": "on", "break_revision": confirmed})[0] == 422
+
+
+@pytest.mark.django_db(transaction=True)
+def test_staff_elimination_csv_matches_django_pairing_order():
+    staff = legacy_tab_session("elimination-csv-staff")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("var_teams_visible", 4)
+    school = School.objects.create(name="CSV School")
+    weak_gov, weak_opp, strong_gov, strong_opp = [
+        Team.objects.create(name=name, school=school, seed=0)
+        for name in ("Lower Gov", "Lower Opp", "Higher Gov", "Higher Opp")
+    ]
+    Round.objects.create(round_number=1, gov_team=strong_gov, opp_team=weak_gov, victor=Round.GOV)
+    Round.objects.create(round_number=1, gov_team=strong_opp, opp_team=weak_opp, victor=Round.GOV)
+    Outround.objects.create(num_teams=4, gov_team=weak_gov, opp_team=weak_opp)
+    Outround.objects.create(num_teams=4, gov_team=strong_gov, opp_team=strong_opp)
+    path = "/outround_pairings/export_csv/0/"
+    client = Client()
+    client.cookies["sessionid"] = staff
+    reference = client.get(path)
+    with rust_server() as port:
+        status, headers, body = request(port, path, cookie=staff)
+    assert status == reference.status_code == 200
+    assert headers["Content-Disposition"] == reference["Content-Disposition"]
+    assert body == reference.content
+    assert body.splitlines()[1].startswith(b"[V] Ro4,Higher Gov,Higher Opp,")
 
 
 @pytest.mark.django_db(transaction=True)

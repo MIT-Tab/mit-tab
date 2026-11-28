@@ -20,6 +20,7 @@ use crate::{
     legacy_session::Actor,
     login, private, public_rankings,
     registration_form::Fields,
+    room_assignment::seeded_key,
     settings::Settings,
     spreadsheets::{self, Format},
     staff_pairing::lock_round,
@@ -256,7 +257,8 @@ async fn export_outround(State(app): State<App>, Path(division): Path<i32>) -> R
         } else {
             "nov_teams_visible"
         };
-        let visible = Settings::load(&mut db, &[key]).await?.integer(key, 256);
+        let settings = Settings::load(&mut db, &[key, "cur_round", "lenient_late"]).await?;
+        let visible = settings.integer(key, 256);
         let snapshots = board_snapshot::capture(&mut db, Pairings::Outround).await?;
         let mut rounds: Vec<_> = snapshots
             .into_values()
@@ -264,7 +266,33 @@ async fn export_outround(State(app): State<App>, Path(division): Path<i32>) -> R
                 row.division == Some(division) && row.num_teams.is_some_and(|size| size >= visible)
             })
             .collect();
-        rounds.sort_by_key(|round| std::cmp::Reverse(round.num_teams));
+        if rounds.len() > 1 {
+            let data = TournamentData::load(&mut db).await?;
+            let scores = data
+                .scores_by_team(public_rankings::policy(&settings))
+                .map_err(|error| sqlx::Error::Protocol(error.into()))?;
+            let strength = |row: &Snapshot| {
+                let gov = row
+                    .gov_team
+                    .as_ref()
+                    .and_then(|team| scores.get(&i64::from(team.id)));
+                let opp = row
+                    .opp_team
+                    .as_ref()
+                    .and_then(|team| scores.get(&i64::from(team.id)));
+                gov.zip(opp)
+                    .map_or((0.0, 0.0, 0.0), |(gov, opp)| seeded_key(gov, opp))
+            };
+            rounds.sort_by(|left, right| {
+                right.num_teams.cmp(&left.num_teams).then_with(|| {
+                    let a = strength(left);
+                    let b = strength(right);
+                    b.0.total_cmp(&a.0)
+                        .then_with(|| b.1.total_cmp(&a.1))
+                        .then_with(|| b.2.total_cmp(&a.2))
+                })
+            });
+        }
         let display = if division == 0 { "V" } else { "N" };
         let mut output = Vec::new();
         for row in rounds {

@@ -217,12 +217,6 @@ pub async fn break_tournament(
         .await?;
     board_outrounds::seed_break(&mut db, user, &settings, false).await?;
     for division in 0..=1 {
-        settings::put(
-            &mut db,
-            VISIBILITY[division as usize],
-            SettingValue::Number(256),
-        )
-        .await?;
         let stage = eligible(&mut db, division, &BTreeMap::new()).await?;
         let Some(size) = stage_size(stage.len() as i32) else {
             continue;
@@ -700,11 +694,6 @@ async fn create_stage(
         SettingValue::Number(0),
     )
     .await?;
-    let key = VISIBILITY[stage.division as usize];
-    let stored = Settings::load(db, &[key]).await?.integer(key, 256);
-    if stored <= stage.size {
-        settings::put(db, key, SettingValue::Number(stage.size * 2)).await?;
-    }
     Ok(())
 }
 
