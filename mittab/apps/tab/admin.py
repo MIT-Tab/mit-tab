@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from django import forms
 from django.contrib import admin
 from django.contrib.admin.actions import delete_selected
+from django.contrib.admin.helpers import AdminErrorList
 from django.contrib.auth import get_user
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
@@ -14,6 +15,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare
+from django.core.exceptions import NON_FIELD_ERRORS
 from django.utils.decorators import method_decorator
 from django.views.decorators.debug import sensitive_post_parameters
 
@@ -22,8 +24,12 @@ from mittab.apps.tab.admin_delete_scope import (
     account_deletion_records, account_deletion_scope, room_deletion_scope, pairing_cascade_deletion_scope,
 )
 from mittab.apps.tab.admin_pairing_deletion import LATER_STAGE, PairingCascade, later_stage_survives, repair_removed_outrounds
+from mittab.apps.tab.admin_pairing_edit import edit_revision, repair_elimination_edit, validate_elimination_edit
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME, is_apda_board_user
 from mittab.libs.cacheing.cache_logic import refresh_rankings_after_commit
+from mittab.libs.cacheing.public_cache import (
+    invalidate_inround_public_pairings_cache, invalidate_public_tab_cards_cache,
+)
 from mittab.libs.outround_tab_logic.pairing import prepare_challenge_edits
 from mittab.apps.tab.live_results import lock_elimination_tournament
 from mittab.apps.tab.board_audit import (
@@ -328,6 +334,7 @@ class TournamentGroupAdmin(AccountDeletionMixin, GroupAdmin):
 
 
 class PairingCascadeDeletionMixin(SignedDeletionMixin):
+    locks_pairing_add = False
     deletion_scope = staticmethod(pairing_cascade_deletion_scope)
     related_permission_message = "You do not have permission to delete related records."
 
@@ -339,15 +346,18 @@ class PairingCascadeDeletionMixin(SignedDeletionMixin):
         return ids
 
     def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
-        if request.method != "POST" or object_id is None:
+        if request.method != "POST" or (object_id is None and not self.locks_pairing_add):
             return super().changeform_view(request, object_id, form_url, extra_context)
         database = router.db_for_write(self.model)
         try:
             with transaction.atomic(using=database):
-                lock_elimination_tournament(using=database)
-                target = self.get_object(request, unquote(object_id))
-                if target is None or not self.model.objects.using(database).select_for_update().filter(pk=target.pk).exists():
-                    return redirect("/admin/")
+                lock = lock_elimination_tournament(using=database)
+                if lock is None and self.model is models.Outround:
+                    return _protected_deletion_response(ProtectedAdminChange("Unable to complete this request."), 503)
+                if object_id is not None:
+                    target = self.get_object(request, unquote(object_id))
+                    if target is None or not self.model.objects.using(database).select_for_update().filter(pk=target.pk).exists():
+                        return redirect("/admin/")
                 _lock_current_admin_session(request, database)
                 return super().changeform_view(request, object_id, form_url, extra_context)
         except AdminAccessChanged:
@@ -377,9 +387,45 @@ class PairingCascadeDeletionMixin(SignedDeletionMixin):
 
 
 class DirectPairingDeletionMixin(PairingCascadeDeletionMixin):
+    locks_pairing_add = True
+
     def _affected_outrounds(self, selected, *, include_panel=True):
         rounds = models.Outround.objects.using(selected.db)
         return rounds.filter(pk__in=selected) if self.model is models.Outround else rounds.none()
+
+
+    def _changeform_view(self, request, object_id, form_url, extra_context):
+        context = dict(extra_context or {})
+        target = self.get_object(request, unquote(object_id)) if object_id is not None else None
+        if target is not None:
+            context["pairing_revision"] = revision = edit_revision(request, target)
+            if request.method == "POST" and not constant_time_compare(
+                revision, request.POST.get("mittab_pairing_revision", ""),
+            ):
+                return self._stale_pairing_form(request, object_id, form_url, context)
+        response = super()._changeform_view(request, object_id, form_url, context)
+        if hasattr(response, "context_data"):
+            form = response.context_data["adminform"].form
+            if form.has_error(NON_FIELD_ERRORS, "pairing_conflict"):
+                response.status_code = 409
+                if target is not None:
+                    response.context_data.update(original=target, subtitle=str(target))
+        return response
+
+    def _stale_pairing_form(self, request, object_id, form_url, context):
+        request.method = "GET"
+        try:
+            response = super()._changeform_view(request, object_id, form_url, context)
+        finally:
+            request.method = "POST"
+        form = response.context_data["adminform"].form
+        message = "This pairing changed. Review the current values before saving."
+        form.errors[NON_FIELD_ERRORS] = form.error_class([message], error_class="nonfield", renderer=form.renderer)
+        errors = AdminErrorList(form, ())
+        errors.extend(form.non_field_errors())
+        response.context_data["errors"] = errors
+        response.status_code = 409
+        return response
 
 
 class PairingAuditAdminMixin:
@@ -392,22 +438,43 @@ class PairingAuditAdminMixin:
         super().save_related(request, form, formsets, change)
         record_pairing_change(form.instance, form.pairing_before, request.user, "admin correction")
         if isinstance(form.instance, models.Round):
-            refresh_rankings_after_commit(using=form.instance._state.db)
+            database = form.instance._state.db
+            refresh_rankings_after_commit(using=database)
+            if form.pairing_before != pairing_snapshot(form.instance):
+                transaction.on_commit(invalidate_inround_public_pairings_cache, using=database)
+                transaction.on_commit(invalidate_public_tab_cards_cache, using=database)
+        else:
+            repair_elimination_edit(request.user, form.pairing_before, pairing_snapshot(form.instance))
 
-class RoundAdminForm(forms.ModelForm):
+
+class PairingAdminForm(forms.ModelForm):
     chair = forms.ModelChoiceField(queryset=models.Judge.objects.all())
 
+    def clean(self):
+        cleaned = super().clean()
+        chair, judges = cleaned.get("chair"), cleaned.get("judges")
+        # The persisted panel still contains the old many-to-many values until save_related.
+        self.instance._panel_validated_by_admin = True
+        if chair is not None and judges is not None and chair not in judges:
+            raise forms.ValidationError("Chair must be a judge in the round")
+        return cleaned
+
+
+class RoundAdminForm(PairingAdminForm):
     class Meta:
         model = models.Round
         fields = "__all__"
 
 
-class OutroundAdminForm(forms.ModelForm):
-    chair = forms.ModelChoiceField(queryset=models.Judge.objects.all())
-
+class OutroundAdminForm(PairingAdminForm):
     class Meta:
         model = models.Outround
         fields = "__all__"
+
+    def clean(self):
+        cleaned = super().clean()
+        validate_elimination_edit(self.instance, cleaned)
+        return cleaned
 
 
 class RoundAdmin(DirectPairingDeletionMixin, PairingAuditAdminMixin, admin.ModelAdmin):
@@ -418,24 +485,6 @@ class RoundAdmin(DirectPairingDeletionMixin, PairingAuditAdminMixin, admin.Model
 class OutroundAdmin(DirectPairingDeletionMixin, PairingAuditAdminMixin, admin.ModelAdmin):
     form = OutroundAdminForm
     filter_horizontal = ("judges", )
-
-    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
-        try:
-            return super().changeform_view(request, object_id, form_url, extra_context)
-        except AdminAccessChanged:
-            return redirect("/403/")
-        except ProtectedAdminChange as error:
-            return _protected_deletion_response(error, 409)
-
-    def save_model(self, request, obj, form, change):
-        database = router.db_for_write(self.model)
-        if lock_elimination_tournament(using=database) is None:
-            raise ProtectedAdminChange("Unable to complete this request.", status=503)
-        _lock_current_admin_session(request, database)
-        if obj.room_id and not models.Room.objects.using(database).filter(pk=obj.room_id).exists():
-            raise ProtectedAdminChange("This room changed. Reload the form before saving.")
-        super().save_model(request, obj, form, change)
-
 
 class RankingInputAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):

@@ -989,7 +989,7 @@ class Outround(models.Model):
                                  choices=CHOICES)
 
     def clean(self):
-        if self.pk and self.chair not in self.judges.all():
+        if self.pk and not getattr(self, "_panel_validated_by_admin", False) and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")
 
     def __str__(self):
@@ -1128,7 +1128,7 @@ class Round(models.Model):
     rfd = models.TextField(blank=True, default="")
 
     def clean(self):
-        if self.pk and self.chair not in self.judges.all():
+        if self.pk and not getattr(self, "_panel_validated_by_admin", False) and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")
 
     def __str__(self):

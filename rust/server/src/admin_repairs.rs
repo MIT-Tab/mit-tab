@@ -44,6 +44,15 @@ impl Edit {
                 let after = board_snapshot::capture(db, board_snapshot::Pairings::Outround).await?;
                 let updated = after.get(&id).ok_or(sqlx::Error::RowNotFound)?;
                 let old = before.get(&id);
+                if old.is_none_or(|previous| previous.num_teams != updated.num_teams)
+                    && updated.num_teams.is_none_or(|size| {
+                        crate::staff_elimination_store::Stage::new(0, size).is_none()
+                    })
+                {
+                    return Ok(Some(
+                        "Choose a stage size from 2 to 512 that is a power of two.",
+                    ));
+                }
                 if old == Some(updated) {
                     return Ok(None);
                 }
@@ -87,19 +96,19 @@ impl Edit {
                 {
                     prune_published_stage(db, division, size, previous, &after).await?;
                 }
-                if changed {
-                    let divisions: BTreeSet<_> = old
-                        .and_then(|round| round.division)
-                        .into_iter()
-                        .chain(updated.division)
-                        .collect();
-                    for division in divisions {
+                let divisions: BTreeSet<_> = old
+                    .and_then(|round| round.division)
+                    .into_iter()
+                    .chain(updated.division)
+                    .collect();
+                let settings = Settings::load(db, publication::VISIBILITY_KEYS).await?;
+                for division in divisions {
+                    if changed {
                         crate::board_outrounds::recompute_staff_seeds(db, user, &after, division)
                             .await?;
                     }
+                    publication::refresh_division(db, &settings, division).await?;
                 }
-                let settings = Settings::load(db, publication::VISIBILITY_KEYS).await?;
-                publication::refresh_placements(db, &settings).await?;
             }
         }
         Ok(None)

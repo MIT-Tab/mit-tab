@@ -9582,8 +9582,8 @@ def test_admin_outround_add_cannot_use_room_deleted_while_waiting():
                 pending.result(timeout=0.5)
             assert client.post(delete_path, {"post": "yes", "mittab_delete_scope": scope}).status_code == 302
         response = pending.result(timeout=6)
-    assert response.status_code == 409
-    assert b"This room changed." in response.content
+    assert response.status_code == 200
+    assert b"Select a valid choice." in response.content
     assert not Outround.objects.exists()
 
 
@@ -10151,6 +10151,8 @@ def test_admin_round_and_outround_forms_match_django_and_record_corrections(html
         compare_admin_page(port, f"{round_list}add/?chair={spare.id}&judges={chair.id},{spare.id}&gov_team={gov.id}", client)
         compare_admin_page(port, f"{round_list}add/", client, post={})
         compare_admin_page(port, f"{outround_list}add/", client, post={**final_fields, "num_teams": "no"})
+        compare_admin_page(port, f"{outround_list}add/", client, post={**final_fields, "num_teams": 3})
+        compare_admin_page(port, f"{round_list}add/", client, post={**prelim_fields, "judges": [wing.id]})
         compare_admin_page(port, f"{debate_url}change/", client,
                            post={**prelim_fields, "judges": [wing.id]}, pairing_revision=True)
         compare_admin_page(port, f"{final_url}change/", client, post={**final_fields, "chair": spare.id, "judges": [wing.id]}, pairing_revision=True)
@@ -10164,12 +10166,19 @@ def test_admin_round_and_outround_forms_match_django_and_record_corrections(html
         assert RoundStats.objects.filter(id=score.id).exists()
 
         _, _, html = request(port, f"{debate_url}change/", cookie=staff)
+        django_revision = admin_edit_proof(client.get(f"{debate_url}change/").content)
         previous_spoken = "Fixture ballot entered after the editor opened"
         Round.objects.filter(id=debate.id).update(victor=Round.GOV, rfd=previous_spoken)
         status, _, html = post(port, f"{debate_url}change/", {
             **prelim_fields, "mittab_pairing_revision": admin_edit_proof(html),
         })
         assert status == 409 and previous_spoken.encode() in html
+        mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', html)[1][:32].decode()
+        with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
+            reference = client.post(f"{debate_url}change/", {**prelim_fields, "mittab_pairing_revision": django_revision})
+        assert reference.status_code == 409
+        assert_html_bytes(html.replace(admin_edit_proof(html).encode(), b"REVISION"),
+                          reference.content.replace(admin_edit_proof(reference.content).encode(), b"REVISION"))
         assert Round.objects.get(id=debate.id).victor == Round.GOV
         Round.objects.filter(id=debate.id).update(victor=Round.UNKNOWN, rfd=debate.rfd)
 
@@ -10196,6 +10205,15 @@ def test_admin_round_and_outround_forms_match_django_and_record_corrections(html
         debate.refresh_from_db()
         assert debate.result_entered_at is None
 
+        revision = admin_edit_proof(client.get(f"{final_url}change/").content)
+        reference = Client()
+        reference.cookies["sessionid"] = staff
+        with transaction.atomic():
+            assert reference.post(f"{final_url}change/", {**final_fields, "mittab_pairing_revision": revision}).status_code == 302
+            assert dict(PublishedTeamPlacement.objects.filter(stage=final_stage).values_list("team_id", "place")) == {
+                gov.id: 2, opp.id: 1,
+            }
+            transaction.set_rollback(True)
         assert save(port, f"{final_url}change/", final_fields)[1]["Location"] == outround_list
         final.refresh_from_db()
         assert final.sidelock and final.choice == Outround.GOV and final.victor == Outround.OPP
@@ -10227,11 +10245,14 @@ def test_admin_round_and_outround_forms_match_django_and_record_corrections(html
                             "victor": Outround.OPP}
         status, _, html = save(port, semifinal_path, semifinal_fields)
         assert status == 409 and b"Re-pair the later stage before changing its qualifying team." in html
+        compare_admin_page(port, semifinal_path, client, post=semifinal_fields, pairing_revision=True)
         semifinal.refresh_from_db()
         assert semifinal.victor == Outround.GOV
         assert save(port, semifinal_path, {**semifinal_fields, "victor": Outround.GOV})[0] == 302
         status, _, html = save(port, f"{final_url}change/", {**final_fields, "gov_team": eliminated.id})
         assert status == 409 and b"Choose distinct teams that are still eligible for this stage." in html
+        compare_admin_page(port, f"{final_url}change/", client,
+                           post={**final_fields, "gov_team": eliminated.id}, pairing_revision=True)
         final.refresh_from_db()
         assert final.gov_team_id == gov.id
         bye = Team.objects.create(name="Bye entrant", school=school, seed=0)
@@ -10446,6 +10467,63 @@ def test_queued_pairing_edit_rejects_changed_board_membership(backend):
         assert b"Private fixture text" not in body
         debate.refresh_from_db()
         assert debate.rfd == "Private fixture text"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_django_admin_round_chair_change_refreshes_public_pairing():
+    staff = legacy_tab_session("pairing-edit-public-cache")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("pairing_released", 1)
+    school = School.objects.create(name="Pairing Publication School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Government", "Opposition")]
+    old, new = [Judge.objects.create(name=name, rank=4) for name in ("Previous Chair", "Replacement Chair")]
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, chair=old)
+    debate.judges.add(old)
+    path = f"/admin/tab/round/{debate.pk}/change/"
+    client, public = Client(), Client()
+    client.cookies["sessionid"] = staff
+    assert b"Previous Chair" in public.get("/public/pairings/").content
+    revision = admin_edit_proof(client.get(path).content)
+    fields = {"round_number": 1, "gov_team": gov.pk, "opp_team": opp.pk, "chair": new.pk,
+              "victor": Round.UNKNOWN, "pullup": Round.NONE, "mittab_pairing_revision": revision}
+    invalid = client.post(path, {**fields, "judges": [old.pk]})
+    assert invalid.status_code == 200 and b"Chair must be a judge in the round" in invalid.content
+    assert client.post(path, {**fields, "judges": [new.pk]}).status_code == 302
+    debate.refresh_from_db()
+    assert debate.chair_id == new.pk and list(debate.judges.values_list("pk", flat=True)) == [new.pk]
+    response = public.get("/public/pairings/")
+    assert response.status_code == 200
+    assert b"Replacement Chair" in response.content and b"Previous Chair" not in response.content
+
+
+@pytest.mark.django_db(transaction=True)
+def test_django_admin_overlapping_elimination_adds_are_serialized():
+    staff = legacy_tab_session("pairing-concurrent-adds")
+    TabSettings.set("cur_round", 2)
+    school = School.objects.create(name="Concurrent Adds School")
+    gov, opp, other = [Team.objects.create(name=name, school=school, seed=0) for name in ("Government", "Opposition", "Other")]
+    chair = Judge.objects.create(name="Fixture chair", rank=3)
+
+    def submit(opposition):
+        client = Client()
+        client.cookies["sessionid"] = staff
+        return client.post("/admin/tab/outround/add/", {
+            "num_teams": 4, "type_of_round": Outround.VARSITY, "gov_team": gov.pk,
+            "opp_team": opposition.pk, "chair": chair.pk, "judges": [chair.pk],
+            "victor": Outround.UNKNOWN, "choice": Outround.UNKNOWN,
+        })
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        with transaction.atomic():
+            TabSettings.objects.select_for_update().get(key="cur_round")
+            pending = [pool.submit(submit, opponent) for opponent in (opp, other)]
+            for reply in pending:
+                with pytest.raises(FutureTimeout):
+                    reply.result(timeout=0.25)
+        replies = [reply.result(timeout=6) for reply in pending]
+    assert sorted(r.status_code for r in replies) == [302, 409]
+    assert Outround.objects.filter(gov_team=gov).count() == 1
 
 
 def admin_delete_proof(body):
@@ -10887,6 +10965,8 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
     )
     token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
     mask = token[1][:32].decode() if token else csrf
+    if pairing_revision and form is not None:
+        form["mittab_pairing_revision"] = admin_edit_proof(client.get(path).content)
     with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
         reference = client.post(path, form) if form is not None else client.get(path)
     assert status == reference.status_code, (path, status, reference.status_code)
@@ -10901,8 +10981,10 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
             assert metadata == 1
             expected_body = re.sub(field, marker, expected_body)
         if pairing_revision:
-            body, metadata = re.subn(rb'<input type="hidden" name="mittab_pairing_revision" value="[a-f0-9]{64}">', b"", body)
-            assert metadata == 1
+            field = rb'<input type="hidden" name="mittab_pairing_revision" value="[a-f0-9]{64}">'
+            body, metadata = re.subn(field, b"<PAIRING_REVISION>", body)
+            expected_body, reference_metadata = re.subn(field, b"<PAIRING_REVISION>", expected_body)
+            assert metadata == reference_metadata == 1
         if registration_revision:
             body, metadata = re.subn(
                 rb'<input type="hidden" name="mittab_registration_revision" value="[a-f0-9]{64}">', b"", body,
