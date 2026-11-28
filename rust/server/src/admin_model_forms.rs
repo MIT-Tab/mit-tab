@@ -224,9 +224,18 @@ async fn change(
     post: Option<&Fields>,
 ) -> Result<Response, sqlx::Error> {
     let resource = &page.resource;
-    let mut db = app.db.begin().await?;
+    let pairing_write = post.is_some() && resource.pairing();
+    let mut connection = app.db.acquire().await?;
+    let mut db = begin_pairing_write(&mut connection, &page, pairing_write).await?;
     if post.is_some() {
-        lock_round_if_configured(&mut db).await?;
+        let locked = if pairing_write {
+            lock_admin_tournament(&mut db, &page).await?
+        } else {
+            lock_round_if_configured(&mut db).await?.is_some()
+        };
+        if pairing_write && resource.list.model.name == "outround" && !locked {
+            return Ok(unavailable());
+        }
     }
     if !admin_html::model_enabled(
         &mut db,
@@ -254,6 +263,9 @@ async fn change(
     } else {
         (None, None)
     };
+    if pairing_write && !pairing_write_still_allowed(&mut db, app, &page).await? {
+        return Ok(access::access_denied());
+    }
     let pairing_revision = initial
         .as_ref()
         .filter(|_| resource.pairing())
@@ -1764,16 +1776,19 @@ impl Removed {
     }
 }
 
-fn is_roster_deletion(page: &Page<'_>) -> bool {
-    matches!(page.resource.list.model.name, "team" | "judge")
+fn is_pairing_cascade_deletion(page: &Page<'_>) -> bool {
+    matches!(
+        page.resource.list.model.name,
+        "team" | "judge" | "round" | "outround"
+    )
 }
 
-async fn begin_deletion<'db>(
+async fn begin_pairing_write<'db>(
     db: &'db mut MySqlConnection,
     page: &Page<'_>,
     confirmed: bool,
 ) -> Result<Transaction<'db, MySql>, sqlx::Error> {
-    if confirmed && is_roster_deletion(page) {
+    if confirmed && is_pairing_cascade_deletion(page) {
         // The graph and session must reflect commits made while locking dependencies.
         sqlx::query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
             .execute(&mut *db)
@@ -1782,14 +1797,14 @@ async fn begin_deletion<'db>(
     db.begin().await
 }
 
-async fn lock_deletion_tournament(
+async fn lock_admin_tournament(
     db: &mut MySqlConnection,
     page: &Page<'_>,
 ) -> Result<bool, sqlx::Error> {
     if lock_round_if_configured(db).await?.is_some() {
         return Ok(true);
     }
-    if !is_roster_deletion(page) {
+    if !is_pairing_cascade_deletion(page) {
         return Ok(false);
     }
     let fallback = sqlx::query_scalar::<_, i32>(
@@ -1800,12 +1815,12 @@ async fn lock_deletion_tournament(
     Ok(fallback.is_some())
 }
 
-async fn roster_delete_still_allowed(
+async fn pairing_write_still_allowed(
     db: &mut MySqlConnection,
     app: &App,
     page: &Page<'_>,
 ) -> Result<bool, sqlx::Error> {
-    if !is_roster_deletion(page) {
+    if !is_pairing_cascade_deletion(page) {
         return Ok(true);
     }
     sqlx::query("SELECT id FROM auth_user WHERE id = ? FOR UPDATE")
@@ -1839,8 +1854,8 @@ async fn delete(
 ) -> Result<Response, sqlx::Error> {
     let confirm = post.is_some_and(|form| form.get("post") == "yes");
     let mut connection = app.db.acquire().await?;
-    let mut db = begin_deletion(&mut connection, &page, confirm).await?;
-    let tournament_locked = confirm && lock_deletion_tournament(&mut db, &page).await?;
+    let mut db = begin_pairing_write(&mut connection, &page, confirm).await?;
+    let tournament_locked = confirm && lock_admin_tournament(&mut db, &page).await?;
     if !admin_html::model_enabled(
         &mut db,
         page.resource.list.model.application(),
@@ -1878,10 +1893,10 @@ async fn delete(
             !preview.verified(app, post.map_or("", |post| post.get("mittab_delete_scope")))
         });
     if confirm {
-        if !roster_delete_still_allowed(&mut db, app, &page).await? {
+        if !pairing_write_still_allowed(&mut db, app, &page).await? {
             return Ok(access::access_denied());
         }
-        if is_roster_deletion(&page)
+        if is_pairing_cascade_deletion(&page)
             && !tournament_locked
             && !pairings.affected_outrounds.is_empty()
         {
@@ -1945,8 +1960,8 @@ async fn delete(
 async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx::Error> {
     let confirm = post.get("post") == "yes";
     let mut connection = app.db.acquire().await?;
-    let mut db = begin_deletion(&mut connection, &page, confirm).await?;
-    let tournament_locked = confirm && lock_deletion_tournament(&mut db, &page).await?;
+    let mut db = begin_pairing_write(&mut connection, &page, confirm).await?;
+    let tournament_locked = confirm && lock_admin_tournament(&mut db, &page).await?;
     if !admin_html::model_enabled(
         &mut db,
         page.resource.list.model.application(),
@@ -2008,10 +2023,10 @@ async fn bulk(app: &App, page: Page<'_>, post: &Fields) -> Result<Response, sqlx
             .as_ref()
             .is_some_and(|preview| !preview.verified(app, post.get("mittab_delete_scope")));
     if confirm {
-        if !roster_delete_still_allowed(&mut db, app, &page).await? {
+        if !pairing_write_still_allowed(&mut db, app, &page).await? {
             return Ok(access::access_denied());
         }
-        if is_roster_deletion(&page)
+        if is_pairing_cascade_deletion(&page)
             && !tournament_locked
             && !pairings.affected_outrounds.is_empty()
         {

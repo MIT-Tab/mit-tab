@@ -63,7 +63,7 @@ def _record_key(obj):
 
 
 @dataclass
-class RosterCascade:
+class PairingCascade:
     database: str
     before: dict
     removed: dict

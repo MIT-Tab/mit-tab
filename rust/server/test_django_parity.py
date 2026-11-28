@@ -10238,6 +10238,13 @@ def test_admin_round_and_outround_forms_match_django_and_record_corrections(html
         assert save(port, f"{final_url}change/", {**final_fields, "opp_team": bye.id})[0] == 302
         assert save(port, f"{final_url}change/", final_fields)[0] == 302
 
+        semifinal_deletion = f"{outround_list}{semifinal.id}/delete/"
+        compare_admin_page(port, semifinal_deletion, client)
+        blocked = post(port, semifinal_deletion, {"post": "yes"})
+        reference = client.post(semifinal_deletion, {"post": "yes"})
+        assert blocked[0] == reference.status_code == 409
+        assert blocked[2] == reference.content == b"Resolve the later stage before deleting this pairing."
+
         ManualJudgeAssignment.objects.filter(round__in=[debate, added]).delete()
         compare_admin_page(port, f"{debate_url}delete/", client, deletion_scope=True)
         _, _, single = request(port, f"{debate_url}delete/", cookie=staff)
@@ -10245,20 +10252,42 @@ def test_admin_round_and_outround_forms_match_django_and_record_corrections(html
         compare_admin_page(port, round_list, client, post={**scope, "index": 0}, deletion_scope=True)
         _, _, body = post(port, round_list, {**scope, "index": 0})
         token = admin_delete_proof(body)
+        django_single = admin_delete_proof(client.get(f"{debate_url}delete/").content)
+        django_bulk = admin_delete_proof(client.post(round_list, {**scope, "index": 0}).content)
         Round.objects.filter(id=debate.id).update(rfd="Fresh private RFD after deletion previews")
         status, _, refreshed = post(port, f"{debate_url}delete/", {
             "post": "yes", "mittab_delete_scope": admin_delete_proof(single),
         })
         assert status == 409 and b"Fresh private RFD" not in refreshed
+        reference = client.post(f"{debate_url}delete/", {"post": "yes", "mittab_delete_scope": django_single})
+        assert reference.status_code == 409 and b"Fresh private RFD" not in reference.content
+        assert client.post(round_list, {**scope, "post": "yes", "mittab_delete_scope": django_bulk}).status_code == 409
         assert post(port, round_list, {**scope, "post": "yes", "mittab_delete_scope": token})[0] == 409
         assert Round.objects.filter(id__in=[debate.id, added.id]).count() == 2
         _, _, body = post(port, round_list, {**scope, "index": 0})
+        fresh = admin_delete_proof(client.post(round_list, {**scope, "index": 0}).content)
+        reference = Client()
+        reference.cookies["sessionid"] = staff
+        with transaction.atomic():
+            assert reference.post(round_list, {**scope, "post": "yes", "mittab_delete_scope": fresh}).status_code == 302
+            assert not Round.objects.filter(pk__in=[debate.pk, added.pk]).exists()
+            assert not RoundStats.objects.filter(pk=score.pk).exists()
+            assert not WrittenRFDEmailLog.objects.filter(pk=email.pk).exists()
+            transaction.set_rollback(True)
         assert post(port, round_list, {**scope, "post": "yes", "mittab_delete_scope": admin_delete_proof(body)})[0] == 302
         assert not RoundStats.objects.filter(id=score.id).exists()
         assert not WrittenRFDEmailLog.objects.filter(id=email.id).exists()
         assert AuditEvent.objects.get(content_type__model="round", object_id=debate.id,
                                       changes__public__source="admin deletion").object_repr == f"Round {debate.id}"
 
+        fresh = admin_delete_proof(client.get(f"{final_url}delete/").content)
+        with transaction.atomic():
+            assert reference.post(f"{final_url}delete/", {"post": "yes", "mittab_delete_scope": fresh}).status_code == 302
+            assert not PublishedOutroundStage.objects.filter(pk=final_stage.pk).exists()
+            assert Outround.objects.filter(pk__in=[novice.pk, semifinal.pk]).count() == 2
+            assert AuditEvent.objects.filter(content_type__model="outround", object_id=final.pk,
+                                             changes__public__source="admin deletion").exists()
+            transaction.set_rollback(True)
         _, _, body = request(port, f"{final_url}delete/", cookie=staff)
         assert post(port, f"{final_url}delete/", {"post": "yes", "mittab_delete_scope": admin_delete_proof(body)})[0] == 302
         assert not PublishedOutroundStage.objects.filter(id=final_stage.id).exists()
@@ -10280,6 +10309,144 @@ def test_admin_round_and_outround_forms_match_django_and_record_corrections(html
         assert not PublishedOutroundStage.objects.filter(id=novice_stage.id).exists()
         assert Judge.objects.filter(id=wing.id).exists()
         assert Team.objects.filter(id=opp.id).exists()
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("backend", ("django", "rust"))
+def test_bulk_elimination_deletion_checks_publication_and_surviving_stages(backend):
+    from mittab.apps.tab.models import PublishedOutroundStage
+
+    staff = legacy_tab_session("bulk-elimination-delete")
+    TabSettings.set("cur_round", 4)
+    TabSettings.set("var_teams_visible", 2)
+    TabSettings.set("nov_teams_visible", 2)
+    school = School.objects.create(name="Elimination Deletion School")
+    gov, opp, other = [Team.objects.create(name=name, school=school, seed=0)
+                      for name in ("Government", "Opposition", "Other")]
+    earlier = Outround.objects.create(num_teams=4, gov_team=gov, opp_team=other, victor=Outround.GOV)
+    later = Outround.objects.create(num_teams=2, gov_team=gov, opp_team=opp, victor=Outround.GOV)
+    novice = Outround.objects.create(type_of_round=Outround.NOVICE, num_teams=2, gov_team=opp, opp_team=other)
+    stage = PublishedOutroundStage.objects.create(type_of_round=Outround.VARSITY, num_teams=2)
+    placement = PublishedTeamPlacement.objects.create(stage=stage, team=gov, place=1)
+    novice_stage = PublishedOutroundStage.objects.create(type_of_round=Outround.NOVICE, num_teams=2)
+    novice_placement = PublishedTeamPlacement.objects.create(stage=novice_stage, team=opp, place=8)
+    path = "/admin/tab/outround/"
+    csrf = "a" * 32
+    selection = {"action": "delete_selected", "_selected_action": [earlier.pk, later.pk]}
+
+    with rust_server() as port:
+        client = Client()
+        client.cookies["sessionid"] = staff
+
+        def submit(fields):
+            if backend == "django":
+                reply = client.post(path, fields)
+                return reply.status_code, reply.content
+            status, _, body = request(port, path, method="POST", form={**fields, "csrfmiddlewaretoken": csrf},
+                                      extra_headers={"Cookie": f"sessionid={staff}; csrftoken={csrf}"})
+            return status, body
+
+        blocked = submit({**selection, "_selected_action": earlier.pk, "post": "yes"})
+        assert blocked == (409, b"Resolve the later stage before deleting this pairing.")
+        status, body = submit({**selection, "index": "0"})
+        assert status == 200
+        token = admin_delete_proof(body)
+        PublishedTeamPlacement.objects.filter(pk=placement.pk).update(place=2)
+
+        status, body = submit({**selection, "post": "yes", "mittab_delete_scope": token})
+        assert status == 409 and b"Review updated deletion" in body
+        refreshed = admin_delete_proof(body)
+        assert refreshed != token
+        assert Outround.objects.filter(pk__in=[earlier.pk, later.pk]).count() == 2
+        assert submit({**selection, "post": "yes", "mittab_delete_scope": refreshed})[0] == 302
+        assert not Outround.objects.filter(pk__in=[earlier.pk, later.pk]).exists()
+        assert not PublishedOutroundStage.objects.filter(pk=stage.pk).exists()
+        assert Outround.objects.filter(pk=novice.pk).exists()
+        assert list(novice_stage.placements.values_list("pk", "team_id", "place")) == [(novice_placement.pk, opp.pk, 8)]
+        assert AuditEvent.objects.filter(content_type__model="outround", object_id__in=[earlier.pk, later.pk],
+                                         changes__public__source="admin deletion").count() == 2
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("backend", ("django", "rust"))
+def test_admin_opening_pairing_deletion_does_not_award_byes(backend):
+    from mittab.apps.tab.live_results import published_team_placements
+
+    staff = legacy_tab_session("opening-stage-delete")
+    TabSettings.set("cur_round", 4)
+    TabSettings.set("var_teams_visible", 8)
+    school = School.objects.create(name="Opening Fixture School")
+    teams = [Team.objects.create(name=f"Opening team {seed}", school=school, seed=0) for seed in range(1, 7)]
+    for seed, team in enumerate(teams, start=1):
+        BreakingTeam.objects.create(team=team, seed=seed, effective_seed=seed)
+    survivor = Outround.objects.create(num_teams=8, gov_team=teams[2], opp_team=teams[5])
+    target = Outround.objects.create(num_teams=8, gov_team=teams[3], opp_team=teams[4])
+    assert len(published_team_placements(Outround.VARSITY)) == 6
+    path = f"/admin/tab/outround/{target.pk}/delete/"
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = staff
+    headers = {"Cookie": f"sessionid={staff}; csrftoken={csrf}"}
+    with rust_server() as port:
+        if backend == "django":
+            proof = admin_delete_proof(client.get(path).content)
+            response = client.post(path, {"post": "yes", "mittab_delete_scope": proof})
+            assert response.status_code == 302
+        else:
+            proof = admin_delete_proof(request(port, path, extra_headers=headers)[2])
+            assert request(port, path, method="POST", extra_headers=headers, form={
+                "post": "yes", "mittab_delete_scope": proof, "csrfmiddlewaretoken": csrf,
+            })[0] == 302
+        assert Outround.objects.filter(pk=survivor.pk).exists()
+        expected = {teams[0].pk: 3, teams[1].pk: 3, teams[2].pk: 5, teams[5].pk: 5}
+        assert dict(PublishedTeamPlacement.objects.filter(stage__num_teams=8).values_list("team_id", "place")) == expected
+        assert published_team_placements(Outround.VARSITY) == expected
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("backend", ("django", "rust"))
+def test_queued_pairing_edit_rejects_changed_board_membership(backend):
+    from time import monotonic, sleep
+
+    staff = legacy_tab_session("pairing-change-queued")
+    staff_user = get_user_model().objects.get(username="pairing-change-queued")
+    TabSettings.set("cur_round", 2)
+    school = School.objects.create(name="Queued Pairing School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Government", "Opposition")]
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, rfd="Private fixture text")
+    path = f"/admin/tab/round/{debate.pk}/change/"
+    csrf = "a" * 32
+    headers = {"Cookie": f"sessionid={staff}; csrftoken={csrf}"}
+    with rust_server() as port:
+        def post():
+            if backend == "rust":
+                return request(port, path, method="POST", form={"csrfmiddlewaretoken": csrf}, extra_headers=headers)
+            client = Client()
+            client.cookies["sessionid"] = staff
+            reply = client.post(path, {"rfd": "Replacement fixture"})
+            return reply.status_code, reply.headers, reply.content
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with transaction.atomic():
+                TabSettings.objects.select_for_update().get(key="cur_round")
+                pending = pool.submit(post)
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        blocked = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "tab_tabsettings" in row[7] and "cur_round" in row[7]
+                                      and "FOR UPDATE" in row[7] for row in cursor.fetchall())
+                    if blocked:
+                        break
+                    sleep(0.025)
+                assert blocked, "The pairing edit did not reach the tournament lock"
+                staff_user.groups.add(Group.objects.create(name="APDA Board"))
+            status, response_headers, body = pending.result(timeout=6)
+        assert (status, response_headers["Location"]) == (302, "/403/")
+        assert b"Private fixture text" not in body
+        debate.refresh_from_db()
+        assert debate.rfd == "Private fixture text"
+
 
 def admin_delete_proof(body):
     return re.search(rb'name="mittab_delete_scope" value="([a-f0-9]{64})"', body)[1].decode()

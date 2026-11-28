@@ -93,12 +93,13 @@ async fn save_placements(
     for ((division, size), mut placements) in released {
         if size == opening_size[division as usize] {
             let breaking_teams: Vec<_> = sqlx::query_scalar::<_, i32>(
-                "SELECT team_id FROM tab_breakingteam WHERE type_of_team = ?",
+                "SELECT team_id FROM tab_breakingteam WHERE type_of_team = ? ORDER BY seed, id",
             )
             .bind(division)
             .fetch_all(&mut *db)
             .await?;
-            for team in breaking_teams {
+            let bye_count = (size as usize).saturating_sub(breaking_teams.len());
+            for team in breaking_teams.into_iter().take(bye_count) {
                 placements.entry(team).or_insert(winning_floor(size));
             }
         }

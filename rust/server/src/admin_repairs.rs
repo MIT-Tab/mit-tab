@@ -203,12 +203,12 @@ pub(super) async fn finish_outround_changes(
         }
     }
     board_snapshot::audit_pairings(db, before, &after, user, "admin deletion").await?;
-    for division in divisions {
-        crate::board_outrounds::recompute_staff_seeds(db, user, &after, division).await?;
-    }
-    if !removed.is_empty() {
+    if !divisions.is_empty() {
         let settings = Settings::load(db, publication::VISIBILITY_KEYS).await?;
-        publication::refresh_placements(db, &settings).await?;
+        for division in divisions {
+            crate::board_outrounds::recompute_staff_seeds(db, user, &after, division).await?;
+            publication::refresh_division(db, &settings, division).await?;
+        }
     }
     Ok(())
 }

@@ -72,10 +72,11 @@ def _publication_records(database, divisions):
             list(placements), list(seeds), list(settings))
 
 
-def roster_deletion_scope(request, selected, preview, counts, _confirmed):
-    cascade = request.admin_roster_deletion
+def pairing_cascade_deletion_scope(request, selected, preview, counts, _confirmed):
+    cascade = request.admin_pairing_deletion
     divisions = {cascade.before[Outround][pk]["division"] for pk in cascade.removed[Outround]}
-    identity = list(selected.order_by("pk").values_list("pk", "name"))
+    identity = (list(selected.order_by("pk").values_list("pk", "name"))
+                if selected.model in (Team, Judge) else [])
     return _sign(request, selected, preview, counts,
                  (identity, cascade.signature(), _publication_records(selected.db, divisions)))
 
