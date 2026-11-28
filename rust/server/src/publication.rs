@@ -14,6 +14,36 @@ pub async fn refresh_placements(
     db: &mut MySqlConnection,
     settings: &Settings,
 ) -> Result<PublishedPlacements, sqlx::Error> {
+    save_placements(db, settings, None).await?;
+    let mut published = [BTreeMap::new(), BTreeMap::new()];
+    for (division, team, place) in sqlx::query_as::<_, (i32, i32, u32)>(
+        "SELECT stage.type_of_round, placement.team_id, MIN(placement.place)
+         FROM tab_publishedteamplacement placement
+         JOIN tab_publishedoutroundstage stage ON stage.id = placement.stage_id
+         WHERE stage.type_of_round IN (0, 1)
+         GROUP BY stage.type_of_round, placement.team_id",
+    )
+    .fetch_all(db)
+    .await?
+    {
+        published[division as usize].insert(team, place as i32);
+    }
+    Ok(published)
+}
+
+pub async fn refresh_division(
+    db: &mut MySqlConnection,
+    settings: &Settings,
+    division: i32,
+) -> Result<(), sqlx::Error> {
+    save_placements(db, settings, Some(division)).await
+}
+
+async fn save_placements(
+    db: &mut MySqlConnection,
+    settings: &Settings,
+    division: Option<i32>,
+) -> Result<(), sqlx::Error> {
     let mut opening_size = [0; 2];
     for (division, size) in sqlx::query_as::<_, (i32, u32)>(
         "SELECT type_of_round, num_teams FROM tab_publishedoutroundstage
@@ -30,12 +60,15 @@ pub async fn refresh_placements(
     for (division, size, government, opposition, outcome) in
         sqlx::query_as::<_, (i32, i32, i32, i32, i32)>(
             "SELECT type_of_round, num_teams, gov_team_id, opp_team_id, victor FROM tab_outround
-         WHERE (type_of_round = 0 AND num_teams >= ?)
-            OR (type_of_round = 1 AND num_teams >= ?)
+         WHERE ((type_of_round = 0 AND num_teams >= ?)
+             OR (type_of_round = 1 AND num_teams >= ?))
+           AND (? IS NULL OR type_of_round = ?)
          ORDER BY id",
         )
         .bind(settings.integer(VISIBILITY_KEYS[0], 256))
         .bind(settings.integer(VISIBILITY_KEYS[1], 256))
+        .bind(division)
+        .bind(division)
         .fetch_all(&mut *db)
         .await?
     {
@@ -72,20 +105,7 @@ pub async fn refresh_placements(
         replace_stage(db, division, size, placements).await?;
     }
 
-    let mut published = [BTreeMap::new(), BTreeMap::new()];
-    for (division, team, place) in sqlx::query_as::<_, (i32, i32, u32)>(
-        "SELECT stage.type_of_round, placement.team_id, MIN(placement.place)
-         FROM tab_publishedteamplacement placement
-         JOIN tab_publishedoutroundstage stage ON stage.id = placement.stage_id
-         WHERE stage.type_of_round IN (0, 1)
-         GROUP BY stage.type_of_round, placement.team_id",
-    )
-    .fetch_all(db)
-    .await?
-    {
-        published[division as usize].insert(team, place as i32);
-    }
-    Ok(published)
+    Ok(())
 }
 
 fn winning_floor(size: i32) -> i32 {

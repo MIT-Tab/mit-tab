@@ -626,7 +626,7 @@ pub async fn pair_next(app: &App, user: i32, prior: Stage) -> Result<Stage, Erro
         })
         .map(|(&id, _)| id)
         .collect();
-    publication::refresh_placements(&mut db, &settings).await?;
+    publication::refresh_division(&mut db, &settings, prior.division).await?;
     let name = format!("Round-of-{}-{}", prior.size, prior.division_name());
     app.backups
         .save_named(&format!("Before Pairing Round {name}"), 4, &name)
@@ -750,12 +750,12 @@ pub async fn release(app: &App, stage: Stage) -> Result<bool, Error> {
     }
     let key = VISIBILITY[stage.division as usize];
     let before = Settings::load(&mut db, &VISIBILITY).await?;
-    publication::refresh_placements(&mut db, &before).await?;
+    publication::refresh_division(&mut db, &before, stage.division).await?;
     let publish = before.integer(key, 256) != stage.size;
     let limit = if publish { stage.size } else { stage.size * 2 };
     settings::put(&mut db, key, SettingValue::Number(limit)).await?;
     let after = Settings::load(&mut db, &VISIBILITY).await?;
-    publication::refresh_placements(&mut db, &after).await?;
+    publication::refresh_division(&mut db, &after, stage.division).await?;
     db.commit().await?;
     app.public_cache.evict_outround_publication(stage.division);
     Ok(publish)
@@ -805,31 +805,49 @@ pub async fn ballot(
             ));
         }
     }
-    let seeded: i64 = sqlx::query_scalar(
-        "SELECT COUNT(DISTINCT team_id) FROM tab_breakingteam
-         WHERE type_of_team = ? AND team_id IN (?, ?)",
+    let seeded = sqlx::query_as::<_, (i32, i32, String, i32, i32)>(
+        "SELECT b.id, b.team_id, t.name, b.seed, b.effective_seed
+         FROM tab_breakingteam b JOIN tab_team t ON t.id = b.team_id
+         WHERE b.type_of_team = ? AND b.team_id IN (?, ?)",
     )
     .bind(stage.division)
     .bind(won)
     .bind(lost)
-    .fetch_one(&mut *db)
-    .await?;
-    if seeded != 2 {
+    .fetch_all(&mut *db)
+    .await?
+    .into_iter()
+    .map(|(id, team, name, seed, effective)| Entry {
+        id,
+        team,
+        name,
+        seed,
+        effective,
+    })
+    .collect::<Vec<_>>();
+    let [first, second] = seeded.as_slice() else {
+        return Err(Error::Invalid("Both teams must have a break seed."));
+    };
+    if first.team == second.team {
         return Err(Error::Invalid("Both teams must have a break seed."));
     }
+    let (winning, losing) = if first.team == won {
+        (first, second)
+    } else {
+        (second, first)
+    };
     board_snapshot::audit_pairings(
         &mut db,
         &BTreeMap::from([(id, original)]),
-        &BTreeMap::from([(id, current.clone())]),
+        &BTreeMap::from([(id, current)]),
         user,
         "staff outround result",
     )
     .await?;
-    let mut after = before;
-    after.insert(id, current);
-    crate::board_outrounds::recompute_staff_seeds(&mut db, user, &after, stage.division).await?;
-    let visibility = Settings::load(&mut db, &VISIBILITY).await?;
-    publication::refresh_placements(&mut db, &visibility).await?;
+    // A staff ballot transfers a seed only when the lower-seeded team wins.
+    if losing.effective < winning.effective {
+        update_seed(&mut db, user, winning, losing.effective).await?;
+        update_seed(&mut db, user, losing, losing.seed).await?;
+    }
     db.commit().await?;
     Ok(stage)
 }

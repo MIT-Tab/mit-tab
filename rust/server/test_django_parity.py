@@ -708,6 +708,67 @@ def test_live_publication_reads_after_concurrent_result_correction():
         assert PublishedTeamPlacement.objects.get(team=second, stage__num_teams=2).place == 1
 
 
+@pytest.mark.django_db(transaction=True)
+def test_saved_elimination_placements_refresh_only_at_publication_boundaries():
+    for key, value in {"cur_round": 2, "tot_rounds": 1, "var_teams_visible": 2,
+                       "nov_teams_visible": 2}.items():
+        TabSettings.set(key, value)
+    school = School.objects.create(name="Placement timing fixture")
+    finals = []
+    for division in (Outround.VARSITY, Outround.NOVICE):
+        teams = [Team.objects.create(name=f"Team {division}-{seed}", school=school, seed=0)
+                 for seed in (1, 2)]
+        for seed, team in enumerate(teams, start=1):
+            BreakingTeam.objects.create(type_of_team=division, team=team, seed=seed, effective_seed=seed)
+        finals.append(Outround.objects.create(type_of_round=division, num_teams=2,
+                                              gov_team=teams[0], opp_team=teams[1]))
+    varsity, novice = finals
+    # A past upset can leave two teams tied on effective seed.
+    BreakingTeam.objects.filter(team=varsity.opp_team).update(effective_seed=1)
+    staff = legacy_tab_session("placement-timing-staff")
+    board = legacy_tab_session("placement-timing-board")
+    get_user_model().objects.get(username="placement-timing-board").groups.add(Group.objects.create(name="APDA Board"))
+    csrf = "a" * 32
+
+    def placements(round_type):
+        return dict(PublishedTeamPlacement.objects.filter(stage__type_of_round=round_type, stage__num_teams=2)
+                    .values_list("team_id", "place"))
+
+    with rust_server() as port:
+        def post(path, data, actor=staff):
+            return request(port, path, method="POST", extra_headers={"Cookie": f"sessionid={actor}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **data})
+
+        for final in finals:
+            result = post(f"/outround/{final.id}/result/", {"winner": Outround.GOV, "round_instance": final.id})
+            assert result[0] == 302
+        assert not PublishedTeamPlacement.objects.exists()
+        assert BreakingTeam.objects.get(team=varsity.opp_team).effective_seed == 1
+
+        release = "/outround_pairing/release/2/0/"
+        assert json.loads(post(release, {})[2])["pairing_released"] is False
+        assert placements(Outround.VARSITY) == {varsity.gov_team_id: 1, varsity.opp_team_id: 2}
+        assert placements(Outround.NOVICE) == {}
+        assert json.loads(post(release, {})[2])["pairing_released"] is True
+
+        correction = f"/apda-board/outround/{varsity.id}/"
+        body = request(port, "/apda-board/outrounds/", cookie=board)[2]
+        revision = re.search(
+            rb'action="' + re.escape(correction.encode()) +
+            rb'"[^>]*>\s*<input[^>]*>\s*<input type="hidden" name="revision" value="([^"]+)"', body,
+        )[1].decode()
+        result = post(correction, {"action": "result", "victor": Outround.OPP, "revision": revision}, actor=board)
+        assert result[0] == 302
+        varsity.refresh_from_db()
+        assert varsity.victor == Outround.OPP
+        assert placements(Outround.VARSITY) == {varsity.gov_team_id: 1, varsity.opp_team_id: 2}
+        assert placements(Outround.NOVICE) == {}
+
+        assert request(port, LIVE)[0] == 200
+        assert placements(Outround.VARSITY) == {varsity.gov_team_id: 2, varsity.opp_team_id: 1}
+        assert placements(Outround.NOVICE) == {novice.gov_team_id: 1, novice.opp_team_id: 2}
+
+
 def compare_live(port, client, *, completed, expected_placement_count=None):
     caches["default"].clear()
     status, _, raw = request(port, LIVE, forwarded_proto="https")
@@ -7578,8 +7639,17 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
             generation = min(seed.id for seed in seeds)
             TabSettings.set("challenge_pick_generation_0", str(generation))
             code = Outround.GOV if c == challenged_match.gov_team_id else Outround.OPP
-            assert post(ballot, {"winner": code, "round_instance": challenged_match.id})[0] == 302
-            assert BreakingTeam.objects.get(team_id=d).effective_seed == 4
+            from mittab.apps.tab.forms import OutroundResultEntryForm
+
+            fields = {"winner": code, "round_instance": challenged_match.id}
+            with transaction.atomic():
+                reference = OutroundResultEntryForm(fields, round_instance=challenged_match)
+                assert reference.is_valid()
+                reference.save()
+                expected = list(BreakingTeam.objects.order_by("id").values_list("effective_seed", flat=True))
+                transaction.set_rollback(True)
+            assert post(ballot, fields)[0] == 302
+            assert list(BreakingTeam.objects.order_by("id").values_list("effective_seed", flat=True)) == expected
             TabSettings.set("challenge_pick_generation_0", generation)
         for winning_team in (c, a, c):
             code = Outround.GOV if winning_team == challenged_match.gov_team_id else Outround.OPP

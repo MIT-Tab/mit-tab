@@ -23,7 +23,6 @@ use crate::{
     legacy_html,
     legacy_session::Actor,
     login::TemplateCsrf,
-    publication,
     settings::Settings,
     tournament_data::TournamentData,
     unavailable,
@@ -778,8 +777,6 @@ async fn correction(app: &App, actor: Actor, id: i32, form: Correction) -> Resul
         let entries = seeds(&mut db).await?;
         recompute(&mut db, user, &after, division, entries).await?;
     }
-    let settings = Settings::load(&mut db, publication::VISIBILITY_KEYS).await?;
-    publication::refresh_placements(&mut db, &settings).await?;
     db.commit().await?;
     app.public_cache.clear_bracket_data();
     app.public_cache.evict_outround_publication(division);
