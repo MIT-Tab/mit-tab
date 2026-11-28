@@ -16,13 +16,13 @@ from mittab.apps.tab.models import Outround, TabSettings
 STALE_PAIRING = "This pairing changed. Reload it before saving."
 
 
-def serialize_elimination_post(view):
+def serialize_staff_pairing_post(view):
     @wraps(view)
     def wrapped(request, *args, **kwargs):
         if request.method != "POST":
             return view(request, *args, **kwargs)
         with transaction.atomic():
-            # Match the tournament lock used by staff ballot entry and advancement.
+            # Share the tournament lock across staff and Board pairing writes.
             lock_id = (TabSettings.objects.select_for_update().filter(key="cur_round")
                        .order_by("id").values_list("id", flat=True).first())
             if lock_id is None:
@@ -40,6 +40,15 @@ def serialize_elimination_post(view):
     return wrapped
 
 
+def stale_round_response(request, round_number):
+    requested_round = request.POST.get("round")
+    if requested_round is not None and requested_round != str(round_number):
+        return HttpResponse("The current round changed. Reload this page and try again.",
+                            status=409, content_type="text/plain; charset=utf-8",
+                            headers={"Cache-Control": "private, no-store"})
+    return None
+
+
 def correction_error(message):
     return JsonResponse({"success": False, "error": message}, status=422,
                         headers={"Cache-Control": "private, no-store"})
@@ -48,7 +57,7 @@ def correction_error(message):
 def staff_elimination_correction(*, shared=False, choice=False):
     """Use the same revision in the card, its successful response, and the audit."""
     def decorate(view):
-        @serialize_elimination_post
+        @serialize_staff_pairing_post
         def correct(request, *args, **kwargs):
             round_id = args[0] if args else kwargs.get("round_id", kwargs.get("outround_id"))
             revision = request.POST.get("revision")

@@ -62,6 +62,8 @@ pub struct Action {
 #[derive(Debug)]
 pub enum ChangeError {
     Conflict(&'static str),
+    StaleRound,
+    Denied,
     Storage,
 }
 
@@ -145,6 +147,11 @@ async fn readiness(
 fn error(actor: Actor, result: ChangeError) -> Response {
     match result {
         ChangeError::Storage => unavailable(),
+        ChangeError::Denied => access::access_denied(),
+        ChangeError::StaleRound => private((
+            StatusCode::CONFLICT,
+            "The current round changed. Reload this page and try again.",
+        )),
         ChangeError::Conflict(message) => html::render(
             "error.html",
             context! {title => "Pairing unavailable", heading => message, nav => Navigation::new(actor, false), back => STATUS},
@@ -191,12 +198,11 @@ async fn preview(
     };
     let shell = legacy_html::shell(&mut db, actor, path).await?;
     let csrf = login::TemplateCsrf::new(headers).map_err(|_| ChangeError::Storage)?;
-    let round_input = format!("<input type=\"hidden\" name=\"round\" value=\"{round}\">");
     let (template, page) = if repair {
         (
             "pairing/confirm_re_pair.html",
             context! {
-                round_number => round, csrf_input => csrf.input(), round_input,
+                round_number => round, csrf_input => csrf.input(),
             },
         )
     } else {
@@ -243,7 +249,7 @@ async fn preview(
             "pairing/pair_round.html",
             context! {
                 title => format!("Pairing Round {round}"),
-                check_status, checked_in_judges, csrf_input => csrf.input(), round_input,
+                check_status, checked_in_judges, csrf_input => csrf.input(), current_round_number => round,
             },
         )
     };
@@ -368,30 +374,59 @@ async fn change(
     form: Action,
     trigger: Trigger,
 ) -> Response {
-    let Actor::User {
-        id, board: false, ..
-    } = actor
-    else {
+    let Actor::User { board: false, .. } = actor else {
         return access::access_denied();
     };
     if !login::valid_csrf(headers, &form.csrfmiddlewaretoken) {
         return private((StatusCode::FORBIDDEN, "CSRF verification failed."));
     }
-    match apply(app, id, form.round, trigger).await {
+    match apply(app, actor, headers, form.round, trigger).await {
+        Ok(()) if matches!(trigger, Trigger::Pair) => {
+            render_status(
+                app,
+                actor,
+                headers,
+                "/pairing/pair_round/",
+                Some(form.round),
+                None,
+            )
+            .await
+        }
+        Ok(()) if matches!(trigger, Trigger::RePair) => {
+            let text = format!("Successfully re-paired round {}", form.round);
+            render_status(
+                app,
+                actor,
+                headers,
+                "/pairing/re_pair_round/",
+                Some(form.round),
+                Some(text),
+            )
+            .await
+        }
         Ok(()) => access::found(STATUS),
         Err(issue) => error(actor, issue),
     }
 }
 
-async fn apply(app: &App, user: i32, requested: i32, trigger: Trigger) -> Result<(), ChangeError> {
+async fn apply(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    requested: i32,
+    trigger: Trigger,
+) -> Result<(), ChangeError> {
     let mut db = app.db.begin().await?;
     let setting_id = lock_round(&mut db).await?;
+    let user = match access::settings_actor(&mut db, app, actor, headers).await {
+        Ok(Actor::User { id, .. }) => id,
+        Err(access::PortalAccessError::Database) => return Err(ChangeError::Storage),
+        _ => return Err(ChangeError::Denied),
+    };
     let settings = Settings::load(&mut db, SETTINGS).await?;
     let round = target(&settings, !matches!(trigger, Trigger::Pair))?;
     if requested != round {
-        return Err(ChangeError::Conflict(
-            "The current round changed. Reload this page and try again.",
-        ));
+        return Err(ChangeError::StaleRound);
     }
     if matches!(trigger, Trigger::Pair) {
         let existing = sqlx::query_scalar::<_, i64>(
@@ -585,10 +620,7 @@ pub async fn status(
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
 ) -> Response {
-    match crate::pairing_status::render(&app, actor, &headers, None).await {
-        Ok(response) => response,
-        Err(issue) => error(actor, issue),
-    }
+    render_status(&app, actor, &headers, STATUS, None, None).await
 }
 
 pub async fn previous(
@@ -597,7 +629,26 @@ pub async fn previous(
     headers: HeaderMap,
     Path(round): Path<i32>,
 ) -> Response {
-    match crate::pairing_status::render(&app, actor, &headers, Some(round)).await {
+    render_status(
+        &app,
+        actor,
+        &headers,
+        &format!("/round/{round}/"),
+        Some(round),
+        None,
+    )
+    .await
+}
+
+async fn render_status(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    path: &str,
+    round: Option<i32>,
+    success: Option<String>,
+) -> Response {
+    match crate::pairing_status::render(app, actor, headers, path, round, success).await {
         Ok(response) => response,
         Err(issue) => error(actor, issue),
     }

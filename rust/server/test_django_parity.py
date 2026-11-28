@@ -431,9 +431,6 @@ def test_staff_screenshot_html_matches_django_bytes(html_assets, screen):
     with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
         response = client.post(path, post_data) if post_data else client.get(path)
     assert status == response.status_code == 200
-    if screen.startswith("pairings"):
-        # The native form carries the displayed round to prevent stale-page writes.
-        body = re.sub(rb'<input type="hidden" name="round" value="\d+">', b'', body)
     assert_html_bytes(body, response.content)
 
 
@@ -1594,11 +1591,17 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
             assert status == 409 and b"pairings are unchanged" in body
             assert round_signature(1) == ([], [], [])
 
-        assert post(pair_page)[1]["Location"] == status_page
+        status, _, body = post(pair_page)
+        assert status == 200 and b"Pairing Controls" in body
         assert round_signature(1) == legacy_round
         assert len(legacy_round[0]) == 2 and len(legacy_round[1]) == 1
         assert legacy_round[2] == [teams[-1].id]
-        assert post(pair_page)[0] == 409
+        status, _, body = post(pair_page)
+        client = Client()
+        client.cookies["sessionid"] = tab
+        stale = client.post(pair_page, {"round": 1})
+        assert status == stale.status_code == 409
+        assert body == stale.content == b"The current round changed. Reload this page and try again."
         assert post(pair_page, round_number=2)[0] == 409
         assert round_signature(2) == ([], [], [])
         assert not Round.objects.filter(round_number=1, room__isnull=False).exists()
@@ -1643,7 +1646,8 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
 
         RoundStats.objects.create(round=first, debater=first.gov_team.debaters.first(),
                                   speaks=26, ranks=1, debater_role=None)
-        assert post(repair_page)[0] == 302
+        status, _, body = post(repair_page)
+        assert status == 200 and b"Successfully re-paired round 1" in body
         assert round_signature(1) == legacy_round
         assert not Round.objects.filter(pk__in=[first.id, second.id]).exists()
         assert not RoundStats.objects.exists()
@@ -1668,7 +1672,7 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
             tab_logic.pair_round()
             expected_second = round_signature(2)
             transaction.set_rollback(True)
-        assert post(pair_page, round_number=2)[0] == 302
+        assert post(pair_page, round_number=2)[0] == 200
         assert round_signature(2) == expected_second
         Round.objects.filter(round_number=2).update(victor=Round.GOV)
         assert request(port, pair_page, cookie=tab)[0] == 200
@@ -1684,7 +1688,7 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
             tab_logic.pair_round()
             expected_extra = round_signature(3)
             transaction.set_rollback(True)
-        assert post(pair_page, round_number=3)[0] == 302
+        assert post(pair_page, round_number=3)[0] == 200
         assert round_signature(3) == expected_extra
         for path in (pair_page, repair_page, room_page, release_page, status_page):
             assert request(port, path, cookie=board)[1]["Location"] == "/403/"
@@ -1746,7 +1750,7 @@ def test_native_pairing_orders_debates_using_the_new_bye(tmp_path):
         status, _, _ = request(port, path, method="POST",
                                extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
                                form={"round": 2, "csrfmiddlewaretoken": csrf})
-        assert status == 302
+        assert status == 200
         assert round_signature(2) == expected
 
 
@@ -1773,7 +1777,7 @@ def test_simultaneous_all_bye_pairing_cannot_advance_two_rounds(tmp_path):
             )[0]
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            assert sorted(executor.map(advance, range(2))) == [302, 409]
+            assert sorted(executor.map(advance, range(2))) == [200, 409]
         assert Bye.objects.filter(round_number=1).count() == 2
         assert Bye.objects.filter(round_number=2).count() == 0
     assert len(list(tmp_path.glob("*.dump.sql"))) == 1

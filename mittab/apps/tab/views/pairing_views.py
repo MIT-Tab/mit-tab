@@ -21,7 +21,9 @@ from mittab.apps.tab.board_audit import (
     audit_pairing_change, audit_pairing_generation, manual_team_edits,
 )
 from mittab.apps.tab.judge_history import current_manual_judge_events
-from mittab.apps.tab.staff_pairing import correction_error, staff_elimination_correction
+from mittab.apps.tab.staff_pairing import (
+    correction_error, serialize_staff_pairing_post, staff_elimination_correction, stale_round_response,
+)
 from mittab.apps.tab.written_rfd import (
     round_allows_written_rfd,
     written_rfd_editing_open,
@@ -55,12 +57,15 @@ def invalidate_public_ballot_cache():
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_staff_pairing_post
 @audit_pairing_generation(Round, "staff pairing")
 def pair_round(request):
     cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
     current_round_number = current_round.value
     if request.method == "POST":
+        if (stale := stale_round_response(request, current_round_number)) is not None:
+            return stale
         # We should pair the round
         try:
             TabSettings.set("pairing_released", 0)
@@ -154,6 +159,7 @@ def pair_round(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_staff_pairing_post
 @audit_pairing_generation(Round, "staff re-pairing")
 def re_pair_round(request):
     """
@@ -176,6 +182,8 @@ def re_pair_round(request):
         )
 
     if request.method == "POST":
+        if (stale := stale_round_response(request, current_round_number)) is not None:
+            return stale
         try:
             backup_name = (
                 f"round_{current_round_number}_before_repairing"
@@ -218,10 +226,13 @@ def re_pair_round(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_staff_pairing_post
 @audit_pairing_generation(Round, "staff judge assignment")
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
+        if (stale := stale_round_response(request, current_round_number)) is not None:
+            return stale
         try:
             backup.backup_round(
                 round_number=current_round_number,
@@ -237,10 +248,13 @@ def assign_judges_to_pairing(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_staff_pairing_post
 @audit_pairing_generation(Round, "staff room assignment")
 def assign_rooms_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
+        if (stale := stale_round_response(request, current_round_number)) is not None:
+            return stale
         try:
             backup.backup_round(
                 round_number=current_round_number,

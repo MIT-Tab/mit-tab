@@ -149,7 +149,7 @@
 
   <form action="." method="post" class="mt-4">
     {% csrf_token %}
-    {% return_to_input %}{% if break_revision %}<input type="hidden" name="break_revision" value="{{ break_revision }}"><p><label><input type="checkbox" name="confirm" required> Replace the existing elimination rounds</label></p>{% endif %}
+    {% if current_round_number %}<input type="hidden" name="round" value="{{ current_round_number }}">{% endif %}{% return_to_input %}{% if break_revision %}<input type="hidden" name="break_revision" value="{{ break_revision }}"><p><label><input type="checkbox" name="confirm" required> Replace the existing elimination rounds</label></p>{% endif %}
     <p class="alert alert-warning">
       This action will attempt to pair the next round. If you have ignored the checks above,
       it may fail. Always back up first if you are unsure.

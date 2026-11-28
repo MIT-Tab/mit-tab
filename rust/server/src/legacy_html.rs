@@ -858,10 +858,10 @@ fn translate(name: &str, source: &str) -> String {
                 "{% if scratch_revision %}<input type=\"hidden\" name=\"mittab_scratch_revision\" value=\"{{ scratch_revision }}\">{% endif %}{% with redirect_target=return_path|default(request.path) %}{% include 'common/_return_to_input.html' %}{% endwith %}",
             ),
             ["return_to_input"] => output.push_str(
-                "{{ round_input|safe }}{% with redirect_target=return_path|default(request.path) %}{% include 'common/_return_to_input.html' %}{% endwith %}",
+                "{% with redirect_target=return_path|default(request.path) %}{% include 'common/_return_to_input.html' %}{% endwith %}",
             ),
             ["return_to_input", "request.path"] => output.push_str(
-                "{{ round_input|safe }}{% with redirect_target=request.path %}{% include 'common/_return_to_input.html' %}{% endwith %}",
+                "{% with redirect_target=request.path %}{% include 'common/_return_to_input.html' %}{% endwith %}",
             ),
             ["is_manual_judge_assignment", "pairing.id", "judge.id", "as", "is_manual_assignment"] => {
                 output.push_str("{% set is_manual_assignment = judge.manual_label %}");

@@ -17,7 +17,7 @@ from mittab.apps.tab.board_audit import (
     with_pairing_snapshot_relations,
 )
 from mittab.apps.tab.staff_pairing import (
-    correction_error, serialize_elimination_post, staff_elimination_correction,
+    correction_error, serialize_staff_pairing_post, staff_elimination_correction,
 )
 from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.apps.tab.live_results import published_team_placements
@@ -35,7 +35,7 @@ from mittab.libs.cacheing.public_cache import (
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-@serialize_elimination_post
+@serialize_staff_pairing_post
 @audit_pairing_generation(Outround, "staff outround pairing")
 def pair_next_outround(request, num_teams, type_of_round):
     challenge_num_teams = int(num_teams / 2)
@@ -350,7 +350,7 @@ def _existing_selected_specs(selected_specs):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-@serialize_elimination_post
+@serialize_staff_pairing_post
 @audit_pairing_generation(Outround, "staff break")
 def break_teams(request):
     if request.method == "POST":
@@ -921,7 +921,7 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     lambda user: user.has_perm("tab.tab_settings.can_change"),
     login_url="/403/", redirect_field_name=None,
 )
-@serialize_elimination_post
+@serialize_staff_pairing_post
 @audit_pairing_change(Outround, "staff outround result")
 def enter_result(request,
                  round_id,
@@ -1143,7 +1143,7 @@ def alternative_rooms(request, round_id, current_room_id=None):
     })
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-@serialize_elimination_post
+@serialize_staff_pairing_post
 @audit_pairing_generation(Outround, "staff judge assignment")
 def assign_judges_to_pairing(request, round_type=None):
     if request.method != "POST":
@@ -1184,7 +1184,7 @@ def assign_judges_to_pairing(request, round_type=None):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-@serialize_elimination_post
+@serialize_staff_pairing_post
 @audit_pairing_generation(Outround, "staff room assignment")
 def assign_rooms_to_pairing(request):
     if request.method != "POST":

@@ -92,7 +92,9 @@ pub async fn render(
     app: &App,
     actor: Actor,
     headers: &HeaderMap,
+    path: &str,
     selected: Option<i32>,
+    success: Option<String>,
 ) -> Result<Response, ChangeError> {
     // This projection contains judge calibration. Board uses its own pairing view.
     if !matches!(actor, Actor::User { board: false, .. }) {
@@ -114,11 +116,7 @@ pub async fn render(
     if selected.is_some() && !(1..=current).contains(&round_number) {
         return Ok(private((StatusCode::NOT_FOUND, "Round not found.")));
     }
-    let path = selected.map_or_else(
-        || "/pairings/status/".into(),
-        |round| format!("/round/{round}/"),
-    );
-    let shell = legacy_html::shell(&mut db, actor, &path).await?;
+    let shell = legacy_html::shell(&mut db, actor, path).await?;
     let mut round_info = pairings(&mut db, round_number).await?;
     sort_pairings(&mut db, &settings, round_number, &mut round_info).await?;
     let warnings = room_warnings(&mut db, round_number, &round_info).await?;
@@ -177,17 +175,20 @@ pub async fn render(
             )
         })
         .collect::<Vec<_>>();
+    let messages: Vec<_> = success
+        .into_iter()
+        .map(|text| context! { text, tags => "success", level => 25 })
+        .collect();
     let csrf = TemplateCsrf::new(headers).map_err(|_| ChangeError::Storage)?;
     let mut response = crate::staff_roster_notice::render(
         app,
         headers,
-        &path,
+        path,
         "pairing/pairing_control.html",
         shell,
         context! {
-            csrf_input => csrf.input(),
+            csrf_input => csrf.input(), messages,
             round_number, round_numbers,
-            round_input => format!("<input type=\"hidden\" name=\"round\" value=\"{round_number}\">"),
             warnings, round_info => &round_info,
             tot_rounds => settings.integer("tot_rounds", 5),
             pairing_released => settings.integer("pairing_released", 0) == 1,
