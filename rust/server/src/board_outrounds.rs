@@ -781,5 +781,9 @@ async fn correction(app: &App, actor: Actor, id: i32, form: Correction) -> Resul
     let settings = Settings::load(&mut db, publication::VISIBILITY_KEYS).await?;
     publication::refresh_placements(&mut db, &settings).await?;
     db.commit().await?;
+    app.public_cache.clear_bracket_data();
+    app.public_cache.evict_outround_publication(division);
+    app.public_cache
+        .evict(crate::public_cache::Page::Outrounds(1 - division));
     Ok(())
 }

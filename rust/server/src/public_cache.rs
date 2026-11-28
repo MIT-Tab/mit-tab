@@ -56,6 +56,17 @@ const OUTROUNDS: Dependency = (
     "tab_outround",
     "id, num_teams, type_of_round, victor, chair_id, gov_team_id, opp_team_id, room_id, sidelock, choice",
 );
+// Django keeps a rendered bracket warm after a ballot save. Visibility settings
+// and changes to the published pairings still invalidate the cache immediately.
+const OUTROUND_PAIRINGS: Dependency = (
+    "tab_outround",
+    "id, num_teams, type_of_round, chair_id, gov_team_id, opp_team_id, room_id, sidelock, choice",
+);
+const BRACKET_REVISION: &str = "COALESCE((SELECT a.id FROM tab_auditevent a
+    JOIN django_content_type t ON t.id = a.content_type_id
+    WHERE t.app_label = 'tab' AND t.model = 'outround'
+      AND a.changes->>'$.public.source' IN ('board correction', 'staff elimination pairing', 'board pairing')
+    ORDER BY a.id DESC LIMIT 1), 0)";
 const BYES: Dependency = ("tab_bye", "id, bye_team_id, round_number");
 const NO_SHOWS: Dependency = ("tab_noshow", "id, no_show_team_id, round_number");
 const SCORES: Dependency = (
@@ -141,7 +152,7 @@ impl Page {
                 MEMBERS,
                 DEBATERS,
                 ROUNDS,
-                OUTROUNDS,
+                OUTROUND_PAIRINGS,
                 ROOMS,
                 JUDGES,
                 ("tab_outround_judges", "id, outround_id, judge_id"),
@@ -281,6 +292,11 @@ impl Page {
                 ));
             }
         }
+        if matches!(self, Self::Outrounds(_)) {
+            // Pairing a stage or correcting a bracket on Board refreshes public
+            // results. The audit rows also let other processes detect it.
+            inputs.push(BRACKET_REVISION);
+        }
         if matches!(self, Self::Home) {
             inputs.push(
                 "COALESCE((SELECT allow_new_registrations AND
@@ -369,9 +385,15 @@ enum Lookup {
     Miss,
 }
 
+struct BracketEntry {
+    expires: Instant,
+    data: Option<String>,
+}
+
 #[derive(Default)]
 struct CacheState {
     entries: HashMap<Key, Entry>,
+    brackets: HashMap<String, BracketEntry>,
     generations: HashMap<Page, u64>,
 }
 
@@ -390,6 +412,55 @@ impl PublicCache {
             cache.entries.retain(|key, _| key.page != page);
             *cache.generations.entry(page).or_default() += 1;
         }
+    }
+
+    pub fn evict_outround_publication(&self, division: i32) {
+        for page in [Page::Outrounds(division), Page::Home, Page::TabCards] {
+            self.evict(page);
+        }
+    }
+
+    pub fn clear_bracket_data(&self) {
+        if let Ok(mut cache) = self.0.lock() {
+            cache.brackets.clear();
+        }
+    }
+
+    pub fn bracket_data(
+        &self,
+        key: String,
+        render: impl FnOnce() -> Option<String>,
+    ) -> Option<String> {
+        let now = Instant::now();
+        if let Ok(cache) = self.0.lock()
+            && let Some(entry) = cache.brackets.get(&key).filter(|entry| entry.expires > now)
+        {
+            return entry.data.clone();
+        }
+
+        let data = render();
+        if let Ok(mut cache) = self.0.lock() {
+            const MAX_BRACKETS: usize = 32;
+            const MAX_BRACKET_BYTES: usize = 1024 * 1024;
+            if key.len() <= MAX_BRACKET_BYTES
+                && data
+                    .as_ref()
+                    .is_none_or(|json| json.len() <= MAX_BRACKET_BYTES)
+            {
+                let brackets = &mut cache.brackets;
+                brackets.retain(|_, entry| entry.expires > now);
+                if brackets.len() < MAX_BRACKETS {
+                    use ring::rand::SecureRandom;
+                    let mut jitter = [0u8];
+                    let _ = ring::rand::SystemRandom::new().fill(&mut jitter);
+                    brackets.entry(key).or_insert_with(|| BracketEntry {
+                        expires: now + Duration::from_secs(60 + u64::from(jitter[0] % 21)),
+                        data: data.clone(),
+                    });
+                }
+            }
+        }
+        data
     }
 
     fn generation(&self, page: Page) -> Option<u64> {
@@ -442,6 +513,14 @@ impl PublicCache {
         }
         cache.insert(key, entry);
     }
+}
+
+pub async fn bracket_revision(db: &mut MySqlConnection) -> Result<i64, sqlx::Error> {
+    QueryBuilder::<MySql>::new("SELECT ")
+        .push(BRACKET_REVISION)
+        .build_query_scalar()
+        .fetch_one(db)
+        .await
 }
 
 pub async fn render(

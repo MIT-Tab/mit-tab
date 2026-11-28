@@ -13,7 +13,7 @@ use sqlx::MySqlConnection;
 use crate::{
     App, access, bracket_display, legacy_html,
     legacy_session::Actor,
-    public_cache::{self, Page},
+    public_cache::{self, Page, PublicCache},
     public_pairings::{Team, navigation, paired_teams},
     settings::Settings,
 };
@@ -127,8 +127,9 @@ pub async fn page(
     if !matches!(division, 0 | 1) {
         return crate::private((StatusCode::NOT_FOUND, "Division not found."));
     }
+    let cache = app.cache_public_pages.then_some(app.public_cache.as_ref());
     public_cache::render(&app, actor, Page::Outrounds(division), async |db| {
-        render(db, actor, division).await
+        render(db, actor, division, cache).await
     })
     .await
 }
@@ -137,6 +138,7 @@ async fn render(
     db: &mut MySqlConnection,
     actor: Actor,
     division: i32,
+    cache: Option<&PublicCache>,
 ) -> Result<Response, sqlx::Error> {
     let settings = Settings::load(db, SETTINGS).await?;
     let varsity = settings.integer("var_teams_visible", 256);
@@ -172,6 +174,7 @@ async fn render(
         };
         eliminated.extend(loser);
     }
+    let mut advancing_by_stage = Vec::new();
     let outround_pairings: Vec<_> = by_stage
         .into_iter()
         .rev()
@@ -186,6 +189,7 @@ async fn render(
                 .map(|(_, team)| *team)
                 .filter(|team| !present.contains(&team.id) && !eliminated.contains(&team.id))
                 .collect();
+            advancing_by_stage.push(excluded.iter().map(|team| team.id).collect::<Vec<_>>());
             let rounds: Vec<_> = matches.into_iter().map(Match::display).collect();
             let division_label = if division == 0 { 'V' } else { 'N' };
             context! {label => format!("[{division_label}] Ro{size}"), rounds, excluded}
@@ -195,7 +199,32 @@ async fn render(
         && settings.integer("outround_pairing_mode", 0) != 1;
     let bracket_data_json = if show_outrounds_bracket {
         let seeded = breaking.into_iter().collect();
-        bracket_display::data(&matches, &seeded)
+        if let Some(cache) = cache {
+            // The embedded bracket has its own cache in Django. Keep outcome
+            // changes warm for the same draw, even when the surrounding page
+            // is re-rendered. Key public names and panels so stale data never
+            // bypasses changes to their visibility.
+            let matchups: Vec<_> = matches
+                .iter()
+                .map(|row| {
+                    (
+                        row.id,
+                        row.size,
+                        row.gov.id,
+                        row.opp.id,
+                        &row.room,
+                        &row.judges,
+                    )
+                })
+                .collect();
+            let revision = public_cache::bracket_revision(db).await?;
+            let key =
+                serde_json::to_string(&(division, revision, &seeded, matchups, advancing_by_stage))
+                    .map_err(|error| sqlx::Error::Protocol(error.to_string()))?;
+            cache.bracket_data(key, || bracket_display::data(&matches, &seeded))
+        } else {
+            bracket_display::data(&matches, &seeded)
+        }
     } else {
         None
     };

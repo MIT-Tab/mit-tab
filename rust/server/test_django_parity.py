@@ -3379,6 +3379,94 @@ def test_native_public_outrounds_match_the_visible_django_bracket_payload(html_a
 
 
 @pytest.mark.django_db(transaction=True)
+def test_public_outround_cache_matches_django_after_ballot_and_release(html_assets):
+    from mittab.libs.cacheing.public_cache import invalidate_outround_public_pairings_cache
+
+    for key, value in {"cur_round": 2, "tot_rounds": 1, "var_teams_visible": 2}.items():
+        TabSettings.set(key, value)
+    school = School.objects.create(name="Cache School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0)
+                for name in ("Final Government", "Final Opposition")]
+    for seed, team in enumerate((gov, opp), start=1):
+        BreakingTeam.objects.create(team=team, type_of_team=Outround.VARSITY, seed=seed, effective_seed=seed)
+    final = Outround.objects.create(num_teams=2, gov_team=gov, opp_team=opp)
+    staff = legacy_tab_session("warm-bracket-staff")
+    board = legacy_tab_session("warm-bracket-board")
+    get_user_model().objects.get(username="warm-bracket-board").groups.add(Group.objects.create(name="APDA Board"))
+    path = "/public/outrounds/0/"
+    anon = Client()
+    ref_board = Client()
+    ref_board.cookies["sessionid"] = board
+    ref_staff = Client()
+    ref_staff.cookies["sessionid"] = staff
+    csrf = "a" * 32
+
+    with rust_server(overrides=html_assets) as port, rust_server(overrides=html_assets) as peer:
+        def post(path, fields):
+            return request(port, path, method="POST",
+                           extra_headers={"Cookie": f"sessionid={staff}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        warm = {}
+        for cookie, reference in ((None, anon), (staff, ref_staff)):
+            # Django initializes public display settings on its first request.
+            expected = reference.get(path).content
+            status, _, body = request(port, path, cookie=cookie)
+            assert status == 200
+            assert_html_bytes(body, expected)
+            warm[cookie] = body
+
+        assert_html_bytes(request(peer, path)[2], warm[None])
+        board_before = request(port, path, cookie=board)[2]
+        assert_html_bytes(board_before, ref_board.get(path).content)
+        assert post(f"/outround/{final.id}/result/", {"winner": Outround.OPP, "round_instance": final.id})[0] == 302
+        final.refresh_from_db()
+        assert final.victor == Outround.OPP
+        for cookie, reference in ((None, anon), (staff, ref_staff)):
+            assert_html_bytes(reference.get(path).content, warm[cookie])
+            assert request(port, path, cookie=cookie)[2] == warm[cookie], (
+                "The warm Tab cache refreshed after a ballot" if cookie else
+                "The warm anonymous cache refreshed after a ballot"
+            )
+
+        status, headers, current = request(port, path, cookie=board)
+        assert status == 200 and headers["Cache-Control"] == "private, no-store"
+        assert_html_bytes(current, ref_board.get(path).content)
+        assert_html_bytes(current, board_before)
+        release = "/outround_pairing/release/2/0/"
+        assert not json.loads(post(release, {})[2])["pairing_released"]
+        assert request(port, path)[1]["Location"] == "/public/access-error/"
+        assert json.loads(post(release, {})[2])["pairing_released"]
+        invalidate_outround_public_pairings_cache(Outround.VARSITY)
+        refreshed = request(port, path)[2]
+        # Reopening the same draw refreshes the page, while Django can still
+        # reuse the embedded bracket until that separate entry expires.
+        assert_html_bytes(refreshed, warm[None])
+        assert_html_bytes(refreshed, anon.get(path).content)
+        assert_html_bytes(request(peer, path)[2], refreshed)
+
+        correction_path = f"/apda-board/outround/{final.id}/"
+        edit = request(port, "/apda-board/outrounds/", cookie=board)[2]
+        revision = re.search(
+            rb'action="' + re.escape(correction_path.encode()) +
+            rb'"[^>]*>\s*<input[^>]*>\s*<input type="hidden" name="revision" value="([^"]+)"', edit,
+        )[1].decode()
+        corrected = request(port, correction_path, method="POST",
+                            extra_headers={"Cookie": f"sessionid={board}; csrftoken={csrf}"},
+                            form={"csrfmiddlewaretoken": csrf, "action": "result",
+                                  "revision": revision, "victor": Outround.GOV})
+        assert corrected[0] == 302
+        final.refresh_from_db()
+        assert final.victor == Outround.GOV
+        from mittab.apps.tab.board_operations import invalidate_results
+        invalidate_results()
+        expected = anon.get(path).content
+        assert expected != refreshed
+        assert_html_bytes(request(port, path)[2], expected)
+        assert_html_bytes(request(peer, path)[2], expected)
+
+
+@pytest.mark.django_db(transaction=True)
 def test_public_preliminary_pairings_and_missing_ballots_match_django_bytes(html_assets, subtests):
     path = "/public/pairings/"
     missing_path = "/public/missing-ballots/"

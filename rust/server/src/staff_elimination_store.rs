@@ -638,6 +638,7 @@ pub async fn pair_next(app: &App, user: i32, prior: Stage) -> Result<Stage, Erro
     board_snapshot::audit_pairings(&mut db, &before, &after, user, "staff elimination pairing")
         .await?;
     db.commit().await?;
+    app.public_cache.evict_outround_publication(prior.division);
     Ok(target)
 }
 
@@ -756,6 +757,7 @@ pub async fn release(app: &App, stage: Stage) -> Result<bool, Error> {
     let after = Settings::load(&mut db, &VISIBILITY).await?;
     publication::refresh_placements(&mut db, &after).await?;
     db.commit().await?;
+    app.public_cache.evict_outround_publication(stage.division);
     Ok(publish)
 }
 
