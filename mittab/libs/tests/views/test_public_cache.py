@@ -1,4 +1,6 @@
 # pylint: disable=W0212
+import random
+
 import pytest
 from django.core.cache import caches
 from django.test import TestCase, Client
@@ -12,6 +14,21 @@ from mittab.libs.cacheing.public_cache import (
     invalidate_outround_public_pairings_cache,
     invalidate_public_rankings_cache,
 )
+
+
+def test_cache_miss_preserves_the_pairing_random_state(settings):
+    settings.CACHES = {"default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "cache-miss-preserves-pairing-random-state",
+    }}
+
+    @cache_logic.cache(seconds=20, stampede=20)
+    def result():
+        return "cached"
+
+    state = random.getstate()
+    assert result() == "cached"
+    assert random.getstate() == state
 
 
 @pytest.mark.django_db(transaction=True)

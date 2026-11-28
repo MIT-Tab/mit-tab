@@ -318,11 +318,6 @@ fn target(settings: &Settings, repair: bool) -> Result<i32, ChangeError> {
     if round < 1 {
         return Err(ChangeError::Conflict("No round has been paired yet."));
     }
-    if round > settings.integer("tot_rounds", 5) {
-        return Err(ChangeError::Conflict(
-            "All scheduled preliminary rounds have been paired.",
-        ));
-    }
     Ok(round)
 }
 

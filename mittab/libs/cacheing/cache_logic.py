@@ -1,6 +1,6 @@
 # Caching decorator taken from http://djangosnippets.org/snippets/564/
 from hashlib import sha1
-import random
+from random import SystemRandom
 
 from django.core.cache import caches
 
@@ -8,6 +8,9 @@ CACHE_TIMEOUT = 20
 
 DEFAULT = "default"
 PERSISTENT = "filesystem"
+
+# Cache hits must not affect the seeded pairing tie-breaks.
+_cache_random = SystemRandom()
 
 
 def cache_fxn_key(fxn, key, cache_name, *args, **kwargs):
@@ -58,7 +61,7 @@ def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT):
             if result is None:
                 result = f(*args, **kwargs)
                 caches[DEFAULT].set(key, result,
-                                    random.randint(seconds, seconds + stampede))
+                                    _cache_random.randint(seconds, seconds + stampede))
             return result
 
         return wrapper

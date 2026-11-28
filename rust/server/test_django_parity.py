@@ -12,7 +12,6 @@ import http.client
 from http.cookies import SimpleCookie
 import json
 import os
-import random
 import re
 from pathlib import Path
 import subprocess
@@ -301,6 +300,7 @@ def test_backup_listing_html_matches_django_bytes(html_assets, tmp_path):
         "pairings empty",
         "pairings prepare",
         "pairings prepare pending",
+        "pairings after scheduled rounds",
         "pairings repair",
         "pairings team choices",
         "pairings room choices",
@@ -320,6 +320,8 @@ def test_backup_listing_html_matches_django_bytes(html_assets, tmp_path):
 def test_staff_screenshot_html_matches_django_bytes(html_assets, screen):
     TabSettings.set("start_tournament_wizard_completed", 1)
     TabSettings.set("cur_round", 2)
+    if screen == "pairings after scheduled rounds":
+        TabSettings.set("tot_rounds", 1)
     school = School.objects.create(name="Example Debate Club")
     first = Team.objects.create(name="North Debate", school=school, seed=Team.UNSEEDED)
     second = Team.objects.create(name="South Debate", school=school, seed=Team.UNSEEDED)
@@ -399,6 +401,7 @@ def test_staff_screenshot_html_matches_django_bytes(html_assets, screen):
         "pairings empty": "/pairings/status/",
         "pairings prepare": "/pairing/pair_round/",
         "pairings prepare pending": "/pairing/pair_round/",
+        "pairings after scheduled rounds": "/pairing/pair_round/",
         "pairings repair": "/pairing/re_pair_round/",
         "pairings team choices": f"/round/{debate.id}/{first.id}/alternative_teams/gov/",
         "pairings room choices": f"/round/{debate.id}/alternative_rooms/{getattr(debate, 'room_id', None)}/",
@@ -1464,9 +1467,7 @@ def round_signature(number):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path, monkeypatch):
-    # Old cache expiry jitter draws from the same generator as side assignment.
-    monkeypatch.setattr(cache_logic, "random", random.Random(1234))
+def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
     tab = legacy_tab_session("pairing-staff")
     board = legacy_tab_session("pairing-board")
     board_user = get_user_model().objects.get(username="pairing-board")
@@ -1597,12 +1598,27 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path, monkeypatch)
         assert post(pair_page, round_number=2)[0] == 302
         assert round_signature(2) == expected_second
         Round.objects.filter(round_number=2).update(victor=Round.GOV)
+        assert request(port, pair_page, cookie=tab)[0] == 200
+        assert post(pair_page, round_number=3)[0] == 409
+        assert round_signature(3) == ([], [], [])
+        for judge, room in zip(judges, rooms):
+            CheckIn.objects.create(judge=judge, round_number=3)
+            RoomCheckIn.objects.create(room=room, round_number=3)
+        caches["default"].clear()
+        caches["filesystem"].clear()
+        with transaction.atomic():
+            assert TabSettings.get("cur_round") == 3
+            tab_logic.pair_round()
+            expected_extra = round_signature(3)
+            transaction.set_rollback(True)
+        assert post(pair_page, round_number=3)[0] == 302
+        assert round_signature(3) == expected_extra
         for path in (pair_page, repair_page, room_page, release_page, status_page):
             assert request(port, path, cookie=board)[1]["Location"] == "/403/"
             assert post(path, session=board, round_number=2)[1]["Location"] == "/403/"
 
     backups = list(backup_dir.glob("*.dump.sql"))
-    assert len(backups) == 4
+    assert len(backups) == 5
     assert not list(backup_dir.glob(".backup-*"))
     assert all(path.stat().st_mode & 0o777 == 0o600 for path in backups)
     for path in backups:
@@ -1641,8 +1657,7 @@ def test_simultaneous_all_bye_pairing_cannot_advance_two_rounds(tmp_path):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_native_judge_assignment_matches_django_for_all_prelim_modes(tmp_path, monkeypatch):
-    monkeypatch.setattr(cache_logic, "random", random.Random(1234))
+def test_native_judge_assignment_matches_django_for_all_prelim_modes(tmp_path):
     tab = legacy_tab_session("assignment-staff")
     TabSettings.set("cur_round", 3)
     schools = [School.objects.create(name=f"Assignment School {i}") for i in range(4)]
