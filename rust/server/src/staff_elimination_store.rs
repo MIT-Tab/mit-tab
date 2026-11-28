@@ -1,16 +1,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use axum::http::HeaderMap;
 use mittab_tabulation::outrounds::{self, Seed, SeedBasis};
 use serde::Serialize;
 use serde_json::json;
 use sqlx::MySqlConnection;
 
 use crate::{
-    App,
+    App, access,
     board::BoardError,
     board_outrounds,
     board_snapshot::{self, Pairings, Snapshot},
-    entity_store, publication,
+    entity_store,
+    legacy_session::Actor,
+    publication,
     settings::{self, SettingValue, Settings},
     staff_pairing::lock_round,
 };
@@ -40,6 +43,7 @@ const PAIRING_PUBLIC: [&str; 2] = ["var_outrounds_public", "nov_outrounds_public
 pub enum Error {
     Invalid(&'static str),
     Assignment(String),
+    Denied,
     Missing,
     Database,
 }
@@ -763,7 +767,8 @@ pub async fn release(app: &App, stage: Stage) -> Result<bool, Error> {
 
 pub async fn ballot(
     app: &App,
-    user: i32,
+    actor: Actor,
+    headers: &HeaderMap,
     id: i32,
     winner: i32,
     revision: &str,
@@ -773,6 +778,11 @@ pub async fn ballot(
     }
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
+    let user = match access::settings_actor(&mut db, app, actor, headers).await {
+        Ok(Actor::User { id, .. }) => id,
+        Err(access::PortalAccessError::Database) => return Err(Error::Database),
+        _ => return Err(Error::Denied),
+    };
     let before = board_snapshot::capture(&mut db, Pairings::Outround).await?;
     let original = before.get(&id).cloned().ok_or(Error::Missing)?;
     if !revision.is_empty() && revision != original.revision() {

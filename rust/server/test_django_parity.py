@@ -7474,8 +7474,6 @@ def test_elimination_staff_and_board_pages_match_django_bytes(html_assets, subte
         # Native staff forms include a revision so stale saves can be rejected.
         if path.startswith("/outround_pairing/") and "/pair/" not in path:
             body = re.sub(rb' data-revision="[a-f0-9]{64}"', b"", body)
-        elif "/result/" in path:
-            body = re.sub(rb'<input type="hidden" name="revision" value="[a-f0-9]+">', b"", body)
         assert_html_bytes(body, reference.content)
         return body
 
@@ -7499,6 +7497,107 @@ def test_elimination_staff_and_board_pages_match_django_bytes(html_assets, subte
             _, _, after = request(port, board_path, extra_headers={"Cookie": f"sessionid={board}; csrftoken=" + "a" * 32})
             strip_token = lambda body: re.sub(rb'name="csrfmiddlewaretoken" value="[A-Za-z0-9]{64}"', b'name="csrfmiddlewaretoken"', body)
             assert strip_token(before) == strip_token(after)
+
+        with subtests.test(case="staff ballot errors"):
+            ballot = f"/outround/{var.id}/result/"
+            token = re.search(rb'name="revision" value="([0-9a-f]{64})"', compare(port, ballot, staff))[1].decode()
+            csrf = "a" * 32
+            headers = {"Cookie": f"sessionid={staff}; csrftoken={csrf}"}
+            client = Client()
+            client.cookies["sessionid"] = staff
+            client.cookies["csrftoken"] = csrf
+            Outround.objects.filter(pk=var.id).update(choice=Outround.OPP)
+
+            def rejected(path, fields, message):
+                status, _, body = request(port, path, method="POST", extra_headers=headers,
+                                          form={"csrfmiddlewaretoken": csrf, **fields})
+                mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)[1][:32]
+                with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask.decode()):
+                    reference = client.post(path, fields)
+                assert status == reference.status_code == 422
+                assert message in body
+                assert_html_bytes(body, reference.content)
+
+            for changes, error in (
+                ({}, b"This pairing changed. Reload it before saving."),
+                ({"round_instance": ended.id}, b"The ballot specifies a different debate."),
+                ({"winner": 0}, b"Select a winner."),
+            ):
+                fields = {"round_instance": var.id, "winner": Outround.GOV, "revision": token, **changes}
+                rejected(ballot, fields, error)
+                assert Outround.objects.get(pk=var.id).victor == Outround.UNKNOWN
+
+            later = Outround.objects.create(num_teams=2, gov_team=ended.opp_team, opp_team=var.gov_team)
+            rejected(f"/outround/{ended.id}/result/",
+                     {"round_instance": ended.id, "winner": Outround.GOV},
+                     b"Re-pair the later stage before changing its qualifying team.")
+            assert Outround.objects.get(pk=ended.id).victor == Outround.OPP
+            later.delete()
+
+            unseeded = Team.objects.create(name="Unseeded semifinal entrant", school=school, seed=0)
+            missing_seed = Outround.objects.create(num_teams=4, gov_team=teams[0], opp_team=unseeded)
+            rejected(f"/outround/{missing_seed.id}/result/",
+                     {"round_instance": missing_seed.id, "winner": Outround.GOV},
+                     b"Both teams must have a break seed.")
+            assert Outround.objects.get(pk=missing_seed.id).victor == Outround.UNKNOWN
+            missing_seed.delete()
+
+            Outround.objects.filter(pk=var.id).update(choice=Outround.GOV)
+            fields = {"round_instance": var.id, "winner": Outround.GOV, "revision": token}
+            viewer = Client()
+            viewer.force_login(get_user_model().objects.create_user(username="ordinary-ballot-viewer"))
+            viewer_cookie = viewer.cookies["sessionid"].value
+            assert viewer.post(ballot, fields)["Location"] == "/403/"
+            assert request(port, ballot, method="POST", cookie=viewer_cookie,
+                           form=fields)[1]["Location"] == "/403/"
+
+            # The Django request must check its revision after
+            # taking the same lock as staff elimination pairing.
+            def django_post(candidate):
+                from django.db import connections
+
+                try:
+                    return candidate.post(ballot, fields)
+                finally:
+                    connections.close_all()
+
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                with transaction.atomic():
+                    TabSettings.objects.select_for_update().filter(key="cur_round").get()
+                    queued = pool.submit(django_post, client)
+                    with pytest.raises(FutureTimeout):
+                        queued.result(timeout=0.5)
+                    Outround.objects.filter(pk=var.id).update(choice=Outround.OPP)
+                response = queued.result()
+                assert response.status_code == 422
+                assert b"This pairing changed. Reload it before saving." in response.content
+            assert Outround.objects.get(pk=var.id).victor == Outround.UNKNOWN
+            Outround.objects.filter(pk=var.id).update(choice=Outround.GOV)
+
+            from django.contrib.sessions.models import Session
+
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                for runtime in ("django", "rust"):
+                    session = legacy_tab_session(f"queued-ballot-{runtime}")
+                    candidate = Client()
+                    candidate.cookies["sessionid"] = session
+                    with transaction.atomic():
+                        TabSettings.objects.select_for_update().filter(key="cur_round").get()
+                        if runtime == "django":
+                            queued = pool.submit(django_post, candidate)
+                        else:
+                            queued = pool.submit(
+                                request, port, ballot, method="POST",
+                                extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                                form={"csrfmiddlewaretoken": csrf, **fields},
+                            )
+                        with pytest.raises(FutureTimeout):
+                            queued.result(timeout=0.5)
+                        Session.objects.filter(session_key=session).delete()
+                    response = queued.result()
+                    location = response["Location"] if runtime == "django" else response[1]["Location"]
+                    assert location == "/403/"
+                    assert Outround.objects.get(pk=var.id).victor == Outround.UNKNOWN
 
         with subtests.test(case="stale staff correction"):
             csrf = "a" * 32

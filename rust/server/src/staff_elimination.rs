@@ -74,6 +74,7 @@ fn error(error: Error) -> Response {
     match error {
         Error::Invalid(message) => private((StatusCode::UNPROCESSABLE_ENTITY, message)),
         Error::Assignment(message) => private((StatusCode::UNPROCESSABLE_ENTITY, message)),
+        Error::Denied => access::access_denied(),
         Error::Missing => private((StatusCode::NOT_FOUND, "Elimination stage not found.")),
         Error::Database => unavailable(),
     }
@@ -523,15 +524,16 @@ async fn ballot_submit(
     if !checked(&headers, &fields) {
         return login::csrf_error();
     }
-    let Some(user) = user(actor) else {
+    if user(actor).is_none() {
         return access::access_denied();
-    };
+    }
     let same = fields.get("round_instance").is_empty()
         || fields.get("round_instance").parse::<i32>() == Ok(id);
     let result = if same {
         store::ballot(
             &app,
-            user,
+            actor,
+            &headers,
             id,
             fields.get("winner").parse().unwrap_or(0),
             fields.get("revision"),

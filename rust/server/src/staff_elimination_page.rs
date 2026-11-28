@@ -559,19 +559,13 @@ pub async fn ballot(
     let hidden = [Value::from_safe_string(format!(
         "<input type=\"hidden\" name=\"round_instance\" value=\"{id}\" id=\"id_round_instance\">"
     ))];
-    let revision_input = format!(
-        "<input type=\"hidden\" name=\"revision\" value=\"{}\">",
-        pairing.revision()
-    );
     let mut response = legacy_html::render(
         "outrounds/ballot.html",
         shell,
         context! {
             title => format!("Entering Ballot for Outround {size} between {} and {}", gov.name, opp.name),
-            csrf_input => csrf.input(), round_input => revision_input, form => context! {
-                hidden_fields => hidden, errors => usize::from(message.is_some()),
-                non_field_errors => message,
-            },
+            csrf_input => csrf.input(), pairing_revision => pairing.revision(), pairing_error => message,
+            form => context! { hidden_fields => hidden },
             widgets => context! { winner => context! {
                 field => context! { label_tag => Value::from_safe_string("<label for=\"id_winner\">Which team won the round?</label>".into()) },
                 input => select,

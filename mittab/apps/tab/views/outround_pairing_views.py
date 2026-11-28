@@ -1,19 +1,23 @@
 import random
 import math
+from functools import wraps
+from types import SimpleNamespace
 from urllib.parse import urlencode
 
 from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
-from django.contrib.auth.decorators import permission_required
+from django.http import HttpResponse, JsonResponse
+from django.contrib.auth import get_user
+from django.contrib.auth.decorators import permission_required, user_passes_test
 from django.db import transaction
 from django.db.models import Q, Exists, OuterRef, Min
 from django.shortcuts import redirect, reverse
 
+from mittab.apps.tab.auth_roles import is_apda_board_user, is_restricted_staff_user
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.apps.tab.board_audit import (
-    audit_pairing_change, audit_pairing_generation, manual_team_edits,
+    audit_pairing_change, audit_pairing_generation, manual_team_edits, pairing_revision,
 )
 from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.apps.tab.live_results import published_team_placements
@@ -30,7 +34,32 @@ from mittab.libs.cacheing.public_cache import (
 )
 
 
+def serialize_elimination_post(view):
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        if request.method != "POST":
+            return view(request, *args, **kwargs)
+        with transaction.atomic():
+            # Match the tournament lock used by staff ballot entry and advancement.
+            lock_id = (TabSettings.objects.select_for_update().filter(key="cur_round")
+                       .order_by("id").values_list("id", flat=True).first())
+            if lock_id is None:
+                return HttpResponse("Unable to complete this request.", status=503,
+                                    content_type="text/plain; charset=utf-8",
+                                    headers={"Cache-Control": "private, no-store"})
+            session = type(request.session)(session_key=request.session.session_key)
+            actor = get_user(SimpleNamespace(session=session))
+            if (not actor.is_authenticated or actor.pk != request.user.pk
+                    or is_apda_board_user(actor) or is_restricted_staff_user(actor)
+                    or not actor.has_perm("tab.tab_settings.can_change")):
+                return redirect("/403/")
+            request.user = actor
+            return view(request, *args, **kwargs)
+    return wrapped
+
+
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@serialize_elimination_post
 @audit_pairing_generation(Outround, "staff outround pairing")
 def pair_next_outround(request, num_teams, type_of_round):
     challenge_num_teams = int(num_teams / 2)
@@ -89,7 +118,7 @@ def pair_next_outround(request, num_teams, type_of_round):
             Outround.objects.filter(num_teams__lt=num_teams,
                                     type_of_round=type_of_round).delete()
             outround_tab_logic.pair(type_of_round)
-        invalidate_outround_public_pairings_cache(type_of_round)
+        transaction.on_commit(lambda: invalidate_outround_public_pairings_cache(type_of_round))
 
         return redirect_and_flash_success(
             request, "Success!", path=reverse("outround_pairing_view",
@@ -911,6 +940,11 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     return JsonResponse(data)
 
 
+@user_passes_test(
+    lambda user: user.has_perm("tab.tab_settings.can_change"),
+    login_url="/403/", redirect_field_name=None,
+)
+@serialize_elimination_post
 @audit_pairing_change(Outround, "staff outround result")
 def enter_result(request,
                  round_id,
@@ -924,20 +958,41 @@ def enter_result(request,
                               "type_of_round": round_obj.type_of_round
                           })
 
+    revision = pairing_revision(round_obj)
+    pairing_error = None
     if request.method == "POST":
-        form = form_class(request.POST, round_instance=round_obj)
-        if form.is_valid():
-            try:
-                form.save()
-            except ValueError:
-                return redirect_and_flash_error(
-                    request, "Invalid round result, could not remedy.")
-            return redirect_and_flash_success(request,
-                                              "Result entered successfully",
-                                              path=redirect_to)
-    else:
-        form_kwargs = {"round_instance": round_obj}
-        form = form_class(**form_kwargs)
+        target = request.POST.get("round_instance")
+        winner = request.POST.get("winner")
+        submitted_revision = request.POST.get("revision")
+        if target and target != str(round_obj.pk):
+            pairing_error = "The ballot specifies a different debate."
+        elif winner not in {"1", "2", "3", "4"}:
+            pairing_error = "Select a winner."
+        elif submitted_revision and submitted_revision != revision:
+            pairing_error = "This pairing changed. Reload it before saving."
+        elif round_obj.winner and round_obj.victor % 2 != int(winner) % 2 and Outround.objects.filter(
+            Q(gov_team=round_obj.winner) | Q(opp_team=round_obj.winner),
+            type_of_round=round_obj.type_of_round, num_teams__lt=round_obj.num_teams,
+        ).exists():
+            pairing_error = "Re-pair the later stage before changing its qualifying team."
+        elif BreakingTeam.objects.filter(
+            type_of_team=round_obj.type_of_round, team_id__in=(round_obj.gov_team_id, round_obj.opp_team_id),
+        ).count() != 2:
+            pairing_error = "Both teams must have a break seed."
+        else:
+            data = request.POST.copy()
+            data["round_instance"] = round_obj.pk
+            form = form_class(data, round_instance=round_obj)
+            if form.is_valid():
+                try:
+                    form.save()
+                except ValueError:
+                    return redirect_and_flash_error(
+                        request, "Invalid round result, could not remedy.")
+                return redirect_and_flash_success(
+                    request, "Result entered successfully", path=redirect_to)
+    if request.method != "POST" or pairing_error:
+        form = form_class(round_instance=round_obj)
 
     return render(
         request, "outrounds/ballot.html", {
@@ -945,7 +1000,9 @@ def enter_result(request,
             "title": f"Entering Ballot for {round_obj}",
             "gov_team": round_obj.gov_team,
             "opp_team": round_obj.opp_team,
-        })
+            "pairing_revision": revision,
+            "pairing_error": pairing_error,
+        }, status=422 if pairing_error else 200)
 
 
 
