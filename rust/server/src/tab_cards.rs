@@ -592,11 +592,23 @@ async fn board_page(
     ))
 }
 
-pub async fn bundle(State(app): State<App>, headers: HeaderMap) -> Response {
+pub async fn bundle(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+) -> Response {
     let label = crate::legacy_archive::tournament_slug(&headers);
     let exported_at = Utc::now().to_rfc3339();
+    let Ok(mut db) = app.db.begin().await else {
+        return unavailable();
+    };
+    if let Err(error) =
+        current_actor(&mut db, &app, actor, &headers, "/archive/black_rod_bundle/").await
+    {
+        drop(db);
+        return error.response(&app, &headers).await;
+    }
     let result = async {
-        let mut db = app.db.begin().await?;
         let payload = crate::bundle::export(&mut db, label, &exported_at).await?;
         db.commit().await?;
         let attachment = HeaderValue::from_str(&format!(

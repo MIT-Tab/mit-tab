@@ -404,6 +404,17 @@ pub(super) async fn refreshed_user(
     }
 }
 
+pub(super) async fn current_board(
+    db: &mut MySqlConnection,
+    app: &App,
+    original: Actor,
+    headers: &HeaderMap,
+) -> Result<Actor, PortalAccessError> {
+    let actor = refreshed_user(db, app, original, headers).await?;
+    require_open_board(db, actor).await?;
+    Ok(actor)
+}
+
 pub(super) async fn require_open_board(
     db: &mut MySqlConnection,
     actor: Actor,

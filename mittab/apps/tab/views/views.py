@@ -270,7 +270,7 @@ def apda_board_school_detail(request, school_id):
     if request.method == "POST":
         form = SchoolApdaIdForm(request.POST, instance=school)
         if form.is_valid():
-            form.save()
+            School.objects.filter(pk=school.pk).update(apda_id=form.cleaned_data["apda_id"])
             return redirect_and_flash_success(
                 request,
                 f"APDA ID updated for {school.name}.",
@@ -306,7 +306,7 @@ def apda_board_debater_detail(request, debater_id):
     if request.method == "POST":
         form = DebaterApdaIdForm(request.POST, instance=debater)
         if form.is_valid():
-            form.save()
+            Debater.objects.filter(pk=debater.pk).update(apda_id=form.cleaned_data["apda_id"])
             return redirect_and_flash_success(
                 request,
                 f"APDA ID updated for {debater.name}.",

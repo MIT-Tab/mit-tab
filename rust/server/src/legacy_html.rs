@@ -557,6 +557,18 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/common/_quick_search.html"),
         ),
         (
+            "apda_board/home.html",
+            include_str!("../../../mittab/templates/apda_board/home.html"),
+        ),
+        (
+            "apda_board/school_detail.html",
+            include_str!("../../../mittab/templates/apda_board/school_detail.html"),
+        ),
+        (
+            "apda_board/debater_detail.html",
+            include_str!("../../../mittab/templates/apda_board/debater_detail.html"),
+        ),
+        (
             "apda_board/outrounds.html",
             include_str!("../../../mittab/templates/apda_board/outrounds.html"),
         ),
@@ -783,6 +795,12 @@ fn translate(name: &str, source: &str) -> String {
                 output.push_str("/apda-board/tab-card/{{ item.id }}/");
             }
             ["static", "'css/tab-cards-print.css'"] => output.push_str("/static/css/tab-cards-print.css"),
+            ["url", "'apda_board_school_detail'", id @ ("school_id" | "team.school.id")] => {
+                output.push_str(&format!("/apda-board/school/{{{{ {id} }}}}/"));
+            }
+            ["url", "'apda_board_debater_detail'", id @ ("debater_id" | "debater.id")] => {
+                output.push_str(&format!("/apda-board/debater/{{{{ {id} }}}}/"));
+            }
             ["url", "'board_inrounds'", "number"] => {
                 output.push_str("/apda-board/inrounds/{{ number }}/");
             }
@@ -1006,7 +1024,7 @@ fn translate(name: &str, source: &str) -> String {
         "ui/form.html" => translated
             .replace("field|uses_file_input", "field.is_file")
             .replace("{{ field }}", "{{ field.input|safe }}"),
-        "tab/school_detail.html" => translated.replace("team.debaters.all", "team.debaters"),
+        "tab/school_detail.html" | "apda_board/school_detail.html" => translated.replace("team.debaters.all", "team.debaters"),
         "tab/room_detail.html" => translated
             .replace("round.judges.all", "round.judges")
             .replace("judge != round.chair", "judge.id != round.chair_id")

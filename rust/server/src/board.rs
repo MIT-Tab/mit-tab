@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use axum::{
     Extension, Form,
-    extract::{Path, Query, State, rejection::FormRejection},
+    extract::{Path, State, rejection::FormRejection},
     http::{HeaderMap, StatusCode, Uri},
     response::Response,
 };
@@ -18,7 +18,7 @@ use crate::{
     html::{self, Navigation},
     legacy_html,
     legacy_session::Actor,
-    login, private, unavailable,
+    login, private, staff_roster_notice, unavailable,
 };
 
 pub enum BoardError {
@@ -80,40 +80,58 @@ pub async fn lock_board(db: &mut MySqlConnection, actor: Actor) -> Result<i32, B
     Ok(id)
 }
 
-#[derive(Deserialize)]
-pub struct ImportStatus {
-    ids_updated: Option<usize>,
-    rows_ignored: Option<usize>,
-}
-
 pub async fn home(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
-    Query(status): Query<ImportStatus>,
 ) -> Response {
+    const PATH: &str = "/apda-board/";
+    let Ok(csrf) = login::TemplateCsrf::new(&headers) else {
+        return unavailable();
+    };
+    let Ok(mut db) = app.db.begin().await else {
+        return unavailable();
+    };
+    let actor = match access::current_board(&mut db, &app, actor, &headers).await {
+        Ok(actor) => actor,
+        Err(error) => {
+            drop(db);
+            return error.response(&app, &headers).await;
+        }
+    };
     let result = async {
-        let mut db = app.db.begin().await?;
         let schools = crate::board_ids::list(&mut db, crate::board_ids::Kind::School).await?;
         let debaters = crate::board_ids::list(&mut db, crate::board_ids::Kind::Debater).await?;
-        let schools_missing = schools.iter().filter(|school| school.missing()).count();
-        let debaters_missing = debaters.iter().filter(|debater| debater.missing()).count();
+        let schools_missing_apda_ids: Vec<_> = schools
+            .iter()
+            .filter(|row| row.missing())
+            .map(|row| row.id)
+            .collect();
+        let debaters_missing_apda_ids: Vec<_> = debaters
+            .iter()
+            .filter(|row| row.missing())
+            .map(|row| row.id)
+            .collect();
+        let school_list: Vec<_> = schools.iter().map(|row| (row.id, &row.name)).collect();
+        let debater_list: Vec<_> = debaters.iter().map(|row| (row.id, &row.name)).collect();
+        let shell = legacy_html::shell(&mut db, actor, PATH).await?;
         db.commit().await?;
-        let Ok(csrf) = html::page_csrf(&headers) else {
-            return Ok(unavailable());
-        };
-        let response = html::render(
-            "board_home.html",
+        let mut response = staff_roster_notice::render(
+            &app,
+            &headers,
+            PATH,
+            "apda_board/home.html",
+            shell,
             context! {
-                title => "APDA Board", schools, debaters, schools_missing, debaters_missing, csrf,
-            message => status.ids_updated.zip(status.rows_ignored).map(|(updated, ignored)| {
-                format!("Updated {updated} APDA IDs. Ignored {ignored} rows.")
-            }),
-                nav => Navigation::new(actor, true),
+                csrf_input => csrf.input(), school_list, debater_list,
+                schools_missing_apda_count => schools_missing_apda_ids.len(),
+                debaters_missing_apda_count => debaters_missing_apda_ids.len(),
+                schools_missing_apda_ids, debaters_missing_apda_ids,
             },
             StatusCode::OK,
         );
-        Ok::<_, sqlx::Error>(html::form_response(response, &headers, &csrf))
+        csrf.set_cookie(&mut response, &headers);
+        Ok::<_, sqlx::Error>(response)
     }
     .await;
     result.unwrap_or_else(|_| unavailable())

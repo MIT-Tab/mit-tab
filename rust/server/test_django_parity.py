@@ -3755,7 +3755,8 @@ def multipart_request(port, path, *, fields, file, cookie, file_field="file"):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_native_board_apda_id_forms_and_spreadsheets_update_only_ids():
+def test_native_board_apda_id_forms_and_spreadsheets_update_only_ids(html_assets):
+    from django.contrib.sessions.models import Session
     from django.core.files.uploadedfile import SimpleUploadedFile
     from mittab.libs.spreadsheets import read_rows, spreadsheet_response
 
@@ -3773,6 +3774,8 @@ def test_native_board_apda_id_forms_and_spreadsheets_update_only_ids():
         for i, school in enumerate((first, second))
     ]
     teams[0].debaters.add(debater)
+    Team.objects.filter(pk=teams[1].pk).update(hybrid_school=first)
+    tiebreaker = debater.tiebreaker
     Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
     home = "/apda-board/"
     school_path = f"{home}school/{first.id}/"
@@ -3781,28 +3784,62 @@ def test_native_board_apda_id_forms_and_spreadsheets_update_only_ids():
     debater_import = f"{home}debaters/import/"
     school_export = f"{home}schools/export/"
     debater_export = f"{home}debaters/export/"
-    with rust_server() as port:
+    client = Client()
+    client.cookies['sessionid'] = board
+    pattern = rb'(name="csrfmiddlewaretoken" value=")[A-Za-z0-9]+'
+
+    def normalized(body):
+        return re.sub(pattern, rb'\1TOKEN', body)
+
+    with rust_server(overrides=html_assets) as port:
         assert request(port, school_export, cookie=tab)[0] == 403
         status, headers, page = request(port, home, cookie=board)
         assert status == 200 and b"Example, East" in page
         assert b"private@example.invalid" not in page
         csrf = load_cookies(headers)["csrftoken"].value
         jar = f"sessionid={board}; csrftoken={csrf}"
-        assert b"APDA ID Team 0" in request(port, school_path, cookie=board)[2]
-        assert b"private@example.invalid" not in request(port, debater_path, cookie=board)[2]
+        client.cookies["csrftoken"] = csrf
+        def compare(url, **posted):
+            status, headers, body = request(port, url, extra_headers={"Cookie": jar},
+                                            method="POST" if posted else "GET",
+                                            form={"csrfmiddlewaretoken": csrf, **posted} if posted else None)
+            reference = client.post(url, posted) if posted else client.get(url)
+            assert reference.status_code == status == 200
+            assert headers["Cache-Control"] == "private, no-store"
+            assert_html_bytes(normalized(body), normalized(reference.content))
+            return body
+
+        assert b"No ID" in compare(home)
+        assert b"Hybrid Teams" in compare(school_path)
+        assert b"APDA ID Team 0" in compare(debater_path)
+        assert b"Enter a whole number." in compare(school_path, apda_id="bad")
+        protected = {url: normalized(compare(url)) for url in (home, school_path, debater_path)}
+        judge = Judge.objects.create(name="Private calibration", rank=2, wing_only=True)
+        Scratch.objects.create(team=teams[0], judge=judge, scratch_type=Scratch.TAB_SCRATCH)
+        Debater.objects.filter(pk=debater.pk).update(email="fixture2@example.invalid")
+        assert {url: normalized(compare(url)) for url in protected} == protected
+        Debater.objects.filter(pk=debater.pk).update(email=debater.email)
+        for url in (home, school_path, debater_path):
+            assert request(port, url, cookie=tab)[0] == 403
 
         def update(path, **fields):
             return request(port, path, method="POST", extra_headers={"Cookie": jar},
                            form={"csrfmiddlewaretoken": csrf, **fields})
 
         assert update(school_path, apda_id=12, name="Other name")[0] == 422
-        assert update(school_path, apda_id=12)[0] == 302
+        status, headers, _ = update(school_path, apda_id="12.0")
+        assert status == 302 and headers["Location"] == school_path
+        signed = load_cookies(headers)["mittab_roster_notice"].value
+        notice_headers = {"Cookie": f"{jar}; mittab_roster_notice={signed}"}
+        assert b"APDA ID updated for Example, East." in request(port, school_path, extra_headers=notice_headers)[2]
+        assert b"APDA ID updated for Example, East." not in request(port, home, extra_headers=notice_headers)[2]
         assert update(school_path, apda_id=12)[0] == 302
         assert update(debater_path, apda_id=77)[0] == 302
         first.refresh_from_db()
         debater.refresh_from_db()
         assert (first.name, first.apda_id) == ("Example, East", 12)
         assert (debater.name, debater.apda_id, debater.email) == ("Example Speaker", 77, "private@example.invalid")
+        assert debater.tiebreaker == tiebreaker
         for format in ("csv", "xls", "xlsx"):
             for path, kind, query in ((school_export, "school", [[name, str(number)] for name, number in School.objects.order_by("name").values_list("name", "apda_id")]),
                                       (debater_export, "debater", [[debater.name, "77"]])):
@@ -3828,7 +3865,10 @@ def test_native_board_apda_id_forms_and_spreadsheets_update_only_ids():
                 file=(f"valid.{format}", valid),
             )
             assert status == 302
-            assert headers["Location"] == f"{home}?ids_updated=1&rows_ignored=1"
+            assert headers["Location"] == home
+            signed = load_cookies(headers)["mittab_roster_notice"].value
+            followed = request(port, home, extra_headers={"Cookie": f"{jar}; mittab_roster_notice={signed}"})[2]
+            assert b"Imported school APDA IDs. Updated 1; ignored 1." in followed
             first.refresh_from_db()
             assert first.apda_id == number
 
@@ -3841,6 +3881,33 @@ def test_native_board_apda_id_forms_and_spreadsheets_update_only_ids():
                                  cookie=jar, file=("valid.csv", valid))[0] == 302
         debater.refresh_from_db()
         assert debater.apda_id == 199 and debater.email == "private@example.invalid"
+
+        def fresh_session():
+            reauthenticated = Client()
+            reauthenticated.force_login(get_user_model().objects.get(username="apda-ids-board"))
+            return reauthenticated.cookies["sessionid"].value
+
+        def edit_with_session(session):
+            return request(port, school_path, method="POST",
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, "apda_id": 900})
+
+        def upload_with_session(session):
+            return multipart_request(port, debater_import, fields={"csrfmiddlewaretoken": csrf},
+                                     cookie=f"sessionid={session}; csrftoken={csrf}",
+                                     file=("revoked.csv", b"debater,id\nExample Speaker,999\n"))
+
+        for submit in (edit_with_session, upload_with_session):
+            session = fresh_session()
+            denied = roster_request_waiting_for_lock(
+                lambda: submit(session),
+                lambda: Session.objects.filter(session_key=session).delete(),
+                lock_query="`key` IN ('tot_rounds','cur_round') ORDER BY id FOR UPDATE",
+            )
+            assert (denied[0], denied[1]["Location"]) == (302, "/403/")
+        first.refresh_from_db()
+        debater.refresh_from_db()
+        assert first.apda_id == 103 and debater.apda_id == 199
 
 
 @pytest.mark.django_db(transaction=True)
@@ -6050,7 +6117,8 @@ def test_judge_roster_forms_and_history_match_django(html_assets, subtests):
         assert not created.checkin_set.exists()
 
 
-def roster_request_waiting_for_lock(submit, change_role):
+def roster_request_waiting_for_lock(submit, change_role, *,
+                                    lock_query="`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE"):
     from time import monotonic, sleep
 
     with ThreadPoolExecutor(max_workers=1) as executor:
@@ -6062,7 +6130,7 @@ def roster_request_waiting_for_lock(submit, change_role):
                 with connection.cursor() as cursor:
                     cursor.execute("SHOW FULL PROCESSLIST")
                     waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
-                                  and "`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE" in row[7]
+                                  and lock_query in row[7]
                                   for row in cursor.fetchall())
                 if waiting:
                     break

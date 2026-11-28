@@ -131,7 +131,7 @@ async fn school_fields(
 }
 
 #[derive(Clone, Serialize)]
-struct Team {
+pub(super) struct Team {
     id: i32,
     name: String,
     school: School,
@@ -150,7 +150,7 @@ struct Debater {
     name: String,
 }
 
-async fn school_teams(
+pub(super) async fn school_teams(
     db: &mut MySqlConnection,
     school: i32,
 ) -> Result<(Vec<Team>, Vec<Team>), sqlx::Error> {

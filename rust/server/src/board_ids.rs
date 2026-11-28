@@ -5,15 +5,19 @@ use axum::{
     response::Response,
 };
 use minijinja::context;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::MySqlConnection;
 
 use crate::{
     App, access,
     board::{self, BoardError},
     html::{self, Navigation},
+    legacy_html,
     legacy_session::Actor,
-    unavailable,
+    login,
+    registration_form::integer_input,
+    staff_roster_fields::{apda_id_error, input},
+    staff_roster_notice, staff_school, unavailable,
 };
 
 #[derive(Clone, Copy)]
@@ -38,7 +42,6 @@ impl Kind {
     }
 }
 
-#[derive(Serialize)]
 pub struct Row {
     pub id: i32,
     pub name: String,
@@ -64,12 +67,7 @@ pub async fn list(db: &mut MySqlConnection, kind: Kind) -> Result<Vec<Row>, sqlx
         .collect())
 }
 
-#[derive(Serialize)]
-struct Affiliation {
-    name: String,
-    school: String,
-    hybrid: Option<String>,
-}
+const HOME: &str = "/apda-board/";
 
 pub async fn school(
     State(app): State<App>,
@@ -77,7 +75,7 @@ pub async fn school(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Response {
-    detail(&app, actor, &headers, id, Kind::School).await
+    detail(&app, actor, &headers, id, Kind::School, None).await
 }
 
 pub async fn debater(
@@ -86,46 +84,101 @@ pub async fn debater(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Response {
-    detail(&app, actor, &headers, id, Kind::Debater).await
+    detail(&app, actor, &headers, id, Kind::Debater, None).await
 }
 
-async fn detail(app: &App, actor: Actor, headers: &HeaderMap, id: i32, kind: Kind) -> Response {
+async fn detail(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    id: i32,
+    kind: Kind,
+    invalid: Option<(&str, String)>,
+) -> Response {
+    let Ok(csrf) = login::TemplateCsrf::new(headers) else {
+        return unavailable();
+    };
+    let Ok(mut db) = app.db.begin().await else {
+        return unavailable();
+    };
+    let actor = match access::current_board(&mut db, app, actor, headers).await {
+        Ok(actor) => actor,
+        Err(error) => {
+            drop(db);
+            return error.response(app, headers).await;
+        }
+    };
     let result = async {
-        let mut db = app.db.begin().await?;
         let sql = match kind {
             Kind::School => "SELECT name, apda_id FROM tab_school WHERE id = ?",
             Kind::Debater => "SELECT name, apda_id FROM tab_debater WHERE id = ?",
         };
         let Some((name, apda_id)) = sqlx::query_as::<_, (String, Option<i32>)>(sql)
-            .bind(id).fetch_optional(&mut *db).await? else { return Err(BoardError::Missing); };
-        let queries = match kind {
-            Kind::School => "SELECT t.name, s.name, h.name FROM tab_team t
-                             JOIN tab_school s ON s.id = t.school_id LEFT JOIN tab_school h ON h.id = t.hybrid_school_id
-                             WHERE ? IN (t.school_id, t.hybrid_school_id) ORDER BY t.name, t.id",
-            Kind::Debater => "SELECT t.name, s.name, h.name FROM tab_team_debaters x
-                              JOIN tab_team t ON t.id = x.team_id JOIN tab_school s ON s.id = t.school_id
-                              LEFT JOIN tab_school h ON h.id = t.hybrid_school_id
-                              WHERE x.debater_id = ? ORDER BY t.name, t.id",
+            .bind(id).fetch_optional(&mut *db).await? else {
+            return Ok(staff_roster_notice::failed(app, headers, HOME, &format!("{} not found", kind.label())));
         };
-        let teams: Vec<_> = sqlx::query_as::<_, (String, String, Option<String>)>(queries)
-            .bind(id).fetch_all(&mut *db).await?.into_iter().map(|(name, school, hybrid)| Affiliation { name, school, hybrid }).collect();
+        let (value, errors) = match invalid {
+            Some((value, error)) => (value.to_owned(), Some(error)),
+            None => (apda_id.map(|value| value.to_string()).unwrap_or_default(), None),
+        };
+        let field = input("apda_id", "Apda id:", "number", &value, "", false, errors);
+        let path = format!("/apda-board/{}/{id}/", kind.key());
+        let title = format!("APDA Board: {name}");
+        let (template, fields) = match kind {
+            Kind::School => {
+                let (school_teams, school_hybrid_teams) = staff_school::school_teams(&mut db, id).await?;
+                ("apda_board/school_detail.html", context! {
+                    school_obj => context! { name }, school_teams, school_hybrid_teams,
+                })
+            }
+            Kind::Debater => {
+                let teams: Vec<_> = sqlx::query_as::<_, (String, i32, String, Option<String>)>(
+                    "SELECT t.name, s.id, s.name, h.name FROM tab_team_debaters x
+                     JOIN tab_team t ON t.id = x.team_id JOIN tab_school s ON s.id = t.school_id
+                     LEFT JOIN tab_school h ON h.id = t.hybrid_school_id
+                     WHERE x.debater_id = ? ORDER BY t.id",
+                )
+                .bind(id).fetch_all(&mut *db).await?.into_iter()
+                .map(|(name, id, school, hybrid)| context! {
+                    name, school => context! { id, name => school }, hybrid_school => context! { name => hybrid },
+                }).collect();
+                ("apda_board/debater_detail.html", context! { debater_obj => context! { name }, teams })
+            }
+        };
+        let shell = legacy_html::shell(&mut db, actor, &path).await?;
         db.commit().await?;
-        let Ok(csrf) = html::page_csrf(headers) else { return Ok(unavailable()); };
-        let response = html::render("board_apda_id.html", context! {
-            title => format!("{} APDA ID", kind.label()), csrf, name, apda_id, teams, nav => Navigation::new(actor, true),
-        }, StatusCode::OK);
-        Ok(html::form_response(response, headers, &csrf))
+        let mut response = staff_roster_notice::render(
+            app, headers, &path, template, shell,
+            context! { title, csrf_input => csrf.input(), form => context! { visible_fields => [field] }, ..fields },
+            StatusCode::OK,
+        );
+        csrf.set_cookie(&mut response, headers);
+        Ok::<_, sqlx::Error>(response)
     }.await;
-    match result {
-        Ok(response) => response,
-        Err(error) => board::respond_error(actor, error, "/apda-board/"),
+    result.unwrap_or_else(|_| unavailable())
+}
+
+async fn lock_id_write(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+) -> Result<sqlx::Transaction<'static, sqlx::MySql>, Box<Response>> {
+    let mut db = app.db.begin().await.map_err(|_| Box::new(unavailable()))?;
+    board::lock_board(&mut db, actor)
+        .await
+        .map_err(|error| Box::new(board::respond_error(actor, error, HOME)))?;
+    if let Err(error) = access::current_board(&mut db, app, actor, headers).await {
+        drop(db);
+        return Err(Box::new(error.response(app, headers).await));
     }
+    Ok(db)
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Edit {
     csrfmiddlewaretoken: String,
+    #[serde(default)]
     apda_id: String,
 }
 
@@ -166,26 +219,33 @@ async fn save(
     let value = form.apda_id.trim();
     let number = if value.is_empty() {
         None
-    } else if let Ok(number) = value.parse::<i32>() {
+    } else if let Ok(number) = integer_input(value) {
         Some(number)
     } else {
-        return board::invalid_form();
+        let error = apda_id_error(&form.apda_id).unwrap_or_else(|| "Enter a whole number.".into());
+        return detail(app, actor, headers, id, kind, Some((&form.apda_id, error))).await;
+    };
+    let mut db = match lock_id_write(app, actor, headers).await {
+        Ok(db) => db,
+        Err(response) => return *response,
     };
     let result = async {
-        let mut db = app.db.begin().await?;
-        board::lock_board(&mut db, actor).await?;
         let existing = match kind {
-            Kind::School => "SELECT id FROM tab_school WHERE id = ? FOR UPDATE",
-            Kind::Debater => "SELECT id FROM tab_debater WHERE id = ? FOR UPDATE",
+            Kind::School => "SELECT name FROM tab_school WHERE id = ? FOR UPDATE",
+            Kind::Debater => "SELECT name FROM tab_debater WHERE id = ? FOR UPDATE",
         };
-        if sqlx::query_scalar::<_, i32>(existing)
+        let Some(name) = sqlx::query_scalar::<_, String>(existing)
             .bind(id)
             .fetch_optional(&mut *db)
             .await?
-            .is_none()
-        {
-            return Err(BoardError::Missing);
-        }
+        else {
+            return Ok(staff_roster_notice::failed(
+                app,
+                headers,
+                HOME,
+                &format!("{} not found", kind.label()),
+            ));
+        };
         let sql = match kind {
             Kind::School => "UPDATE tab_school SET apda_id = ? WHERE id = ?",
             Kind::Debater => "UPDATE tab_debater SET apda_id = ? WHERE id = ?",
@@ -196,7 +256,12 @@ async fn save(
             .execute(&mut *db)
             .await?;
         db.commit().await?;
-        Ok(access::found(format!("/apda-board/{}/{id}/", kind.key())))
+        Ok(staff_roster_notice::saved(
+            app,
+            headers,
+            &format!("/apda-board/{}/{id}/", kind.key()),
+            &format!("APDA ID updated for {name}."),
+        ))
     }
     .await;
     match result {
@@ -212,26 +277,42 @@ pub struct ExportOptions {
 
 pub async fn export_schools(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
     axum::extract::Query(options): axum::extract::Query<ExportOptions>,
 ) -> Response {
-    export(&app, Kind::School, options).await
+    export(&app, actor, &headers, Kind::School, options).await
 }
 
 pub async fn export_debaters(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
     axum::extract::Query(options): axum::extract::Query<ExportOptions>,
 ) -> Response {
-    export(&app, Kind::Debater, options).await
+    export(&app, actor, &headers, Kind::Debater, options).await
 }
 
-async fn export(app: &App, kind: Kind, options: ExportOptions) -> Response {
+async fn export(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    kind: Kind,
+    options: ExportOptions,
+) -> Response {
     use crate::spreadsheets::{self, Format};
     use axum::http::{HeaderValue, header};
     let Some(format) = Format::parse(options.format.as_deref().unwrap_or("csv")) else {
         return crate::private((StatusCode::BAD_REQUEST, "Choose CSV, XLS, or XLSX."));
     };
+    let Ok(mut db) = app.db.begin().await else {
+        return unavailable();
+    };
+    if let Err(error) = access::current_board(&mut db, app, actor, headers).await {
+        drop(db);
+        return error.response(app, headers).await;
+    }
     let result = async {
-        let mut db = app.db.acquire().await?;
         let rows: Vec<_> = list(&mut db, kind)
             .await?
             .into_iter()
@@ -242,6 +323,7 @@ async fn export(app: &App, kind: Kind, options: ExportOptions) -> Response {
                 ]
             })
             .collect();
+        db.commit().await?;
         Ok::<_, sqlx::Error>(rows)
     }
     .await;
@@ -356,9 +438,11 @@ async fn import(
         Ok(Err(error)) => return invalid_upload(actor, &error),
         Err(_) => return unavailable(),
     };
+    let mut db = match lock_id_write(app, actor, headers).await {
+        Ok(db) => db,
+        Err(response) => return *response,
+    };
     let result: Result<(usize, usize), BoardError> = async {
-        let mut db = app.db.begin().await?;
-        board::lock_board(&mut db, actor).await?;
         let (find, update) = match kind {
             Kind::School => (
                 "SELECT id FROM tab_school WHERE name = ? FOR UPDATE",
@@ -393,9 +477,15 @@ async fn import(
     }
     .await;
     match result {
-        Ok((updated, ignored)) => access::found(format!(
-            "/apda-board/?ids_updated={updated}&rows_ignored={ignored}"
-        )),
+        Ok((updated, ignored)) => staff_roster_notice::saved(
+            app,
+            headers,
+            HOME,
+            &format!(
+                "Imported {} APDA IDs. Updated {updated}; ignored {ignored}.",
+                kind.key()
+            ),
+        ),
         Err(error) => board::respond_error(actor, error, "/apda-board/"),
     }
 }
