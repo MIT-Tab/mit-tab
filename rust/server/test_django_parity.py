@@ -1640,6 +1640,56 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_native_pairing_orders_debates_using_the_new_bye(tmp_path):
+    from mittab.libs.tab_logic.rankings import rank_teams
+
+    tab = legacy_tab_session("post-bye-ordering")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 5)
+    TabSettings.set("min_byes", 0)
+    school = School.objects.create(name="Bye Ordering School")
+    teams = [Team.objects.create(name=f"Bye Ordering Team {i}", school=school, seed=1, checked_in=True)
+             for i in range(11)]
+    Team.objects.filter(pk__in=[team.pk for team in teams]).update(tiebreaker=None)
+    for index, (team, tiebreaker) in enumerate(zip(teams, (1, 6, 2, 7, 3, 8, 5, 9, 4, 10, 11))):
+        Team.objects.filter(id=team.id).update(tiebreaker=tiebreaker)
+        team.debaters.add(*[
+            Debater.objects.create(name=f"Bye Ordering Speaker {index}-{slot}", novice_status=Debater.VARSITY)
+            for slot in (1, 2)
+        ])
+    for gov, opp in zip(teams[:10:2], teams[1:10:2]):
+        debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+        for rank, (speaker, role) in enumerate(zip(
+            [*gov.debaters.all(), *opp.debaters.all()], ("pm", "mg", "lo", "mo"),
+        ), 1):
+            RoundStats.objects.create(round=debate, debater=speaker, debater_role=role, speaks=30 - rank, ranks=rank)
+    Bye.objects.create(round_number=1, bye_team=teams[-1])
+    for index in range(5):
+        CheckIn.objects.create(judge=Judge.objects.create(name=f"Bye Ordering Judge {index}", rank=5), round_number=2)
+        RoomCheckIn.objects.create(room=Room.objects.create(name=f"Bye Ordering Room {index}", rank=5), round_number=2)
+
+    old_positions = {standing.team.id: index for index, standing in enumerate(rank_teams())}
+    with transaction.atomic():
+        tab_logic.pair_round()
+        expected = round_signature(2)
+        transaction.set_rollback(True)
+    assert expected[1] == [teams[9].id]
+    old_order = sorted(expected[0], key=lambda debate: min(old_positions[debate[0]], old_positions[debate[1]]))
+    assert expected[0] != old_order
+
+    path = "/pairing/pair_round/"
+    with rust_server(overrides={"BACKUP_STORAGE": "", "BACKUP_PREFIX": str(tmp_path)}) as port:
+        status, headers, _ = request(port, path, cookie=tab)
+        assert status == 200
+        csrf = load_cookies(headers)["csrftoken"].value
+        status, _, _ = request(port, path, method="POST",
+                               extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
+                               form={"round": 2, "csrfmiddlewaretoken": csrf})
+        assert status == 302
+        assert round_signature(2) == expected
+
+
+@pytest.mark.django_db(transaction=True)
 def test_simultaneous_all_bye_pairing_cannot_advance_two_rounds(tmp_path):
     tab = legacy_tab_session("pairing-race")
     TabSettings.set("cur_round", 1)

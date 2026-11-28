@@ -421,7 +421,7 @@ async fn apply(app: &App, user: i32, requested: i32, trigger: Trigger) -> Result
             if matches!(trigger, Trigger::RePair) {
                 clear(&mut db, round).await?;
             }
-            let participants = TournamentData::load(&mut db).await?;
+            let mut participants = TournamentData::load(&mut db).await?;
             let policy = policy(&settings, round);
             let plan = participants
                 .pairing_plan(&policy, settings.integer("lenient_late", 0))

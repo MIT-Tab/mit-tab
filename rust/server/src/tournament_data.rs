@@ -305,21 +305,15 @@ impl TournamentData {
     }
 
     pub fn pairing_plan(
-        &self,
+        &mut self,
         policy: &Policy,
         lenient_late: i32,
     ) -> Result<PairingPlan, &'static str> {
-        let scores: HashMap<_, _> = self
-            .scores(
-                ScoringPolicy {
-                    current_round: policy.current_round as i32,
-                    lenient_late_through: lenient_late,
-                },
-                RoundFilter::default(),
-            )?
-            .into_iter()
-            .map(|team| (team.id, team.score))
-            .collect();
+        let scoring = ScoringPolicy {
+            current_round: policy.current_round as i32,
+            lenient_late_through: lenient_late,
+        };
+        let scores = self.scores_by_team(scoring)?;
         let empty = TeamHistory::default();
         let entrants: Vec<_> = self
             .teams
@@ -355,8 +349,28 @@ impl TournamentData {
                 }
             })
             .collect();
-        plan_prelim(&entrants, policy)
-            .map_err(|_| "Could not pair the teams with the current results and settings.")
+        let mut plan = plan_prelim(&entrants, policy)
+            .map_err(|_| "Could not pair the teams with the current results and settings.")?;
+        if policy.current_round > 1 && !plan.byes.is_empty() {
+            // The legacy pairing logic records byes before ordering the new debates.
+            // They count toward opponent strength, including for earlier opponents.
+            for &team in &plan.byes {
+                self.byes
+                    .entry(team)
+                    .or_default()
+                    .push(scoring.current_round);
+            }
+            let positions: HashMap<_, _> = self
+                .scores(scoring, RoundFilter::default())?
+                .into_iter()
+                .enumerate()
+                .map(|(position, standing)| (standing.id, position))
+                .collect();
+            plan.debates.sort_by_key(|debate| {
+                positions[&debate.government].min(positions[&debate.opposition])
+            });
+        }
+        Ok(plan)
     }
 
     pub fn side_counts(&self, team: TeamId) -> (u32, u32) {

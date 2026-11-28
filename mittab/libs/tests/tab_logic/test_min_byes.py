@@ -291,7 +291,11 @@ class TestMinByes(TestCase):
     def test_zero_matches_pre_feature_tournaments(self):
         # Golden data generated from c41a23e's unmodified pairing module, using
         # zero_snapshot's deterministic results and the same testing_db fixture.
-        # Reproduce the historical cache RNG for this pre-feature comparison.
+        # Reproduce the historical cache behavior for this pre-feature comparison.
+        def pair_with_historical_cache():
+            with mock.patch.object(cache_logic, "clear_cache"):
+                tab_logic.pair_round()
+
         golden = json.loads(
             Path(__file__).with_name("min_byes_legacy.json").read_text(encoding="utf-8")
         )
@@ -306,5 +310,5 @@ class TestMinByes(TestCase):
                         TabSettings.objects.filter(key="min_byes").delete()
                     TabSettings.set("fair_bye", policy)
                     TabSettings.set("r2_random_within_brackets", random_r2)
-                    self.assertEqual(self.zero_snapshot(), expected)
+                    self.assertEqual(self.zero_snapshot(pair_with_historical_cache), expected)
                     transaction.set_rollback(True)

@@ -7,6 +7,7 @@ from django.db.models import *
 
 from mittab.apps.tab.models import *
 from mittab.libs import errors, mwmatching
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.tab_logic.stats import *
 from mittab.libs.tab_logic.rankings import *
 
@@ -266,6 +267,9 @@ def pair_round():
         )
     # sort with pairing with highest ranked team first
     else:
+        if Bye.objects.filter(round_number=current_round).exists():
+            # A new bye changes the strength of the team's earlier opponents.
+            cache_logic.clear_cache()
         sorted_teams = [s.team for s in rank_teams()]
         pairings = sorted(
             pairings,
