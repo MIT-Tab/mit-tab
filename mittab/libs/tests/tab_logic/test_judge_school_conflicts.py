@@ -630,7 +630,7 @@ class TestManualJudgeViews(TestCase):
         included_names = {judge[0] for judge in response.context["included_judges"]}
         self.assertIn(rejudge.name, excluded_names | included_names)
 
-    def test_outround_alternative_judges_within_pairing_uses_selected_scope(self):
+    def test_outround_alternatives_offer_other_debates_in_selected_scope(self):
         varsity_gov = self.make_team("Varsity Gov", self.school_primary)
         varsity_opp = self.make_team("Varsity Opp", self.school_other)
         novice_school = School.objects.create(name="View Novice")
@@ -673,7 +673,7 @@ class TestManualJudgeViews(TestCase):
         excluded_names = {judge[0] for judge in response.context["excluded_judges"]}
         included_names = {judge[0] for judge in response.context["included_judges"]}
 
-        self.assertIn(current_scope_judge.name, included_names)
+        self.assertNotIn(current_scope_judge.name, included_names | excluded_names)
         self.assertIn(concurrent_scope_judge.name, included_names)
         self.assertIn(available_judge.name, excluded_names)
         self.assertNotIn(concurrent_scope_judge.name, excluded_names)
